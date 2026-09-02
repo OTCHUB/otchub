@@ -8,10 +8,15 @@ export default function HoldingsGallery({ holdings, byStock }) {
   const [sel, setSel] = useState(null);
   const all = holdings || [];
   const listed = all.filter((h) => h.is_listed && h.listing_price_sol != null);
-  const snipes = listed
-    .map((h) => ({ ...h, spread_sol: (h.accrued_value_sol || 0) - (h.listing_price_sol || 0) }))
-    .sort((a, b) => b.spread_sol - a.spread_sol);
-  const list = (mode === "SNIPE" ? snipes : mode === "LISTED" ? listed : all).slice(0, 60);
+  const withSpread = (arr) =>
+    arr.map((h) => ({ ...h, spread_sol: (h.accrued_value_sol || 0) - (h.listing_price_sol || 0) }));
+  const snipes = withSpread(listed).sort((a, b) => b.spread_sol - a.spread_sol);
+  // ALL: Magic Eden listings first (positive delta on top), then unlisted
+  const allSorted = [
+    ...snipes,
+    ...all.filter((h) => !(h.is_listed && h.listing_price_sol != null)),
+  ];
+  const list = (mode === "SNIPE" ? snipes : mode === "LISTED" ? snipes : allSorted).slice(0, 60);
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -30,7 +35,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
           const spread = (h.accrued_value_sol || 0) - (h.listing_price_sol || 0);
           const snipe = h.is_listed && h.listing_price_sol != null && spread > 0.0001;
           return (
-            <button key={h.asset_id} onClick={() => setSel(h)} className="border border-green-500/20 bg-black text-left hover:border-green-500/50">
+            <button key={h.asset_id} onClick={() => setSel(h)} className={`border text-left hover:border-green-500/50 ${snipe ? "border-emerald-400 bg-emerald-500/10" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black" : "border-green-500/20 bg-black"}`}>
               <div className="relative aspect-square">
                 {h.image_url ? <Image src={h.image_url} fittingType="fill" className="h-full w-full" /> : <div className="flex h-full items-center justify-center font-mono text-[10px] text-green-500/30">NO_IMG</div>}
                 {h.is_listed && h.listing_price_sol != null && <span className="absolute right-1 top-1 bg-black/80 px-1 font-mono text-[9px] text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}</span>}
