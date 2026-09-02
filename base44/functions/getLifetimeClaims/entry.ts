@@ -1,24 +1,41 @@
-// Authoritative per-wallet lifetime-claimed totals, derived DIRECTLY from the
-// wallet's real on-chain OTC claim transactions — not from client-side
-// estimates. For each successful tx touching the OTC program, we find the claim
-// instruction(s): an OTC-program instruction whose nft_stock (desk vault) token
-// account sent tokens to the signer's user_stock. The matching token transfer
-// gives the exact mint + raw amount that actually moved, so only claims that
-// truly landed on-chain are counted (a failed sim / rejected sign contributes
-// nothing). The desk NFT (asset_id) is read from the instruction's accounts.
+// Authoritative per-wallet lifetime-claimed totals, derived from the wallet's
+// REAL on-chain OTC claim transactions.
 //
-// Results are cached incrementally in ClaimCache: we remember the newest
-// signature we've already processed and only parse txs newer than it, so the
-// second+ call is cheap. USD/SOL display values are recomputed from the cached
-// on-chain amounts against current spot prices (DexScreener) on every call, so
-// the totals stay current without re-scanning the chain.
+// How claims are found: instead of paging through the wallet's entire tx
+// history (which for active wallets holds thousands of unrelated txs, so a
+// 1000-signature window silently misses older claims), we scan the wallet's
+// 13 per-ticker user_stock token accounts. The only instructions that ever
+// write those accounts are the OTC claim instruction (vault -> user_stock) and
+// the account's own creation, so their signature lists are precisely the
+// wallet's claim txs — the COMPLETE claim history, no matter how much other
+// wallet activity there is. A dedup by signature keeps multi-ticker claim
+// txs from being counted twice.
+//
+// Results are cached incrementally per token account (the newest signature
+// already processed per account), so follow-up calls only parse new txs.
+// USD/SOL display values are recomputed from the cached on-chain amounts
+// against current spot prices (DexScreener) on every call.
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { secrets } from "base44:runtime";
+import { Buffer } from "node:buffer";
 import { PROGRAM_ID, STOCKS } from "../../shared/otcIdl.ts";
+
+// web3.js expects a global Buffer; set it before the module is imported.
+if (!globalThis.Buffer) globalThis.Buffer = Buffer;
+const { PublicKey } = await import("npm:@solana/web3.js@1.98.4");
+
+const ATA_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 const STOCKS_BY_MINT = Object.fromEntries(STOCKS.map((s) => [s.mint, s]));
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+// Bump to invalidate caches written by an older parser (e.g. the pre-ATA-scan
+// version, whose by_desk came from a partial 1000-signature window — merging
+// a full rescan into it would double-count).
+const CACHE_VERSION = 2;
 
 function heliusRpcUrl() {
   return `https://mainnet.helius-rpc.com/?api-key=${secrets.get("HELIUS_API_KEY")}`;
@@ -52,22 +69,43 @@ async function parseTransactions(signatures) {
   return await res.json();
 }
 
-// Wallet signatures, newest first, up to `limit` (max 1000). `before` paginates
-// older; omit on the first page.
-async function getSignatures(address, limit = 1000, before = null) {
-  const params = [address, { limit }];
-  if (before) params[1].before = before;
-  return await rpc("getSignaturesForAddress", params);
+// The OTC program derives stock token accounts with a CUSTOM seed order —
+// [owner, tokenProgram, mint] under the ATA program — NOT the standard
+// [mint, owner, tokenProgram] ATA order (verified on-chain).
+function userStockAta(userPk, mint, tokenProgramPk) {
+  return PublicKey.findProgramAddressSync(
+    [userPk.toBuffer(), tokenProgramPk.toBuffer(), new PublicKey(mint).toBuffer()],
+    ATA_PROGRAM_ID
+  )[0];
+}
+
+// Resolve which token program owns each stock mint (Token-2022 vs standard).
+async function resolveTokenPrograms() {
+  const mints = STOCKS.map((s) => s.mint);
+  let value = [];
+  try {
+    const result = await rpc("getMultipleAccounts", [mints, { encoding: "base64" }]);
+    value = result?.value || [];
+  } catch {
+    value = mints.map(() => null);
+  }
+  const map = {};
+  const t22 = TOKEN_2022_PROGRAM_ID.toBase58();
+  for (let i = 0; i < mints.length; i++) {
+    map[mints[i]] = value[i]?.owner === t22
+      ? TOKEN_2022_PROGRAM_ID.toBase58()
+      : TOKEN_PROGRAM_ID.toBase58();
+  }
+  return map;
 }
 
 // From one parsed tx, extract every claim that paid the wallet:
-//   claim accounts (non-ext, 10): user, config, asset, vault, stock_mint,
-//     nft_stock, user_stock, token_program, ata, system
-//   claim accounts (ext, 12):      user, config, config_ext, asset, vault,
-//     vault_ext, stock_mint, nft_stock, user_stock, token_program, ata, system
-// We identify a claim by an OTC-program instruction whose nft_stock sent tokens
-// to its user_stock — distribute/open_ticker never move tokens out of the
-// vault to the user, so they're excluded automatically.
+//   claim accounts (always 12 in this app's txs; the official frontend may
+//   use 10 for non-extended tickers — both supported below):
+//   We identify a claim by an OTC-program instruction whose nft_stock (desk
+//   vault) token account sent tokens to the signer's user_stock.
+//   NOTE: Helius tokenTransfers[].tokenAmount is ALREADY decimal-adjusted
+//   (the UI amount) for that mint — do NOT divide by 10^decimals again.
 function extractClaimsFromTx(tx, wallet) {
   const claims = [];
   const transfers = tx.tokenTransfers || [];
@@ -82,8 +120,7 @@ function extractClaimsFromTx(tx, wallet) {
     const accts = ix.accounts || [];
     if (accts.length !== 10 && accts.length !== 12) continue;
     // accounts[0] is the claim signer (the claiming user). Only count claims
-    // made BY this wallet, so querying any address can't pull in other users'
-    // claims that merely referenced it.
+    // made BY this wallet.
     if (accts[0] !== wallet) continue;
     const ext = accts.length === 12;
     const asset = ext ? accts[3] : accts[2];
@@ -95,9 +132,6 @@ function extractClaimsFromTx(tx, wallet) {
     if (!t) continue;
     const stock = STOCKS_BY_MINT[t.mint];
     if (!stock) continue;
-    // Helius tokenTransfers[].tokenAmount is ALREADY decimal-adjusted (the UI
-    // amount) for that mint — dividing by 10^decimals again scaled every claim
-    // down to dust, so lifetime totals always rendered as zero.
     const amount = Number(t.tokenAmount);
     if (!(amount > 0)) continue;
     claims.push({
@@ -136,15 +170,6 @@ async function fetchPricesUsd(mints) {
   } catch {
     /* ignore */
   }
-  if (priceMap[SOL_MINT] == null) {
-    try {
-      const r = await rpc("getTokenSupply", [SOL_MINT]); // not SOL price; fallback below
-      void r;
-    } catch {
-      /* ignore */
-    }
-    // DexScreener SOL pair usually present; if not, leave null.
-  }
   return priceMap;
 }
 
@@ -155,14 +180,12 @@ export default async function (req) {
     const wallet = (body.wallet || "").trim();
     const force = body.force === true;
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
+    const userPk = new PublicKey(wallet);
 
-    // Cache under a distinct key: this cache used to share the SAME entity row
-    // as the claim-scan cache (both keyed by the plain wallet), so the two
-    // shapes kept overwriting each other — forcing a full 1000-tx re-parse here
-    // and a full vault re-scan there on every load. A suffixed key gives each
-    // cache its own row.
+    // Cache under a distinct key: this cache must not share the entity row of
+    // the claim-scan cache (plain wallet key) — the two shapes would keep
+    // overwriting each other.
     const cacheKey = `${wallet}__lifetime`;
-    // Load incremental cache (amounts + last processed signature).
     let cache = null;
     try {
       const existing = await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey });
@@ -170,35 +193,47 @@ export default async function (req) {
     } catch {
       /* ignore */
     }
-    const cached = cache?.desks || null; // { last_signature, scanned_at, by_desk }
-    // force = full recompute from the 1000-sig window; otherwise incrementally
-    // add new claims to the cached aggregate.
-    let amountsByDesk = (!force && cached?.by_desk) ? structuredClone(cached.by_desk) : {};
-    let lastSignature = (!force && cached?.last_signature) || null;
+    const cached = cache?.desks || null;
+    const usable = cached?._v === CACHE_VERSION;
 
-    // Incremental on-chain scan unless fresh cache (and not forced).
+    let amountsByDesk = (!force && usable && cached.by_desk)
+      ? structuredClone(cached.by_desk)
+      : {};
+    let markers = (!force && usable && cached.markers) ? { ...cached.markers } : {};
+
+    // Incremental on-chain scan unless the cache is fresh (and not forced).
     const SCAN_TTL_MS = 5 * 60 * 1000;
-    const fresh = cached?.scanned_at && Date.now() - cached.scanned_at < SCAN_TTL_MS;
+    const fresh = usable && cached.scanned_at && Date.now() - cached.scanned_at < SCAN_TTL_MS;
+    let parsedCount = 0;
     if (!fresh || force) {
-      const sigInfos = await getSignatures(wallet, 1000);
-      // newest first; collect new successful sigs until we reach lastSignature.
-      const newSigs = [];
-      for (const s of sigInfos) {
-        if (s.err) continue;
-        if (lastSignature && s.signature === lastSignature) break;
-        newSigs.push(s.signature);
+      const tpMap = await resolveTokenPrograms();
+      // Collect un-parsed signatures across all 13 user_stock accounts.
+      const toParse = new Set();
+      for (const s of STOCKS) {
+        const ata = userStockAta(userPk, s.mint, new PublicKey(tpMap[s.mint])).toBase58();
+        let sigs;
+        try {
+          sigs = await rpc("getSignaturesForAddress", [ata, { limit: 1000 }]);
+        } catch {
+          sigs = [];
+        }
+        const okSigs = sigs.filter((x) => !x.err).map((x) => x.signature);
+        const marker = markers[ata];
+        let stopIdx = okSigs.length;
+        if (marker) {
+          const mi = okSigs.indexOf(marker);
+          if (mi >= 0) stopIdx = mi; // only parse sigs newer than the marker
+          // marker not in this page: fall through and parse the whole page
+        }
+        for (let i = 0; i < stopIdx; i++) toParse.add(okSigs[i]);
+        if (okSigs.length) markers[ata] = okSigs[0];
       }
-      // If lastSignature wasn't found in this page and we have a full page of
-      // new sigs, the cache is stale relative to wallet activity beyond 1000
-      // txs — parse the whole page (best effort) rather than miss claims.
-      const toParse =
-        newSigs.length === sigInfos.filter((s) => !s.err).length && newSigs.length >= 1000
-          ? sigInfos.filter((s) => !s.err).map((s) => s.signature)
-          : newSigs;
-      // Parse in batches of 100.
-      for (let i = 0; i < toParse.length; i += 100) {
-        const batch = toParse.slice(i, i + 100);
-        const parsed = await parseTransactions(batch);
+      // Parse in batches of 100 (dedup by signature — multi-ticker claim txs
+      // appear in several accounts' lists but are parsed once).
+      const sigList = [...toParse];
+      parsedCount = sigList.length;
+      for (let i = 0; i < sigList.length; i += 100) {
+        const parsed = await parseTransactions(sigList.slice(i, i + 100));
         for (const tx of parsed || []) {
           if (tx.transactionError) continue;
           const claims = extractClaimsFromTx(tx, wallet);
@@ -208,9 +243,9 @@ export default async function (req) {
           }
         }
       }
-      lastSignature = sigInfos.find((s) => !s.err)?.signature || lastSignature;
       const updated = {
-        last_signature: lastSignature,
+        _v: CACHE_VERSION,
+        markers,
         scanned_at: Date.now(),
         by_desk: amountsByDesk,
       };
@@ -272,7 +307,7 @@ export default async function (req) {
       total_sol: totalSol,
       count: claimCount,
       source: "on-chain",
-      last_signature: lastSignature,
+      parsed_txs: parsedCount,
       scanned_at: cached?.scanned_at || null,
     });
   } catch (error) {
