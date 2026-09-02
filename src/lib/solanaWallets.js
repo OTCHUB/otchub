@@ -2,9 +2,64 @@
 // Merges window-injected providers (Phantom, Solflare, Backpack, etc.) with
 // Wallet Standard wallets (Jupiter Mobile, and any standard-only wallet that
 // does NOT inject a window global), so a single button handles every brand.
+//
+// IMPORTANT: @wallet-standard/app's `getWallets()` returns a *manager* object
+// ({ get, on, register }), NOT an array. Standard wallets also register
+// asynchronously: the first `getWallets()` call dispatches
+// `wallet-standard:app-ready`, and wallets reply with
+// `wallet-standard:register-wallet` whenever they load. So we must (1) init the
+// manager early to fire app-ready, and (2) subscribe to `register` events so
+// wallets that appear after first paint are picked up.
 
 import { getWallets as getStandardWallets } from "@wallet-standard/app";
 import { setConnectedWallet } from "@/lib/walletSigner";
+
+let _manager = null;
+const _subscribers = new Set();
+
+function standardManager() {
+  if (_manager) return _manager;
+  try {
+    _manager = getStandardWallets();
+    if (_manager && typeof _manager.on === "function") {
+      _manager.on("register", () => {
+        _subscribers.forEach((cb) => {
+          try {
+            cb();
+          } catch {
+            /* ignore */
+          }
+        });
+      });
+      _manager.on("unregister", () => {
+        _subscribers.forEach((cb) => {
+          try {
+            cb();
+          } catch {
+            /* ignore */
+          }
+        });
+      });
+    }
+  } catch {
+    _manager = null;
+  }
+  return _manager;
+}
+
+// Fire app-ready as soon as this module loads so standard wallets register ASAP.
+if (typeof window !== "undefined") {
+  standardManager();
+}
+
+export function subscribeStandardWallets(cb) {
+  _subscribers.add(cb);
+  // Ensure the manager exists so the listener is attached.
+  standardManager();
+  return () => {
+    _subscribers.delete(cb);
+  };
+}
 
 function windowWallets() {
   const w = typeof window !== "undefined" ? window : {};
@@ -25,14 +80,22 @@ function windowWallets() {
 }
 
 function standardWallets() {
-  if (!getStandardWallets) return [];
+  const m = standardManager();
+  if (!m) return [];
   try {
-    const list = getStandardWallets() || [];
-    return list
+    const list = typeof m.get === "function" ? m.get() : [];
+    return (Array.isArray(list) ? list : [])
       .filter((w) => Array.isArray(w?.chains) && w.chains.some((c) => String(c).startsWith("solana:")))
-      .filter((w) => w?.features && typeof w.features["standard:connect"]?.connect === "function")
-      .map((w) => ({ id: `std:${w.name}`, name: w.name || "Standard Wallet", wallet: w, kind: "standard" }));
-  } catch (e) {
+      .filter(
+        (w) => w?.features && typeof w.features["standard:connect"]?.connect === "function"
+      )
+      .map((w) => ({
+        id: `std:${w.name}`,
+        name: w.name || "Standard Wallet",
+        wallet: w,
+        kind: "standard",
+      }));
+  } catch {
     return [];
   }
 }

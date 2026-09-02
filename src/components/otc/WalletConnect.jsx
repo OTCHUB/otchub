@@ -1,27 +1,48 @@
-import React, { useState } from "react";
-import { detectWallets, connectWallet } from "@/lib/solanaWallets";
+import React, { useState, useEffect } from "react";
+import { detectWallets, connectWallet, subscribeStandardWallets } from "@/lib/solanaWallets";
 
 export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [picker, setPicker] = useState(null); // list when multiple wallets found
   const [manual, setManual] = useState("");
+  const [wallets, setWallets] = useState(() => detectWallets());
+
+  // Standard wallets (e.g. Jupiter Mobile) register asynchronously after the
+  // app fires `wallet-standard:app-ready`. Re-detect whenever one registers.
+  useEffect(() => {
+    const refresh = () => setWallets(detectWallets());
+    refresh();
+    const unsub = subscribeStandardWallets(refresh);
+    // Also poll briefly for the first couple seconds — some wallets register
+    // slightly out of band of the event in in-app browsers.
+    const t1 = setTimeout(refresh, 500);
+    const t2 = setTimeout(refresh, 1500);
+    const t3 = setTimeout(refresh, 3000);
+    return () => {
+      unsub();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
 
   const handleConnect = async () => {
     setError(null);
     setBusy(true);
     try {
-      const wallets = detectWallets();
-      if (!wallets.length) {
+      const list = detectWallets();
+      setWallets(list);
+      if (!list.length) {
         setError(
-          "No injected Solana wallet found. Open this app directly in your wallet's in-app browser (e.g. Jupiter app → enter URL), or paste your address below."
+          "No Solana wallet detected yet. If using Jupiter Mobile, open this app inside the Jupiter in-app browser, or paste your address below."
         );
         return;
       }
-      if (wallets.length === 1) {
-        await doConnect(wallets[0]);
+      if (list.length === 1) {
+        await doConnect(list[0]);
       } else {
-        setPicker(wallets);
+        setPicker(list);
       }
     } catch (e) {
       setError(e?.message || "Connect failed");
@@ -67,6 +88,7 @@ export default function WalletConnect({ onConnected }) {
         </button>
         <span className="text-[10px] text-green-500/40">
           PHANTOM · SOLFLARE · BACKPACK · JUPITER · OTHERS
+          {wallets.length > 0 && ` · ${wallets.length} DETECTED`}
         </span>
       </div>
 
