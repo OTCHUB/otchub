@@ -111,12 +111,13 @@ export async function fetchMagicEdenStats(symbol) {
   }
 }
 
-export async function fetchMagicEdenListings(symbol, limit = 1000) {
+export async function fetchMagicEdenListings(symbol, limit = 100) {
   try {
     const all = [];
     let offset = 0;
     // Paginate the entire listings set so every listed desk gets its true
-    // current Magic Eden price — not just the first page.
+    // current Magic Eden price — not just the first page. NOTE: Magic Eden's
+    // v2 /listings endpoint rejects limit > 100 with a 400, so cap at 100.
     while (offset < 10000) {
       const res = await fetch(
         `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=${offset}`

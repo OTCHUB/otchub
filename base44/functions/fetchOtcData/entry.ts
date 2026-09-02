@@ -32,12 +32,7 @@ export default async function (req) {
     // serves the latest stored snapshot, so this avoids redundant on-chain
     // / market fetches while still showing fresh data. Pass { force: true }
     // to bypass (manual admin refresh).
-    const reqArgs =
-      req && typeof req === "object"
-        ? req.body && typeof req.body === "object"
-          ? req.body
-          : req
-        : {};
+    const reqArgs = await req.json().catch(() => ({}));
     if (reqArgs.force !== true) {
       const recent = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
       const last = recent?.[0];
