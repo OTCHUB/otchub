@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from "react";
 import {
   buildDistributeInstructions,
-  executeClaimChunked,
   resolveTokenPrograms,
 } from "@/lib/otcClaim";
+import { executeCrank } from "@/lib/otcCrank";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fmtSol, fmtNum } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
 
 const SLOTS = 13; // lineup slots (distribute(index) u8 arg)
-const CHUNK_IX = 300; // ixs per wallet approval group
+const TXS_PER_WAVE = 100; // signed txs per wallet approval (1 prompt per wave)
 const MAX_DEPTH = 10;
 
 // Nuclear-style launcher for the protocol's PERMISSIONLESS `distribute(index)`
@@ -22,6 +22,10 @@ const MAX_DEPTH = 10;
 export default function DistributeCrank({ wallet, allDesks, latest }) {
   const [armed, setArmed] = useState(false);
   const [depth, setDepth] = useState(1);
+  // Atomic 5-tx Jito bundles via Helius — requires a Helius API key on a plan
+  // with bundle access; on other plans submits fail fast and fall back to
+  // normal sends, so it stays OFF by default until that's confirmed.
+  const [useBundles, setUseBundles] = useState(false);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState([]);
   const [progress, setProgress] = useState(null);
@@ -41,10 +45,10 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
   }, [allDesks]);
 
   const ixCount = desks.length * SLOTS * depth;
-  const estTxs = Math.ceil(ixCount / 5); // slot-major packing fits ~5/tx
-  const estGroups = Math.ceil(ixCount / CHUNK_IX);
-  const feeLo = (estTxs * 0.0000058).toFixed(3); // base + floor priority fee
-  const feeHi = (estTxs * 0.000045).toFixed(2); // base + busy-network priority fee
+  const estTxs = Math.ceil(ixCount / 6); // slot-major packing fits ~6-8/tx
+  const estWaves = Math.max(1, Math.ceil(estTxs / TXS_PER_WAVE)); // ~1 approval per wave
+  const feeLo = (estTxs * 0.0000058 + estTxs * 0.000005).toFixed(3); // base+floor fee + jito tip
+  const feeHi = (estTxs * 0.000045 + estTxs * 0.000005).toFixed(2); // busy-network fee + jito tip
   const owed = latest?.protocol_owed_sol;
 
   const launch = async () => {
@@ -74,13 +78,13 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
       const ixs = [];
       for (let r = 0; r < depth; r++) ixs.push(...base);
       log({ type: "info", msg: "IGNITION :: 3... 2... 1... ☢ LAUNCH" });
-      const results = await executeClaimChunked(
+      const results = await executeCrank(
         ixs,
         wallet,
         signer.signAllTransactionsRaw,
         log,
-        CHUNK_IX,
-        setProgress
+        setProgress,
+        { useBundles }
       );
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
@@ -123,7 +127,9 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
         can call for ANY desk. Each call advances a desk ONE round per slot; a desk behind R rounds
         needs R calls. Launching here cranks every desk so the owed backlog flows into vaults.
         Slots whose vault ticker account isn't open yet fail sim and are dropped (no fee); no-op
-        cranks deliver 0 safely.
+        cranks deliver 0 safely. With JITO_BUNDLE ON, signed txs go out 5-at-a-time as ATOMIC
+        bundles that land in order in one slot (each carries a 5,000-lamport Jito tip ≈ $0.001;
+        unlanded bundles fall back to normal broadcast).
       </HelpNote>
 
       {!desks.length ? (
@@ -156,11 +162,23 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
                 title="How many rounds to crank per desk-slot per launch. 1 = advance every desk one round."
               />
             </div>
+            <button
+              onClick={() => setUseBundles((v) => !v)}
+              disabled={busy}
+              title="ON: signed txs are submitted as atomic 5-tx Jito bundles via Helius — all-or-nothing, executed in order in a single slot (needs a Helius plan with bundle access). Each tx carries a 5,000-lamport tip and each bundle costs 1 integration credit. OFF: normal broadcast."
+              className={`border px-2 py-1 text-[9px] disabled:opacity-40 ${
+                useBundles
+                  ? "border-cyan-400/60 text-cyan-300"
+                  : "border-amber-500/30 text-amber-500/50 hover:border-amber-400/50"
+              }`}
+            >
+              [JITO_BUNDLE:{useBundles ? "ON" : "OFF"}]
+            </button>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-amber-500/60">
               <span>{fmtNum(desks.length)} DESKS</span>
               <span>{fmtNum(ixCount)} IX</span>
               <span>≈{fmtNum(estTxs)} TX</span>
-              <span className="text-amber-400">≈{estGroups} APPROVAL(S)</span>
+              <span className="text-amber-400">≈{estWaves} APPROVAL(S)</span>
               <span className="text-cyan-400">FEES ≈ {feeLo}–{feeHi} SOL</span>
             </div>
           </div>
@@ -194,7 +212,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
           </div>
           <p className="mt-1 text-[9px] text-amber-500/40">
             {armed
-              ? "ARMED — launch will request ~" + estGroups + " batched signature(s). REJECT any prompt to abort."
+              ? "ARMED — launch will request ~" + estWaves + " batched signature(s). REJECT any prompt to abort."
               : "Arm, then launch. Sim-first, permissionless, abortable at any prompt."}
           </p>
 

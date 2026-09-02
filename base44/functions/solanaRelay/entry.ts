@@ -124,6 +124,48 @@ export default async function (req) {
       return Response.json({ ok: true, lamports: r?.value ?? null });
     }
 
+    if (mode === "bundle") {
+      // Helius basic bundles (direct Jito proxy): up to 5 fully-signed base64
+      // txs submitted as ONE ATOMIC unit. Bundled txs execute sequentially in a
+      // single slot — the caller relies on this to land many crank txs that all
+      // write the same config PDA (normal sends get dropped from the same slot
+      // by the scheduler's write-conflict rule). Each tx carries the required
+      // 5,000-lamport Jito tip, added by the caller at build time. 1 credit
+      // per sendBundle call. Returns a bundle id for getBundleStatuses.
+      const txs = body.txs;
+      if (
+        !Array.isArray(txs) ||
+        txs.length < 1 ||
+        txs.length > 5 ||
+        txs.some((t) => typeof t !== "string" || t.length < 64 || t.length > 3000)
+      ) {
+        return Response.json({ error: "txs must be 1-5 base64 txs" }, { status: 400 });
+      }
+      const bundleId = await heliusRpc("sendBundle", [txs, { encoding: "base64" }]);
+      if (!bundleId) return Response.json({ error: "no bundle id" }, { status: 502 });
+      return Response.json({ ok: true, bundleId });
+    }
+
+    if (mode === "bundleStatus") {
+      // Landing check for submitted bundles: a null entry = not landed yet.
+      const ids = body.ids;
+      if (!Array.isArray(ids) || ids.length < 1 || ids.length > 5) {
+        return Response.json({ error: "ids must be 1-5 bundle ids" }, { status: 400 });
+      }
+      const r = await heliusRpc("getBundleStatuses", [ids]);
+      const statuses = (r?.value || []).map((s) =>
+        s
+          ? {
+              bundleId: s.bundle_id ?? null,
+              slot: s.slot ?? null,
+              status: s.confirmation_status ?? null,
+              err: s.err ? JSON.stringify(s.err) : null,
+            }
+          : null
+      );
+      return Response.json({ ok: true, statuses });
+    }
+
     return Response.json({ error: "unknown mode" }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e?.message || "relay failed" }, { status: 500 });

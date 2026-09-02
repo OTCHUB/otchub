@@ -1102,4 +1102,4 @@ export async function executePairedClaim(
   return results;
 }
 
-export { packTxs, ensureConfirmed };
+export { packTxs, ensureConfirmed, mapLimit, writableKeys, simulate };
