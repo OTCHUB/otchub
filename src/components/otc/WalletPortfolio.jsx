@@ -188,7 +188,8 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
           {lifetime?.by_stock?.length > 0 && (
             <div className="mt-2 border border-amber-500/20 p-2">
               <div className="text-[9px] uppercase tracking-widest text-amber-500/50">
-                LIFETIME :: BY STOCK (AMOUNT · SOL · USD)
+                LIFETIME :: BY STOCK (AMOUNT
+                <span className="hidden sm:inline"> · SOL</span> · USD)
               </div>
               <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3">
                 {lifetime.by_stock.map((s) => (
@@ -200,7 +201,8 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
                     <span className="truncate text-right">
                       <span className="text-green-300">{fmtNum(s.amount)}</span>{" "}
                       <span className="text-green-500/50">
-                        {fmtSol(s.value_sol, 3)} ◎ / {fmtUsd(s.value_usd)}
+                        <span className="hidden sm:inline">{fmtSol(s.value_sol, 3)} ◎ / </span>
+                        {fmtUsd(s.value_usd)}
                       </span>
                     </span>
                   </div>
