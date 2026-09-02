@@ -6,22 +6,31 @@ export default async function (req) {
     const base44 = createClientFromRequest(req);
     const reqArgs = await req.json().catch(() => ({}));
 
-    // Force ingest is admin-only: it runs the full on-chain + market sweep and
-    // rewrites the holdings table, so anonymous callers must not be able to
-    // spam it (RPC quota burn / DB churn). The 5-minute scheduler invokes this
-    // function WITHOUT force, and the Helius webhook ingests through
-    // shared/otcSnapshot directly — both are unaffected by this gate. The
-    // lightweight priceOnly path stays public.
+    // Force ingest is PUBLIC, but rate-limited: a full sweep burns RPC quota
+    // and rewrites the holdings table, so anyone can force it at most once per
+    // FORCE_MIN_MS globally. Duplicate/racing tasks are impossible two ways:
+    //  - two force calls within the window: the second is served the snapshot
+    //    the first one just wrote (rate gate below);
+    //  - two force calls at the same instant: the ingest lock in
+    //    shared/otcSnapshot.ts ("otc_ingest") lets only one run — the loser
+    //    returns immediately with the latest snapshot instead of duplicating
+    //    the sweep or the holdings rewrite.
+    const FORCE_MIN_MS = 2 * 60 * 1000;
     if (reqArgs.force === true) {
-      let isAdmin = false;
-      try {
-        const user = await base44.auth.me();
-        isAdmin = user?.role === "admin";
-      } catch {
-        isAdmin = false;
-      }
-      if (!isAdmin) {
-        return Response.json({ error: "Force ingest is admin-only" }, { status: 403 });
+      const recent = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
+      const last = recent?.[0] || null;
+      const ageMs = last?.created_date
+        ? Date.now() - new Date(last.created_date).getTime()
+        : Infinity;
+      if (ageMs < FORCE_MIN_MS) {
+        return Response.json({
+          ok: true,
+          cached: true,
+          rate_limited: true,
+          snapshot_id: last.id,
+          age_ms: ageMs,
+          retry_in_ms: FORCE_MIN_MS - ageMs,
+        });
       }
     }
 
