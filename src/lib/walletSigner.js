@@ -52,10 +52,33 @@ function serializeForSigning(tx) {
   throw new Error("Unsupported transaction type");
 }
 
+// Wallet sign calls can silently hang if the wallet prompt closes without
+// responding (a known quirk on some injected wallets). Race each call against a
+// generous timeout so a stalled prompt surfaces as a clear error instead of
+// hanging the whole claim run forever.
+const SIGN_TIMEOUT_MS = 120000;
+function withSignTimeout(promise, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `${label} timed out after ${SIGN_TIMEOUT_MS / 1000}s — the wallet prompt may have closed without responding. Re-run the claim.`
+            )
+          ),
+        SIGN_TIMEOUT_MS
+      );
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function signTransactionRaw(conn, tx) {
   // Injected (window.*) wallet: provider.signTransaction(tx) -> signed tx object.
   if (conn.kind === "injected" && conn.provider?.signTransaction) {
-    const signed = await conn.provider.signTransaction(tx);
+    const signed = await withSignTimeout(conn.provider.signTransaction(tx), "Wallet sign prompt");
     if (!signed) throw new Error("Wallet did not return a signed transaction");
     return new Uint8Array(signed.serialize());
   }
@@ -70,11 +93,10 @@ async function signTransactionRaw(conn, tx) {
   const chain = account.chains?.[0];
   if (!chain) throw new Error("Wallet did not report a supported chain");
 
-  const res = await feat.signTransaction({
-    account,
-    transaction: serializeForSigning(tx),
-    chain,
-  });
+  const res = await withSignTimeout(
+    feat.signTransaction({ account, transaction: serializeForSigning(tx), chain }),
+    "Wallet sign prompt"
+  );
   const out = Array.isArray(res) ? res[0] : res;
   const signed = out?.signedTransaction;
   if (!signed || typeof signed.length !== "number") {
@@ -91,7 +113,7 @@ async function signTransactionRaw(conn, tx) {
 async function signAllTransactionsRaw(conn, txs) {
   if (!txs || !txs.length) return [];
   if (conn.kind === "injected" && conn.provider?.signAllTransactions) {
-    const signed = await conn.provider.signAllTransactions(txs);
+    const signed = await withSignTimeout(conn.provider.signAllTransactions(txs), "Wallet batch sign prompt");
     if (!Array.isArray(signed) || signed.length !== txs.length) {
       throw new Error("Wallet returned wrong number of signed transactions");
     }

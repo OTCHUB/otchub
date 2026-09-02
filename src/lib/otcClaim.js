@@ -333,6 +333,18 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+// Race a promise against a timeout so a stalled RPC relay (e.g. a broadcast
+// that never confirms) can never hang the whole batch indefinitely.
+async function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 // Batch execution: simulate ALL txs first, then request ONE wallet signature
 // for every passing tx (signAllTransactions — a single approval for the whole
 // batch on Phantom / Solflare / Backpack), then broadcast them all. A failing
@@ -379,22 +391,24 @@ export async function executeClaimTxsBatch(txs, signAllTransactionsRaw, onLog) {
     for (const p of passing) results.push({ ok: false, reason: "bad-sign" });
     return results;
   }
+  onLog({ type: "info", msg: `WALLET_SIGNED :: ${signed.length} tx(s). Broadcasting...` });
 
   onLog({ type: "info", msg: `SEND :: ${passing.length} tx(s)...` });
-  const sends = await mapLimit(signed, 8, (bytes) =>
-    relay("send", { tx: Buffer.from(bytes).toString("base64") })
-      .then((r) => ({ ok: true, sig: r.sig }))
-      .catch((e) => ({ ok: false, reason: e.message }))
+  const sends = await mapLimit(signed, 8, (bytes, i) =>
+    withTimeout(relay("send", { tx: Buffer.from(bytes).toString("base64") }), 60000, `TX ${passing[i].idx + 1} broadcast`)
+      .then((r) => {
+        onLog({ type: "ok", msg: `TX ${passing[i].idx + 1} SENT ${r.sig}`, sig: r.sig });
+        return { ok: true, sig: r.sig };
+      })
+      .catch((e) => {
+        onLog({ type: "err", msg: `TX ${passing[i].idx + 1} SEND_FAIL: ${e.message}` });
+        return { ok: false, reason: e.message };
+      })
   );
   for (let i = 0; i < passing.length; i++) {
     const s = sends[i];
-    if (s.ok) {
-      onLog({ type: "ok", msg: `TX ${passing[i].idx + 1} SENT ${s.sig}`, sig: s.sig });
-      results.push({ ok: true, sig: s.sig });
-    } else {
-      onLog({ type: "err", msg: `TX ${passing[i].idx + 1} SEND_FAIL: ${s.reason}` });
-      results.push({ ok: false, reason: s.reason });
-    }
+    if (s.ok) results.push({ ok: true, sig: s.sig });
+    else results.push({ ok: false, reason: s.reason });
   }
   return results;
 }
