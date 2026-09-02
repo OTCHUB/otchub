@@ -14,6 +14,7 @@ const LAMPORTS_PER_SOL = 1e9;
 const OTC_DECIMALS = 6;
 const OTC_DEPOSIT = 100000; // OTC burned per mint
 const SURCHARGE_SOL = 0.5; // SOL surcharge per mint (0.45 pot + 0.05 protocol)
+const ME_BUYER_FEE_PCT = 0.02; // Magic Eden 2% platform fee paid by the BUYER on top of listing price
 
 export default async function (req) {
   try {
@@ -102,8 +103,9 @@ export default async function (req) {
       tokenPriceUsd != null && solPriceUsd != null
         ? OTC_DEPOSIT * tokenPriceUsd + SURCHARGE_SOL * solPriceUsd
         : null;
-    const secondaryCostSol = floorSol;
-    const secondaryCostUsd = floorUsd;
+    // True buyer cost on secondary = list price + 2% Magic Eden buyer fee
+    const secondaryCostSol = floorSol != null ? floorSol * (1 + ME_BUYER_FEE_PCT) : null;
+    const secondaryCostUsd = floorUsd != null ? floorUsd * (1 + ME_BUYER_FEE_PCT) : null;
 
     let spreadSol = null;
     let spreadUsd = null;
@@ -243,8 +245,9 @@ export default async function (req) {
         accrued_value_usd: accrued != null && solPriceUsd ? accrued * solPriceUsd : null,
         mint_day: mintDay,
         is_listed: listedSet.has(id),
-        listing_price_sol: lp != null ? lp : null,
-        listing_price_usd: lp != null && solPriceUsd ? lp * solPriceUsd : null,
+        // True buyer cost = raw ME list price + 2% platform buyer fee
+        listing_price_sol: lp != null ? lp * (1 + ME_BUYER_FEE_PCT) : null,
+        listing_price_usd: lp != null && solPriceUsd ? lp * (1 + ME_BUYER_FEE_PCT) * solPriceUsd : null,
       };
     });
 
