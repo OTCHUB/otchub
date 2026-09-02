@@ -95,7 +95,10 @@ function extractClaimsFromTx(tx, wallet) {
     if (!t) continue;
     const stock = STOCKS_BY_MINT[t.mint];
     if (!stock) continue;
-    const amount = Number(t.tokenAmount) / 10 ** stock.decimals;
+    // Helius tokenTransfers[].tokenAmount is ALREADY decimal-adjusted (the UI
+    // amount) for that mint — dividing by 10^decimals again scaled every claim
+    // down to dust, so lifetime totals always rendered as zero.
+    const amount = Number(t.tokenAmount);
     if (!(amount > 0)) continue;
     claims.push({
       asset_id: asset,
@@ -153,10 +156,16 @@ export default async function (req) {
     const force = body.force === true;
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
 
+    // Cache under a distinct key: this cache used to share the SAME entity row
+    // as the claim-scan cache (both keyed by the plain wallet), so the two
+    // shapes kept overwriting each other — forcing a full 1000-tx re-parse here
+    // and a full vault re-scan there on every load. A suffixed key gives each
+    // cache its own row.
+    const cacheKey = `${wallet}__lifetime`;
     // Load incremental cache (amounts + last processed signature).
     let cache = null;
     try {
-      const existing = await base44.asServiceRole.entities.ClaimCache.filter({ wallet });
+      const existing = await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey });
       cache = (existing && existing[0]) || null;
     } catch {
       /* ignore */
@@ -209,7 +218,7 @@ export default async function (req) {
         if (cache) {
           await base44.asServiceRole.entities.ClaimCache.update(cache.id, { desks: updated });
         } else {
-          await base44.asServiceRole.entities.ClaimCache.create({ wallet, desks: updated });
+          await base44.asServiceRole.entities.ClaimCache.create({ wallet: cacheKey, desks: updated });
         }
       } catch {
         /* cache write is best-effort */
