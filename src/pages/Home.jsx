@@ -85,9 +85,11 @@ export default function Home() {
     String(b.day || "").localeCompare(String(a.day || ""))
   );
   const trailingPd = sortedPd.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);
-  const perDeskPerDaySol = trailingPd.length
+  const perDesk7dSol = trailingPd.length
     ? trailingPd.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailingPd.length
     : sortedPd[0]?.per_desk_sol ?? 0;
+  // 24H window = the latest daily row; shown next to the 7D trailing average.
+  const perDesk24hSol = sortedPd[0]?.per_desk_sol ?? 0;
 
   if (loading || !bootDone) {
     return <BootScreen onComplete={() => setBootDone(true)} />;
@@ -154,7 +156,8 @@ export default function Home() {
               <WalletPortfolio
                 address={wallet}
                 onClear={() => setWallet(null)}
-                perDeskPerDaySol={perDeskPerDaySol}
+                perDesk24hSol={perDesk24hSol}
+                perDesk7dSol={perDesk7dSol}
               />
             ) : (
               <WalletConnect onConnected={setWallet} />

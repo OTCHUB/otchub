@@ -17,7 +17,7 @@ function Metric({ label, value, sub, accent = "text-green-300" }) {
   );
 }
 
-export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0 }) {
+export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, perDesk7dSol = 0 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -98,7 +98,8 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
 
   const desks = data?.desks_owned || 0;
   const solUsd = data?.sol_price_usd || null;
-  const estPerDaySol = desks * (perDeskPerDaySol || 0);
+  const estPerDay24hSol = desks * (perDesk24hSol || 0);
+  const estPerDay7dSol = desks * (perDesk7dSol || 0);
   // Raw ME floor (no fees) × owned desks
   const floorSol = data?.nft_floor_sol ?? null;
   const nftValueSol = floorSol != null ? desks * floorSol : null;
@@ -162,12 +163,26 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
               sub={`≈ ${fmtUsd(nftValueUsd)} · RAW FLOOR · NO FEES`}
               accent="text-cyan-300"
             />
-            <Metric
-              label="EST_EARN_PER_DAY"
-              value={fmtSol(estPerDaySol, 4)}
-              sub={`≈ ${fmtUsd(solUsd ? estPerDaySol * solUsd : null)} · ${fmtNum(desks)} desks · 7d avg`}
-              accent="text-emerald-400"
-            />
+            <div className="border border-green-500/20 p-2">
+              <div className="text-[9px] uppercase tracking-widest text-green-500/50">
+                EST_EARN_PER_DAY
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-2 font-mono text-sm font-bold">
+                <div className="text-emerald-400">
+                  {fmtSol(estPerDay24hSol, 4)}
+                  <div className="text-[9px] font-normal text-green-500/50">
+                    24H · ≈ {fmtUsd(solUsd ? estPerDay24hSol * solUsd : null)}
+                  </div>
+                </div>
+                <div className="text-cyan-300">
+                  {fmtSol(estPerDay7dSol, 4)}
+                  <div className="text-[9px] font-normal text-green-500/50">
+                    7D_AVG · ≈ {fmtUsd(solUsd ? estPerDay7dSol * solUsd : null)}
+                  </div>
+                </div>
+              </div>
+              <div className="text-[9px] text-green-500/50">{fmtNum(desks)} DESKS</div>
+            </div>
           </div>
           {/* Lifetime earnings per stock (ticker) — amount + live SOL/USD */}
           {lifetime?.by_stock?.length > 0 && (
