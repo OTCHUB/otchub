@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, packTxs, executeClaimTxs } from "@/lib/otcClaim";
+import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, packTxs, executeClaimTxsBatch } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -167,7 +167,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         const actIxs = await buildActivateInstructions(targets, address, tpMap);
         const actTxs = await packTxs(actIxs, address);
         log({ type: "info", msg: `Activate: ${actTxs.length} tx(s) to submit.` });
-        const actRes = await executeClaimTxs(actTxs, signer.signTransactionRaw, log);
+        const actRes = await executeClaimTxsBatch(actTxs, signer.signAllTransactionsRaw, log);
         const actOk = actRes.filter((r) => r.ok).length;
         log({ type: actRes.length - actOk ? "err" : "ok", msg: `Activate done: ${actOk}/${actRes.length} confirmed.` });
         if (actOk > 0) await new Promise((r) => setTimeout(r, 5000));
@@ -181,7 +181,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       const distTxs = await packTxs(distIxs, address);
       if (distTxs.length) {
         log({ type: "info", msg: `Distribute: ${distTxs.length} tx(s) to submit.` });
-        const distRes = await executeClaimTxs(distTxs, signer.signTransactionRaw, log);
+        const distRes = await executeClaimTxsBatch(distTxs, signer.signAllTransactionsRaw, log);
         const distOk = distRes.filter((r) => r.ok).length;
         log({ type: distRes.length - distOk ? "err" : "ok", msg: `Distribute done: ${distOk}/${distRes.length} confirmed.` });
         if (distOk > 0) await new Promise((r) => setTimeout(r, 5000));
@@ -206,7 +206,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       const ixs = await buildClaimInstructions(claimable, address, tpMap);
       const txs = await packTxs(ixs, address);
       log({ type: "info", msg: `Claim: ${txs.length} tx(s) to submit.` });
-      const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
+      const results = await executeClaimTxsBatch(txs, signer.signAllTransactionsRaw, log);
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
       log({ type: fail ? "err" : "ok", msg: `CLAIM DONE: ${ok} confirmed, ${fail} failed.` });

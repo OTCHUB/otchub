@@ -315,6 +315,90 @@ export async function executeClaimTxs(txs, signTransactionRaw, onLog) {
   return results;
 }
 
+// Run a bounded number of async tasks at once. Keeps large parallel batches
+// (simulate/send of dozens of txs) from hammering Helius rate limits while
+// still finishing well inside the blockhash validity window.
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= items.length) break;
+        out[i] = await fn(items[i], i);
+      }
+    })
+  );
+  return out;
+}
+
+// Batch execution: simulate ALL txs first, then request ONE wallet signature
+// for every passing tx (signAllTransactions — a single approval for the whole
+// batch on Phantom / Solflare / Backpack), then broadcast them all. A failing
+// simulation drops just that tx; the rest still sign and send. Simulations
+// and sends run with limited concurrency so an 80+ tx batch finishes in a few
+// seconds, safely inside the blockhash validity window.
+export async function executeClaimTxsBatch(txs, signAllTransactionsRaw, onLog) {
+  const results = [];
+  if (!txs || !txs.length) return results;
+
+  onLog({ type: "info", msg: `SIM :: ${txs.length} tx(s)...` });
+  const sims = await mapLimit(txs, 8, (t) => simulate(t));
+  const passing = [];
+  for (let i = 0; i < txs.length; i++) {
+    const sim = sims[i];
+    if (!sim.ok) {
+      const errLine = (sim.logs || []).find((l) => l.includes("Error Message")) ||
+        (sim.logs || []).find((l) => l.includes("Error Code"));
+      onLog({
+        type: "err",
+        msg: `TX ${i + 1} SIM_FAIL: ${sim.err}${errLine ? ` :: ${errLine.replace("Program log: ", "")}` : ""}`,
+      });
+      results.push({ ok: false, reason: sim.err });
+    } else {
+      passing.push({ tx: txs[i], idx: i });
+    }
+  }
+  if (!passing.length) {
+    onLog({ type: "err", msg: "All simulations failed — nothing to sign." });
+    return results;
+  }
+
+  onLog({ type: "info", msg: `SIGN :: 1 prompt for ${passing.length} tx(s)...` });
+  let signed;
+  try {
+    signed = await signAllTransactionsRaw(passing.map((p) => p.tx));
+  } catch (e) {
+    onLog({ type: "err", msg: `SIGN_REJECTED: ${e.message}` });
+    for (const p of passing) results.push({ ok: false, reason: "rejected" });
+    return results;
+  }
+  if (!Array.isArray(signed) || signed.length !== passing.length) {
+    onLog({ type: "err", msg: "Wallet returned wrong number of signed txs." });
+    for (const p of passing) results.push({ ok: false, reason: "bad-sign" });
+    return results;
+  }
+
+  onLog({ type: "info", msg: `SEND :: ${passing.length} tx(s)...` });
+  const sends = await mapLimit(signed, 8, (bytes) =>
+    relay("send", { tx: Buffer.from(bytes).toString("base64") })
+      .then((r) => ({ ok: true, sig: r.sig }))
+      .catch((e) => ({ ok: false, reason: e.message }))
+  );
+  for (let i = 0; i < passing.length; i++) {
+    const s = sends[i];
+    if (s.ok) {
+      onLog({ type: "ok", msg: `TX ${passing[i].idx + 1} SENT ${s.sig}`, sig: s.sig });
+      results.push({ ok: true, sig: s.sig });
+    } else {
+      onLog({ type: "err", msg: `TX ${passing[i].idx + 1} SEND_FAIL: ${s.reason}` });
+      results.push({ ok: false, reason: s.reason });
+    }
+  }
+  return results;
+}
+
 // Build claim instructions for a set of desks' claimable tickers, in order.
 export async function buildClaimInstructions(deskPlans, user, tokenProgramMap) {
   const ixs = [];

@@ -32,6 +32,7 @@ export function getSigner() {
     publicKey: _connected.publicKey,
     name: _connected.name,
     signTransactionRaw: (tx) => signTransactionRaw(_connected, tx),
+    signAllTransactionsRaw: (txs) => signAllTransactionsRaw(_connected, txs),
   };
 }
 
@@ -80,4 +81,23 @@ async function signTransactionRaw(conn, tx) {
     throw new Error("Wallet returned no signed transaction");
   }
   return new Uint8Array(signed);
+}
+
+// Sign many transactions with ONE wallet prompt. Injected wallets (Phantom /
+// Solflare / Backpack via window.*) expose signAllTransactions, which signs an
+// array in a single approval — collapsing N popups to 1. Wallet Standard has
+// no batch-signing standard, so fall back to per-tx signing there (rare; most
+// standard wallets also inject).
+async function signAllTransactionsRaw(conn, txs) {
+  if (!txs || !txs.length) return [];
+  if (conn.kind === "injected" && conn.provider?.signAllTransactions) {
+    const signed = await conn.provider.signAllTransactions(txs);
+    if (!Array.isArray(signed) || signed.length !== txs.length) {
+      throw new Error("Wallet returned wrong number of signed transactions");
+    }
+    return signed.map((s) => new Uint8Array(s.serialize()));
+  }
+  const out = [];
+  for (const tx of txs) out.push(await signTransactionRaw(conn, tx));
+  return out;
 }
