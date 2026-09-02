@@ -32,6 +32,18 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [bootDone, setBootDone] = useState(false);
+  const [walletOpenSignal, setWalletOpenSignal] = useState(0);
+
+  // Jump the user straight to the wallet connect controls (e.g. from the
+  // swap panel when no wallet is connected): expand the card, then scroll.
+  const goWalletConnect = useCallback(() => {
+    setWalletOpenSignal((s) => s + 1);
+    setTimeout(() => {
+      document
+        .getElementById("otc-wallet")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -151,7 +163,7 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          <CollapsibleCard title="WALLET">
+          <CollapsibleCard title="WALLET" id="otc-wallet" openSignal={walletOpenSignal}>
             {wallet ? (
               <WalletPortfolio
                 address={wallet}
@@ -262,7 +274,12 @@ export default function Home() {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
             <CollapsibleCard title="TRADE :: $OTC TOKEN">
-              <JupiterSwapPanel wallet={wallet} latest={latest} history={data?.history} />
+              <JupiterSwapPanel
+                wallet={wallet}
+                latest={latest}
+                history={data?.history}
+                onGoConnect={goWalletConnect}
+              />
             </CollapsibleCard>
           </div>
           <CollapsibleCard title="TRADE :: NFT DESKS">

@@ -1,9 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 // All panels open by default; click anywhere on the header bar to toggle.
-export default function CollapsibleCard({ title, children, defaultOpen = true, id, right }) {
+// `openSignal` lets other panels force this card open: bump the counter and
+// the card re-expands (used by the swap panel's "connect wallet" shortcut).
+export default function CollapsibleCard({ title, children, defaultOpen = true, id, right, openSignal }) {
   const [open, setOpen] = useState(defaultOpen);
   const toggle = () => setOpen((o) => !o);
+
+  useEffect(() => {
+    if (openSignal) setOpen(true);
+  }, [openSignal]);
 
   return (
     <div id={id} className="flex h-full flex-col break-inside-avoid">

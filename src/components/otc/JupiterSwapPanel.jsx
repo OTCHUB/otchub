@@ -40,7 +40,7 @@ function fmtLamports(raw) {
 // Two-way $OTC trading via Jupiter: BUY = SOL -> $OTC, SELL = $OTC -> SOL.
 // Same reliability model as before: every swap tx is simulated before the
 // wallet is asked to sign, so a failing sim aborts with no fee spent.
-export default function JupiterSwapPanel({ wallet, latest, history }) {
+export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect }) {
   const [mode, setMode] = useState("BUY"); // "BUY" | "SELL"
   const [amount, setAmount] = useState("0.1");
   const [slippageBps, setSlippageBps] = useState(100);
@@ -335,9 +335,13 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
       </div>
 
       {!wallet ? (
-        <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] text-amber-400/80">
-          CONNECT WALLET ABOVE TO SWAP
-        </div>
+        <button
+          onClick={() => onGoConnect?.()}
+          className="mt-3 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
+          title="Open the wallet connect panel"
+        >
+          [▲ CONNECT WALLET — GO TO WALLET PANEL]
+        </button>
       ) : (
         <>
           {/* Balance rows: native SOL + $OTC, both with live USD equivalents */}
