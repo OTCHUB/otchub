@@ -65,6 +65,31 @@ export async function fetchSolPriceUsd() {
   return solUsd ? parseFloat(solUsd.priceUsd) : null;
 }
 
+// DAS getAsset with showFungible: token metadata + VERIFIED USD price
+// (token_info.price_info.price_per_token, cached by Helius up to 600s) plus
+// the exact decimal-adjusted on-chain supply — a fresh fallback/cross-check
+// for the DexScreener-derived prices. https://www.helius.dev/docs/das/get-tokens
+export async function fetchDasTokenInfo(tokenMint) {
+  try {
+    const result = await heliusRpc("getAsset", [
+      { id: tokenMint, options: { showFungible: true } },
+    ]);
+    const info = result?.token_info;
+    if (!info) return null;
+    const decimals = info.decimals ?? 0;
+    return {
+      symbol: info.symbol || null,
+      decimals,
+      supply: info.supply != null ? info.supply / Math.pow(10, decimals) : null,
+      priceUsd: info.price_info?.price_per_token != null
+        ? parseFloat(info.price_info.price_per_token)
+        : null,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function fetchTokenAccountsByOwner(owner, tokenMint) {
   const result = await heliusRpc("getTokenAccountsByOwner", [
     owner,

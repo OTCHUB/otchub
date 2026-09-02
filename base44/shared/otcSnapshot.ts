@@ -4,6 +4,7 @@
 
 import {
   ADDRESSES,
+  fetchDasTokenInfo,
   fetchDexScreenerToken,
   fetchSolPriceUsd,
   fetchAccountBalanceLamports,
@@ -41,6 +42,10 @@ export async function priceOnlyRefresh(base44) {
   let solPriceUsd = await fetchSolPriceUsd();
   let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
   let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
+  // Helius DAS price (verified token, cached ≤10 min) as a fresh fallback
+  // when DexScreener is rate-limited. https://www.helius.dev/docs/das/get-tokens
+  const dasInfo = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
+  if (tokenPriceUsd == null && dasInfo?.priceUsd != null) tokenPriceUsd = dasInfo.priceUsd;
 
   const p = await latestSnapshot(base44);
   if (!p) return null;
@@ -97,6 +102,7 @@ export async function priceOnlyRefresh(base44) {
     updated: p.id,
     token_price_usd: tokenPriceUsd,
     sol_price_usd: solPriceUsd,
+    das_price_usd: dasInfo?.priceUsd ?? null,
     recommendation,
   };
 }
@@ -130,9 +136,15 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
   let solPriceUsd = await fetchSolPriceUsd();
 
+  // Helius DAS getAsset (showFungible): verified USD price (cached ≤10 min)
+  // plus exact on-chain supply — fills price/supply gaps whenever DexScreener
+  // or getTokenSupply fails. https://www.helius.dev/docs/das/get-tokens
+  const dasInfo = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
+
   // Fall back to last known prices if DexScreener is rate-limited this run
   let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
   let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
+  if (tokenPriceUsd == null && dasInfo?.priceUsd != null) tokenPriceUsd = dasInfo.priceUsd;
   if (tokenPriceUsd == null || solPriceUsd == null || tokenPriceSol == null) {
     const p = await latestSnapshot(base44);
     if (p) {
@@ -161,7 +173,9 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   const listings = lsR.status === "fulfilled" ? lsR.value : [];
   const assets = asR.status === "fulfilled" ? asR.value : null;
   const stats = stR.status === "fulfilled" ? stR.value : null;
-  const tokenSupply = tsR.status === "fulfilled" ? tsR.value : null;
+  // Supply fallback: DAS getAsset carries the exact decimal-adjusted
+  // on-chain supply, so a getTokenSupply outage doesn't stall burn metrics.
+  const tokenSupply = tsR.status === "fulfilled" ? tsR.value : dasInfo?.supply ?? null;
 
   const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
@@ -257,7 +271,10 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     token_price_sol: tokenPriceSol,
     token_market_cap: pair?.marketCap
       ? parseFloat(pair.marketCap)
-      : stats?.marketCap ?? null,
+      : stats?.marketCap ??
+        (tokenPriceUsd != null && dasInfo?.supply != null
+          ? tokenPriceUsd * dasInfo.supply
+          : null),
     token_volume_24h: pair?.volume?.h24 ? parseFloat(pair.volume.h24) : stats?.volume24h ?? null,
     token_liquidity_usd: pair?.liquidity?.usd ? parseFloat(pair.liquidity.usd) : null,
     token_price_change_24h: pair?.priceChange?.h24 ? parseFloat(pair.priceChange.h24) : null,
