@@ -51,7 +51,8 @@ export default function SupplyChart({ history }) {
             <YAxis
               yAxisId="supply"
               orientation="left"
-              domain={["dataMin", "dataMax"]}
+              domain={[0, 1_000_000_000]}
+              allowDataOverflow
               stroke="#1a6b3a"
               fontSize={9}
               tick={{ fill: "#2a8b4a" }}

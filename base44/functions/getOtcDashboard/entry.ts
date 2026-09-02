@@ -52,49 +52,61 @@ export default async function (req) {
       if (D_mig > D_total) D_mig = D_total;
     }
 
+    // Cumulative burnt OTC from a desk count, applying the 1M→100k deposit
+    // migration at D_mig (falls back to flat 100k/desk when migration unknown).
+    const burntFromDesks = (D) => {
+      if (D == null) return null;
+      if (D_mig == null) return D * DEPOSIT_NEW;
+      if (D <= D_mig) return D * DEPOSIT_OLD;
+      return D_mig * DEPOSIT_OLD + (D - D_mig) * DEPOSIT_NEW;
+    };
+
     const bootstrap = perDeskItems
       .filter((d) => d.day && d.desks != null)
       .map((d) => {
-        const D_d = d.desks;
-        let burnt;
-        if (D_mig == null) {
-          burnt = D_d * DEPOSIT_NEW;
-        } else if (D_d <= D_mig) {
-          burnt = D_d * DEPOSIT_OLD;
-        } else {
-          burnt = D_mig * DEPOSIT_OLD + (D_d - D_mig) * DEPOSIT_NEW;
-        }
+        const burnt = burntFromDesks(d.desks);
         return {
           t: d.day,
-          desks_minted: D_d,
+          desks_minted: d.desks,
           token_burnt: burnt,
-          token_total_supply: OTC_TGE_SUPPLY - burnt,
+          token_total_supply: burnt != null ? OTC_TGE_SUPPLY - burnt : null,
         };
       });
 
     const snapshotHistory = list
       .slice()
       .reverse()
-      .map((s) => ({
-        t: s.created_date,
-        token_price_usd: s.token_price_usd,
-        token_price_sol: s.token_price_sol,
-        sol_price_usd: s.sol_price_usd,
-        nft_floor_sol: s.nft_floor_sol,
-        nft_floor_usd: s.nft_floor_usd,
-        pot_sol_balance: s.pot_sol_balance,
-        protocol_distributed_sol: s.protocol_distributed_sol,
-        protocol_buyback_sol: s.protocol_buyback_sol,
-        desks_minted: s.desks_minted,
-        token_total_supply: s.token_total_supply,
-        token_burnt: s.token_burnt,
-        rounds_total: s.rounds_total,
-        mint_cost_usd: s.mint_cost_usd,
-        secondary_cost_usd: s.secondary_cost_usd,
-        spread_usd: s.spread_usd,
-        spread_pct: s.spread_pct,
-        nft_total_supply: s.nft_total_supply,
-      }));
+      .map((s) => {
+        // Backfill supply/burn from desks for snapshots that predate supply
+        // fetching (or where a run failed mid-field), so the chart series is
+        // complete — same migration logic as the daily bootstrap.
+        let supply = s.token_total_supply;
+        let burnt = s.token_burnt;
+        if (supply == null && s.desks_minted != null) {
+          burnt = burntFromDesks(s.desks_minted);
+          if (burnt != null) supply = OTC_TGE_SUPPLY - burnt;
+        }
+        return {
+          t: s.created_date,
+          token_price_usd: s.token_price_usd,
+          token_price_sol: s.token_price_sol,
+          sol_price_usd: s.sol_price_usd,
+          nft_floor_sol: s.nft_floor_sol,
+          nft_floor_usd: s.nft_floor_usd,
+          pot_sol_balance: s.pot_sol_balance,
+          protocol_distributed_sol: s.protocol_distributed_sol,
+          protocol_buyback_sol: s.protocol_buyback_sol,
+          desks_minted: s.desks_minted,
+          token_total_supply: supply,
+          token_burnt: burnt,
+          rounds_total: s.rounds_total,
+          mint_cost_usd: s.mint_cost_usd,
+          secondary_cost_usd: s.secondary_cost_usd,
+          spread_usd: s.spread_usd,
+          spread_pct: s.spread_pct,
+          nft_total_supply: s.nft_total_supply,
+        };
+      });
 
     // Merge the daily bootstrap (full history) with live snapshot points
     // (recent granularity), sorted chronologically. The supply/desks chart
