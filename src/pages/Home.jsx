@@ -14,6 +14,7 @@ import HoldingsGallery from "@/components/otc/HoldingsGallery";
 import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
+import BootScreen from "@/components/otc/BootScreen";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 
 export default function Home() {
@@ -22,6 +23,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [wallet, setWallet] = useState(null);
+  const [bootDone, setBootDone] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -63,14 +65,8 @@ export default function Home() {
 
   const latest = data?.latest;
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black font-mono">
-        <span className="text-green-400">
-          <span className="animate-pulse">▋</span> LOADING OTC_HUB...
-        </span>
-      </div>
-    );
+  if (loading || !bootDone) {
+    return <BootScreen onComplete={() => setBootDone(true)} />;
   }
 
   return (
