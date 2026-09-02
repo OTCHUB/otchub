@@ -4,19 +4,19 @@ import { fmtSol, fmtUsd } from "@/lib/format";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 
 export default function HoldingsGallery({ holdings, byStock }) {
-  const [mode, setMode] = useState("ALL");
+  const [mode, setMode] = useState("SNIPE");
   const [sel, setSel] = useState(null);
   const all = holdings || [];
   const listed = all.filter((h) => h.is_listed && h.listing_price_sol != null);
   const withSpread = (arr) =>
     arr.map((h) => ({ ...h, spread_sol: (h.accrued_value_sol || 0) - (h.listing_price_sol || 0) }));
+  // LISTED: lowest listing price first (cheapest on secondary market)
+  const byPriceAsc = [...listed].sort((a, b) => (a.listing_price_sol || 0) - (b.listing_price_sol || 0));
+  // STOCK: highest stock holding first (most accrued value)
+  const byStockDesc = [...all].sort((a, b) => (b.accrued_value_sol || 0) - (a.accrued_value_sol || 0));
+  // SNIPE: best of both worlds — highest net (stock holding − listing price)
   const snipes = withSpread(listed).sort((a, b) => b.spread_sol - a.spread_sol);
-  // ALL: Magic Eden listings first (positive delta on top), then unlisted
-  const allSorted = [
-    ...snipes,
-    ...all.filter((h) => !(h.is_listed && h.listing_price_sol != null)),
-  ];
-  const list = (mode === "SNIPE" ? snipes : mode === "LISTED" ? snipes : allSorted).slice(0, 60);
+  const list = (mode === "LISTED" ? byPriceAsc : mode === "STOCK" ? byStockDesc : snipes).slice(0, 60);
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -25,7 +25,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
           NFT_HOLDINGS :: {all.length} · LISTED {listed.length}
         </span>
         <div className="flex gap-1">
-          {["ALL", "LISTED", "SNIPE"].map((m) => (
+          {["LISTED", "STOCK", "SNIPE"].map((m) => (
             <button key={m} onClick={() => setMode(m)} className={`border px-2 py-0.5 font-mono text-[10px] ${mode === m ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"}`}>[{m}]</button>
           ))}
         </div>
