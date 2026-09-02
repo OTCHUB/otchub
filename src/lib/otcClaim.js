@@ -73,23 +73,23 @@ const configExtPda = () => pda([Buffer.from("config_ext")]);
 const vaultPda = (asset) => pda([Buffer.from("vault"), new PublicKey(asset).toBuffer()]);
 const vaultExtPda = (vault) => pda([Buffer.from("vault_ext"), vault.toBuffer()]);
 
-function nftStockAta(vault, mint, tokenProgram) {
-  return getAssociatedTokenAddressSync(
-    new PublicKey(mint),
-    vault,
-    true, // vault is a PDA (off-curve)
-    tokenProgram,
+// The OTC program derives stock token accounts with a CUSTOM seed order —
+// [owner, tokenProgram, mint] under the ATA program — NOT the standard
+// [mint, owner, tokenProgram] ATA order (verified on-chain against the vault's
+// real token accounts). The standard getAssociatedTokenAddressSync produces
+// the wrong address, so claims would fail simulation; derive manually.
+function stockAta(owner, mint, tokenProgram) {
+  const tp = tokenProgram || TOKEN_PROGRAM_ID;
+  return PublicKey.findProgramAddressSync(
+    [new PublicKey(owner).toBuffer(), new PublicKey(tp).toBuffer(), new PublicKey(mint).toBuffer()],
     ATA_PROGRAM_ID
-  );
+  )[0];
+}
+function nftStockAta(vault, mint, tokenProgram) {
+  return stockAta(vault, mint, tokenProgram);
 }
 function userStockAta(user, mint, tokenProgram) {
-  return getAssociatedTokenAddressSync(
-    new PublicKey(mint),
-    user,
-    false,
-    tokenProgram,
-    ATA_PROGRAM_ID
-  );
+  return stockAta(user, mint, tokenProgram);
 }
 
 // Resolve which token program owns each stock mint (Token-2022 vs standard).
@@ -163,7 +163,7 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
   const userPk = new PublicKey(user);
   const assetPk = new PublicKey(assetId);
   const vault = vaultPda(assetPk);
-  const tp = tokenProgramMap[ticker.mint];
+  const tp = new PublicKey(tokenProgramMap[ticker.mint] || TOKEN_PROGRAM_ID);
   const nftStock = nftStockAta(vault, ticker.mint, tp);
   const userStock = userStockAta(userPk, ticker.mint, tp);
 

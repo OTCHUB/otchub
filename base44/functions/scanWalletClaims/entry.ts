@@ -26,6 +26,8 @@ const { PublicKey } = await import("npm:@solana/web3.js@1.98.4");
 
 const PROGRAM_ID = new PublicKey("AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW");
 const ATA_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 // Same stock registry as the client (src/lib/otcClaim.js). Kept in sync so the
 // backend can derive vault stock ATAs without the client.
@@ -57,15 +59,44 @@ function vaultPda(assetStr) {
   return vault;
 }
 
-// Associated token account address is program-independent: it is the PDA of the
-// ATA program over [mint, owner], so we derive it directly (matches the
-// client's getAssociatedTokenAddressSync(mint, vault, true, tp, ATA_PROGRAM)).
-function nftStockAta(vault, mintStr) {
+// Associated token account PDA seeds are [mint, owner, tokenProgram] under the
+// ATA program — the token program is a REQUIRED seed. The previous derivation
+// omitted it, producing wrong addresses (every account read as non-existent,
+// so all balances showed 0). This now matches the client's
+// getAssociatedTokenAddressSync(mint, vault, true, tp, ATA_PROGRAM).
+function nftStockAta(vault, mintStr, tokenProgramPk) {
+  const tp = tokenProgramPk || TOKEN_PROGRAM_ID;
+  // Custom seed order [vault, tokenProgram, mint] (verified on-chain) — NOT the
+  // standard [mint, owner, tokenProgram] ATA order.
   const [addr] = PublicKey.findProgramAddressSync(
-    [new PublicKey(mintStr).toBuffer(), vault.toBuffer()],
+    [vault.toBuffer(), tp.toBuffer(), new PublicKey(mintStr).toBuffer()],
     ATA_PROGRAM_ID
   );
   return addr;
+}
+
+// Resolve whether each stock mint lives under the standard Token program or
+// Token-2022 (the "extended" tickers use Token-2022). Needed to derive the
+// correct vault ATA. Defaults to the standard Token program on any failure.
+async function resolveTokenPrograms() {
+  const mints = STOCKS.map((s) => s.mint);
+  let value;
+  try {
+    const result = await heliusRpc("getMultipleAccounts", [
+      mints,
+      { encoding: "base64" },
+    ]);
+    value = result?.value || [];
+  } catch {
+    value = mints.map(() => null);
+  }
+  const map = {};
+  const t22 = TOKEN_2022_PROGRAM_ID.toBase58();
+  for (let i = 0; i < mints.length; i++) {
+    map[mints[i]] =
+      value[i]?.owner === t22 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  }
+  return map;
 }
 
 async function saveCache(base44, existing, wallet, desks) {
@@ -137,6 +168,10 @@ export default async function (req) {
       return Response.json({ ok: true, fresh: true, desks: [], wallet, desks_count: 0 });
     }
 
+    // Resolve each stock mint's token program (Token vs Token-2022) so the
+    // vault ATA is derived with the correct [mint, vault, tokenProgram] seeds.
+    const tpMap = await resolveTokenPrograms();
+
     // Build the flat list of vault stock ATA addresses to read.
     const vaults = desks.map((d) => vaultPda(d.asset_id));
     const flat = []; // {d, t, addr}
@@ -145,7 +180,7 @@ export default async function (req) {
         flat.push({
           d,
           t,
-          addr: nftStockAta(vaults[d], STOCKS[t].mint).toBase58(),
+          addr: nftStockAta(vaults[d], STOCKS[t].mint, tpMap[STOCKS[t].mint]).toBase58(),
         });
       }
     }
@@ -157,7 +192,7 @@ export default async function (req) {
       const pubkeys = slice.map((x) => x.addr);
       let value;
       try {
-        const result = await heliusRpc("getMultipleAccountsInfo", [
+        const result = await heliusRpc("getMultipleAccounts", [
           pubkeys,
           { encoding: "jsonParsed" },
         ]);
@@ -186,7 +221,8 @@ export default async function (req) {
     // Assemble per-desk results.
     const out = desks.map((d, di) => {
       const tickers = STOCKS.map((s, t) => {
-        const addr = nftStockAta(vaults[di], s.mint).toBase58();
+        const tp = tpMap[s.mint];
+        const addr = nftStockAta(vaults[di], s.mint, tp).toBase58();
         const r = info.get(addr) || { exists: false, amount: 0, tokenProgram: null };
         return {
           index: s.index,
@@ -196,7 +232,7 @@ export default async function (req) {
           extended: s.extended,
           amount: r.exists ? r.amount : 0,
           exists: r.exists,
-          token_program: r.exists ? r.tokenProgram : null,
+          token_program: r.exists ? r.tokenProgram : (tp ? tp.toBase58() : null),
         };
       });
       const claimable = tickers.filter((x) => x.exists && x.amount > 0);
