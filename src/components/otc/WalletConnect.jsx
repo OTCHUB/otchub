@@ -1,13 +1,48 @@
 import React, { useState } from "react";
-import { WALLET_PROVIDERS, useSolanaWallet } from "@/hooks/useSolanaWallet";
+import { detectWallets, connectProvider } from "@/lib/solanaWallets";
 
 export default function WalletConnect({ onConnected }) {
-  const { connect, connecting, error, detectedIds } = useSolanaWallet();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [picker, setPicker] = useState(null); // list when multiple wallets found
   const [manual, setManual] = useState("");
 
-  const handleConnect = async (id) => {
-    const pk = await connect(id);
-    if (pk) onConnected?.(pk);
+  const handleConnect = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const wallets = detectWallets();
+      if (!wallets.length) {
+        setError(
+          "No injected Solana wallet found. Open this app directly in your wallet's in-app browser (e.g. Jupiter app → enter URL), or paste your address below."
+        );
+        return;
+      }
+      if (wallets.length === 1) {
+        await doConnect(wallets[0]);
+      } else {
+        setPicker(wallets);
+      }
+    } catch (e) {
+      setError(e?.message || "Connect failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doConnect = async (wallet) => {
+    setPicker(null);
+    setBusy(true);
+    setError(null);
+    try {
+      const pk = await connectProvider(wallet.provider);
+      if (!pk) throw new Error("No public key returned");
+      onConnected?.(pk);
+    } catch (e) {
+      setError(e?.message || `${wallet.name} connect failed`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submitManual = (e) => {
@@ -21,33 +56,40 @@ export default function WalletConnect({ onConnected }) {
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
         WALLET_CONNECT :: OTC_PORTFOLIO
       </div>
-      <div className="mt-1 text-[9px] text-green-500/40">
-        DETECTED: {detectedIds.length ? detectedIds.join(", ").toUpperCase() : "NONE — IF YOUR WALLET INJECTS LATE, CLICK ITS BUTTON ANYWAY"}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={handleConnect}
+          disabled={busy}
+          className="border border-green-500/50 px-4 py-2 text-[12px] font-bold text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+        >
+          {busy ? "[CONNECTING...]" : "[CONNECT_WALLET]"}
+        </button>
+        <span className="text-[10px] text-green-500/40">
+          PHANTOM · SOLFLARE · BACKPACK · JUPITER · OTHERS
+        </span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {WALLET_PROVIDERS.map((p) => {
-          const on = detectedIds.includes(p.id);
-          return (
+
+      {picker && (
+        <div className="mt-3 flex flex-wrap gap-2 border border-green-500/30 p-2">
+          <span className="text-[10px] text-green-500/60">SELECT_WALLET:</span>
+          {picker.map((p) => (
             <button
               key={p.id}
-              onClick={() => handleConnect(p.id)}
-              disabled={connecting}
-              className={`border px-3 py-1.5 text-[11px] disabled:opacity-40 ${
-                on
-                  ? "border-emerald-400 text-emerald-400 hover:bg-emerald-500/10"
-                  : "border-green-500/30 text-green-500/50 hover:bg-green-500/5"
-              }`}
+              onClick={() => doConnect(p)}
+              className="border border-green-500/50 px-3 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
             >
-              [{p.name.toUpperCase()}]{on ? " *" : ""}
+              [{p.name.toUpperCase()}]
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
       <form onSubmit={submitManual} className="mt-3 flex gap-2">
         <input
           value={manual}
           onChange={(e) => setManual(e.target.value)}
-          placeholder="OR ENTER WALLET ADDRESS..."
+          placeholder="OR PASTE WALLET ADDRESS..."
           className="min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-[11px] text-green-400 placeholder:text-green-500/30 focus:outline-none"
         />
         <button
@@ -57,7 +99,8 @@ export default function WalletConnect({ onConnected }) {
           [LOOKUP]
         </button>
       </form>
-      {error && <div className="mt-2 text-[11px] text-amber-400">ERR: {error}</div>}
+
+      {error && <div className="mt-2 text-[11px] leading-relaxed text-amber-400">ERR: {error}</div>}
     </div>
   );
 }
