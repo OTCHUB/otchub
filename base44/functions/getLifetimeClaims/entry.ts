@@ -19,7 +19,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { secrets } from "base44:runtime";
 import { Buffer } from "node:buffer";
-import { PROGRAM_ID, STOCKS } from "../../shared/otcIdl.ts";
+import { PROGRAM_ID, STOCKS, INSTRUCTIONS } from "../../shared/otcIdl.ts";
 
 // web3.js expects a global Buffer; set it before the module is imported.
 if (!globalThis.Buffer) globalThis.Buffer = Buffer;
@@ -107,6 +107,22 @@ async function resolveTokenPrograms() {
 //   vault) token account sent tokens to the signer's user_stock.
 //   NOTE: Helius tokenTransfers[].tokenAmount is ALREADY decimal-adjusted
 //   (the UI amount) for that mint — do NOT divide by 10^decimals again.
+// True only for the protocol's claim(index) instruction: the first 8 bytes
+// of the instruction data must equal the claim discriminator from the IDL.
+// This hard-guarantees that only genuine on-chain claims are counted —
+// stock tokens the user bought themselves (Jupiter swaps, plain transfers
+// in) never route through the OTC program and can never be tallied here.
+function isClaimInstruction(ix) {
+  if (!ix.data) return false;
+  try {
+    const bytes = Buffer.from(ix.data, "base64");
+    if (bytes.length < 8) return false;
+    return INSTRUCTIONS.claim.every((b, i) => bytes[i] === b);
+  } catch {
+    return false;
+  }
+}
+
 function extractClaimsFromTx(tx, wallet) {
   const claims = [];
   const transfers = tx.tokenTransfers || [];
@@ -118,6 +134,7 @@ function extractClaimsFromTx(tx, wallet) {
     }
   }
   for (const ix of otcIxs) {
+    if (!isClaimInstruction(ix)) continue;
     const accts = ix.accounts || [];
     if (accts.length !== 10 && accts.length !== 12) continue;
     // accounts[0] is the claim signer (the claiming user). Only count claims
@@ -147,29 +164,34 @@ function extractClaimsFromTx(tx, wallet) {
   return claims;
 }
 
-// Spot USD prices for a set of token mints (batched DexScreener) + SOL.
+// Spot USD prices for a set of token mints (DexScreener) + SOL.
+// DexScreener caps each response at 30 pairs, and wrapped SOL alone has 30+
+// pairs — so SOL MUST be requested on its own and stocks in small chunks,
+// otherwise later mints' pairs are silently truncated out of the batch
+// (this is why every SOL value showed 0.000).
 async function fetchPricesUsd(mints) {
-  const set = new Set(mints);
-  set.add(SOL_MINT);
-  const list = [...set].filter(Boolean);
+  const stockMints = [...new Set(mints)].filter((m) => m && m !== SOL_MINT);
+  const chunks = [[SOL_MINT]];
+  for (let i = 0; i < stockMints.length; i += 5) {
+    chunks.push(stockMints.slice(i, i + 5));
+  }
   const priceMap = {};
-  try {
-    const url = `https://api.dexscreener.com/latest/dex/tokens/${list.join(",")}`;
-    const res = await fetch(url);
-    if (res.ok) {
+  for (const chunk of chunks) {
+    try {
+      const res = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`
+      );
+      if (!res.ok) continue;
       const json = await res.json();
-      const byMint = {};
       for (const p of json.pairs || []) {
         const m = p.baseToken?.address;
-        if (!m) continue;
-        if (p.chainId === "solana" && p.priceUsd != null) {
-          if (byMint[m] == null) byMint[m] = parseFloat(p.priceUsd);
-        }
+        if (!m || p.chainId !== "solana" || p.priceUsd == null) continue;
+        const px = parseFloat(p.priceUsd);
+        if (Number.isFinite(px) && priceMap[m] == null) priceMap[m] = px;
       }
-      for (const m of list) priceMap[m] = byMint[m] ?? null;
+    } catch {
+      /* ignore chunk */
     }
-  } catch {
-    /* ignore */
   }
   return priceMap;
 }
