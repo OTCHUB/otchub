@@ -230,8 +230,8 @@ export default function Home() {
         </div>
 
         {/* Arbitrage + Protocol */}
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
+          <div className="h-full lg:col-span-2">
             <CollapsibleCard title="ARBITRAGE">
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>

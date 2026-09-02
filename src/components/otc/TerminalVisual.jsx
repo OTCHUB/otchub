@@ -22,6 +22,12 @@ const FEED = [
   () => `snapshot ingest -> row #${rand(1200, 1900)} stored`,
   () => `anchor log :: Distribute { index: ${rand(0, 4999)}, amount: ${rand(1, 9)}.${rand(0, 99)} }`,
   () => `claim(${short("9WzDXwQyFho6YtSMAd1zvW5tRyLNhrx")}) -> vault drained OK`,
+  () => `getTokenAccountsByOwner(vault) -> ${rand(1, 6)} token acct(s)`,
+  () => `getSignaturesForAddress(POT_PDA) -> ${rand(5, 40)} recent`,
+  () => `Magic Eden floor sweep -> ${rand(2, 14)} desks moved`,
+  () => `Jupiter route -> SOL/OTC via ${rand(1, 3)} AMM pool(s)`,
+  () => `getAsset(asset: ${short(MINT)}) -> plugin: ${pick(["trade", "royalty", "vault"])}`,
+  () => `webhook event :: accountChange desk#${rand(1, 5000)} -> re-snapshot queued`,
 ];
 
 const CODE_LINES = [
@@ -63,7 +69,7 @@ export default function TerminalVisual({ variant = "feed", className = "" }) {
           setTyping(line.slice(0, ci));
           ci += 1;
         } else {
-          setRows((p) => [...p.slice(-10), line]);
+          setRows((p) => [...p.slice(-14), line]);
           setTyping("");
           ci = 0;
           li += 1;
@@ -71,10 +77,12 @@ export default function TerminalVisual({ variant = "feed", className = "" }) {
       }, 22);
       return () => clearInterval(id);
     }
-    setRows([pick(FEED)(), pick(FEED)(), pick(FEED)()]);
+    // Pre-fill so the panel reads as an active, full terminal from the first
+    // frame instead of an empty box that slowly fills.
+    setRows(Array.from({ length: 14 }, () => pick(FEED)()));
     const id = setInterval(() => {
-      setRows((p) => [...p.slice(-12), pick(FEED)()]);
-    }, 650);
+      setRows((p) => [...p.slice(-24), pick(FEED)()]);
+    }, 400);
     return () => clearInterval(id);
   }, [variant]);
 

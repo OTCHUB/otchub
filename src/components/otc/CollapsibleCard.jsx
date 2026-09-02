@@ -6,7 +6,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, i
   const toggle = () => setOpen((o) => !o);
 
   return (
-    <div id={id} className="break-inside-avoid">
+    <div id={id} className="flex h-full flex-col break-inside-avoid">
       <div
         onClick={toggle}
         className={`flex cursor-pointer select-none items-center justify-between bg-black px-3 py-2 ${
@@ -23,7 +23,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, i
           </div>
         )}
       </div>
-      {open && <div>{children}</div>}
+      {open && <div className="flex-1">{children}</div>}
     </div>
   );
 }

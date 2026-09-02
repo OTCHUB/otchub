@@ -25,7 +25,7 @@ export default function ProtocolPanel({ latest }) {
     burnt != null && tge > 0 ? ((burnt / tge) * 100).toFixed(2) : null;
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
         PROTOCOL_ECONOMICS
       </div>
