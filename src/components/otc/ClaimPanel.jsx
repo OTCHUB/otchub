@@ -24,6 +24,19 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
 
+  // Compact age label for a timestamp ("2h 5m ago").
+  const agoLabel = (iso) => {
+    if (!iso) return null;
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
   const loadLifetime = async (w, force = false) => {
     try {
       const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w, force });
@@ -325,7 +338,9 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
         Each ticker is probed unsigned (no fee) for how many distributes its claim needs; failing
         sims are skipped (no fee spent); the program enforces you own the NFT. PULL_OWED ON also
         opens missing accounts and pulls the full owed backlog first (more approvals; run
-        occasionally).
+        occasionally). NOTE: claims drain the vault to ZERO on-chain, but desks re-accrue new
+        stock continuously — balances that reappear after a claim (marked ↻ NEW_ACCRUAL) are
+        fresh distributions, not stale data. [SCAN_DESKS] always re-reads live vault balances.
       </HelpNote>
 
       {Object.keys(lifetime).length > 0 && (() => {
@@ -354,6 +369,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
           .map((d) => {
           const deskPlan = plan?.find((p) => p.asset_id === d.asset_id);
           const sel = selected.has(d.asset_id);
+          const lastClaim = lifetime[d.asset_id]?.last_claim_at || null;
           return (
             <label
               key={d.asset_id}
@@ -399,8 +415,16 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
                       {fmtSol(deskSolValue(deskPlan), 4)}
                     </div>
                     {deskPlan.claimable.length > 0 ? (
-                      <div className="font-mono text-[8px] leading-tight text-cyan-400/70">
-                        {deskPlan.claimable.length} CLAIMABLE
+                      <div
+                        className="font-mono text-[8px] leading-tight text-cyan-400/70"
+                        title={
+                          lastClaim
+                            ? `Fresh stock accrued since your last claim (${agoLabel(lastClaim)})`
+                            : undefined
+                        }
+                      >
+                        {lastClaim ? "↻ " : ""}
+                        {deskPlan.claimable.length} {lastClaim ? "NEW_ACCRUAL" : "CLAIMABLE"}
                       </div>
                     ) : cleared.has(d.asset_id) ? (
                       <div className="font-mono text-[8px] leading-tight text-emerald-400">
@@ -431,8 +455,13 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
                     <div className="font-mono text-[8px] leading-tight text-amber-300/60">
                       {fmtUsd(lifetime[d.asset_id].value_usd)}
                     </div>
-                  </div>
-                )}
+                    {lastClaim && (
+                      <div className="font-mono text-[8px] leading-tight text-amber-300/40">
+                        LAST_CLAIM {agoLabel(lastClaim)}
+                      </div>
+                    )}
+                    </div>
+                    )}
               </div>
             </label>
           );

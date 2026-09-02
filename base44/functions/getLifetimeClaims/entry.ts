@@ -226,6 +226,18 @@ export default async function (req) {
     // durable, always-current source.
     const seenKeys = new Set();
     const amountsByDesk = {};
+    // Latest claim per desk — used by the claim panel to label vault balances
+    // that appeared AFTER the user's last claim as fresh accruals (claims drain
+    // the vault to zero on-chain, so any later balance is new distribution).
+    const lastClaimByDesk = {};
+    const noteClaimTime = (assetId, iso) => {
+      const cur = lastClaimByDesk[assetId];
+      if (!iso || (!cur && cur !== "")) {
+        if (iso) lastClaimByDesk[assetId] = iso;
+        return;
+      }
+      if (!cur || iso > cur) lastClaimByDesk[assetId] = iso;
+    };
     try {
       const logs = await base44.asServiceRole.entities.ClaimLog.filter(
         { wallet },
@@ -237,6 +249,7 @@ export default async function (req) {
         const d = (amountsByDesk[r.asset_id] ||= {});
         d[r.symbol] = (d[r.symbol] || 0) + (Number(r.amount) || 0);
         seenKeys.add(`${r.tx_sig}|${r.symbol}|${r.asset_id}`);
+        noteClaimTime(r.asset_id, r.created_date);
       }
     } catch {
       /* DB read failure -> the on-chain scan below still recovers */
@@ -286,6 +299,7 @@ export default async function (req) {
             seenKeys.add(key);
             const d = (amountsByDesk[c.asset_id] ||= {});
             d[c.symbol] = (d[c.symbol] || 0) + c.amount;
+            if (c.ts) noteClaimTime(c.asset_id, new Date(c.ts * 1000).toISOString());
             newClaims.push({
               wallet,
               asset_id: c.asset_id,
@@ -357,6 +371,7 @@ export default async function (req) {
         value_usd: deskUsd,
         value_sol: deskSol,
         count: Object.keys(tickers).length,
+        last_claim_at: lastClaimByDesk[asset_id] || null,
       });
       totalUsd += deskUsd;
       totalSol += deskSol;
