@@ -22,14 +22,6 @@ const ME_TOTAL_MARKUP = 1 + ME_BUYER_FEE_PCT + ME_ROYALTY_PCT; // 1.07 — true 
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
-    try {
-      const user = await base44.auth.me();
-      if (user && user.role !== "admin") {
-        return Response.json({ error: "Admin only" }, { status: 403 });
-      }
-    } catch (e) {
-      // no authenticated user — workflow context, allowed
-    }
 
     // Freshness gate (global cache): skip the expensive external RPC/API
     // calls when a snapshot was ingested recently. The dashboard always

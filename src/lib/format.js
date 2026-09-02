@@ -30,10 +30,23 @@ export const fmtCompact = (v) => {
 
 export const timeAgo = (iso) => {
   if (!iso) return "—";
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 0) return "just now";
-  if (s < 60) return `${Math.floor(s)}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  // Base44 serializes datetimes as naive UTC (no "Z"/offset), which the JS
+  // Date parser misreads as local time — skewing the relative value by the
+  // viewer's timezone offset (e.g. 7h in UTC+7). Force UTC parsing when the
+  // timestamp carries no explicit offset.
+  let s = iso;
+  if (
+    typeof s === "string" &&
+    s.includes("T") &&
+    !s.endsWith("Z") &&
+    !/[+-]\d\d:?\d\d$/.test(s)
+  ) {
+    s = s + "Z";
+  }
+  const diff = (Date.now() - new Date(s).getTime()) / 1000;
+  if (diff < 0) return "just now";
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 };
