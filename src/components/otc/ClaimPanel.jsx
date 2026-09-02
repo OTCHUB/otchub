@@ -7,7 +7,6 @@ import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
-  const [selected, setSelected] = useState(() => new Set());
   const [tpMap, setTpMap] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [plan, setPlan] = useState(null);
@@ -56,15 +55,6 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }, 0);
   const deskSolValue = (dp) =>
     solPriceUsd ? deskUsdValue(dp) / solPriceUsd : null;
-
-  const toggle = (id) =>
-    setSelected((prev) => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  const selectAll = () => setSelected(new Set(desks.map((d) => d.asset_id)));
-  const clearAll = () => setSelected(new Set());
 
   const applyScan = (scanned) => {
     const list = scanned || [];
@@ -128,68 +118,83 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     loadLifetime(address);
   }, [address]);
 
-  const runClaim = async (allDesks) => {
+  // Single unified claim pipeline. Runs three phases in order, each building
+  // and sending its own txs (all simulated before signing, so a failing tx is
+  // skipped with no fee spent):
+  //   1. ACTIVATE  — open any ticker vault accounts that aren't open yet
+  //                  (badge "NEEDS ACTIVATE"). Without these, distribute can't
+  //                  deliver and claim can't withdraw. Skipped if all open.
+  //   2. DISTRIBUTE — push each desk's owed backlog from the protocol pool into
+  //                  its vault so balances are current. Permissionless; a no-op
+  //                  (delivers 0) for tickers already current.
+  //   3. CLAIM     — withdraw every claimable ticker from each vault into the
+  //                  signer's own wallet. The program enforces NFT ownership.
+  // A re-scan runs between phases so each phase reads fresh on-chain state.
+  const runClaimAll = async () => {
     const signer = getSignerForAddress(address);
     if (!signer) {
       log({ type: "err", msg: "No signing wallet connected for this address." });
       return;
     }
-    const targets = allDesks ? plan : plan.filter((d) => selected.has(d.asset_id));
-    if (!targets || !targets.length) {
+    if (!plan || !plan.length) {
       log({ type: "err", msg: "Nothing to claim — run a scan first." });
-      return;
-    }
-    const withClaimable = targets.filter((d) => d.claimable.length);
-    if (!withClaimable.length) {
-      log({ type: "err", msg: "No desks with claimable balance." });
       return;
     }
     setBusy(true);
     try {
-      // Pre-distribute owed backlog so every ticker is current. Claim refuses
-      // ("UndistributedBalance") on tickers whose vault hasn't received the
-      // latest round. Distribute is permissionless; a no-op (delivers 0) for
-      // tickers already current, so this is safe to run unconditionally.
-      log({ type: "info", msg: `Pre-distributing owed stock for ${withClaimable.length} desk(s)...` });
-      const distIxs = await buildDistributeInstructions(withClaimable, address, tpMap);
-      if (distIxs.length) {
-        const distTxs = await packTxs(distIxs, address);
+      // ---- Phase 1: ACTIVATE (only if any ticker account is missing) ----
+      const toActivate = [];
+      for (const d of plan) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
+      if (toActivate.length) {
+        log({ type: "info", msg: `PHASE 1/3 :: ACTIVATE :: opening ${toActivate.length} ticker account(s)...` });
+        const actIxs = await buildActivateInstructions(plan, address, tpMap);
+        const actTxs = await packTxs(actIxs, address);
+        log({ type: "info", msg: `Activate: ${actTxs.length} tx(s) to submit.` });
+        const actRes = await executeClaimTxs(actTxs, signer.signTransactionRaw, log);
+        const actOk = actRes.filter((r) => r.ok).length;
+        log({ type: actRes.length - actOk ? "err" : "ok", msg: `Activate done: ${actOk}/${actRes.length} confirmed.` });
+        if (actOk > 0) await new Promise((r) => setTimeout(r, 5000));
+      } else {
+        log({ type: "info", msg: `PHASE 1/3 :: ACTIVATE :: all ticker accounts already open.` });
+      }
+
+      // ---- Phase 2: DISTRIBUTE (owed backlog → vault) ----
+      log({ type: "info", msg: `PHASE 2/3 :: DISTRIBUTE :: owed stock for ${plan.length} desk(s)...` });
+      const distIxs = await buildDistributeInstructions(plan, address, tpMap);
+      const distTxs = await packTxs(distIxs, address);
+      if (distTxs.length) {
         log({ type: "info", msg: `Distribute: ${distTxs.length} tx(s) to submit.` });
         const distRes = await executeClaimTxs(distTxs, signer.signTransactionRaw, log);
         const distOk = distRes.filter((r) => r.ok).length;
         log({ type: distRes.length - distOk ? "err" : "ok", msg: `Distribute done: ${distOk}/${distRes.length} confirmed.` });
         if (distOk > 0) await new Promise((r) => setTimeout(r, 5000));
       }
-      // Re-scan to read fresh post-distribute balances, then build claims.
+
+      // ---- Phase 3: CLAIM (vault → wallet) ----
       const fresh = await scan({ force: true, silent: true });
-      const claimable = (fresh || [])
-        .filter((d) => (allDesks ? true : selected.has(d.asset_id)))
-        .filter((d) => d.claimable.length);
+      const claimable = (fresh || []).filter((d) => d.claimable.length);
       if (!claimable.length) {
-        log({ type: "err", msg: "Nothing claimable after distribute." });
+        log({ type: "err", msg: "PHASE 3/3 :: CLAIM :: nothing claimable after distribute." });
         return;
       }
-      log({ type: "info", msg: `Building claim ixs for ${claimable.length} desk(s)...` });
+      // Capture pre-claim balances for lifetime delta logging.
+      const pre = {};
+      for (const d of claimable) {
+        pre[d.asset_id] = {};
+        for (const t of d.claimable) pre[d.asset_id][t.mint] = t.amount;
+      }
+      log({ type: "info", msg: `PHASE 3/3 :: CLAIM :: ${claimable.length} desk(s), building ixs...` });
       const ixs = await buildClaimInstructions(claimable, address, tpMap);
-      log({ type: "info", msg: `Packing ${ixs.length} instruction(s) into txs...` });
       const txs = await packTxs(ixs, address);
-      log({ type: "info", msg: `${txs.length} transaction(s) to submit.` });
+      log({ type: "info", msg: `Claim: ${txs.length} tx(s) to submit.` });
       const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
-      log({
-        type: fail ? "err" : "ok",
-        msg: `DONE: ${ok} confirmed, ${fail} failed.`,
-      });
+      log({ type: fail ? "err" : "ok", msg: `CLAIM DONE: ${ok} confirmed, ${fail} failed.` });
       if (ok > 0) {
         if (onClaimed) onClaimed();
-        // Capture pre-claim balances, re-scan on-chain, and log the per-ticker
-        // deltas (claimed = pre − post) as lifetime history for this wallet.
-        const pre = {};
-        for (const d of claimable) {
-          pre[d.asset_id] = {};
-          for (const t of d.claimable) pre[d.asset_id][t.mint] = t.amount;
-        }
+        // Re-scan on-chain and log the per-ticker deltas (claimed = pre − post)
+        // as lifetime history for this wallet.
         const postPlan = await scan({ force: true, silent: true });
         const claimed = [];
         for (const d of postPlan || []) {
@@ -229,124 +234,27 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
   };
 
-  const runActivate = async (allDesks) => {
-    const signer = getSignerForAddress(address);
-    if (!signer) {
-      log({ type: "err", msg: "No signing wallet connected for this address." });
-      return;
-    }
-    const targets = allDesks ? plan : plan.filter((d) => selected.has(d.asset_id));
-    if (!targets || !targets.length) {
-      log({ type: "err", msg: "Nothing selected — scan first." });
-      return;
-    }
-    const toActivate = [];
-    for (const d of targets) {
-      for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
-    }
-    if (!toActivate.length) {
-      log({ type: "info", msg: "All tickers already open on selected desks." });
-      return;
-    }
-    setBusy(true);
-    try {
-      log({ type: "info", msg: `Building activate ixs for ${toActivate.length} ticker(s)...` });
-      const ixs = await buildActivateInstructions(targets, address, tpMap);
-      log({ type: "info", msg: `Packing ${ixs.length} instruction(s)...` });
-      const txs = await packTxs(ixs, address);
-      log({ type: "info", msg: `${txs.length} transaction(s) to submit.` });
-      const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
-      const ok = results.filter((r) => r.ok).length;
-      const fail = results.length - ok;
-      log({ type: fail ? "err" : "ok", msg: `ACTIVATE DONE: ${ok} confirmed, ${fail} failed.` });
-      if (ok > 0) {
-        await scan({ force: true, silent: true });
-        if (onClaimed) onClaimed();
-      }
-    } catch (e) {
-      log({ type: "err", msg: `ACTIVATE_ABORT: ${e.message}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Permissionless delivery: triggers each selected desk's owed stock
-  // backlog (all 13 lineup slots) from the protocol pool into the desk vault,
-  // so it becomes claimable. Simulated per-tx before signing like claim.
-  const runDistribute = async () => {
-    const signer = getSignerForAddress(address);
-    if (!signer) {
-      log({ type: "err", msg: "No signing wallet connected for this address." });
-      return;
-    }
-    const targets = plan ? plan.filter((d) => selected.has(d.asset_id)) : [];
-    if (!targets.length) {
-      log({ type: "err", msg: "Nothing selected — scan & select desks first." });
-      return;
-    }
-    setBusy(true);
-    try {
-      log({ type: "info", msg: `Building distribute ixs for ${targets.length} desk(s) × 13 stocks...` });
-      const ixs = await buildDistributeInstructions(targets, address, tpMap);
-      log({ type: "info", msg: `Packing ${ixs.length} instruction(s)...` });
-      const txs = await packTxs(ixs, address);
-      log({ type: "info", msg: `${txs.length} transaction(s) to submit.` });
-      const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
-      const ok = results.filter((r) => r.ok).length;
-      const fail = results.length - ok;
-      log({ type: fail ? "err" : "ok", msg: `DISTRIBUTE DONE: ${ok} confirmed, ${fail} failed.` });
-      if (ok > 0) {
-        await scan({ force: true, silent: true });
-        if (onClaimed) onClaimed();
-      }
-    } catch (e) {
-      log({ type: "err", msg: `DISTRIBUTE_ABORT: ${e.message}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const totalClaimable = plan
-    ? plan.reduce((a, d) => a + d.claimable.length, 0)
-    : 0;
+  const totalClaimable = plan ? plan.reduce((a, d) => a + d.claimable.length, 0) : 0;
   const totalNeedsActivation = plan
     ? plan.reduce((a, d) => a + (d.tickers || []).filter((t) => !t.exists).length, 0)
     : 0;
-
-  const selectedDesks = plan ? plan.filter((d) => selected.has(d.asset_id)) : [];
-  const selectedUsd = selectedDesks.reduce((s, d) => s + deskUsdValue(d), 0);
-  const selectedSol = solPriceUsd ? selectedUsd / solPriceUsd : null;
   const allUsd = plan ? plan.reduce((s, d) => s + deskUsdValue(d), 0) : 0;
   const allSol = solPriceUsd ? allUsd / solPriceUsd : null;
 
+  const phaseLabel = busy ? "PROCESSING..." : totalNeedsActivation > 0 ? "ACTIVATE → DISTRIBUTE → CLAIM" : "DISTRIBUTE → CLAIM";
+
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-emerald-400/80">
-          CLAIM_TOOL :: STOCK → WALLET
-        </span>
-        <div className="flex gap-1">
-          <button
-            onClick={selectAll}
-            disabled={!desks.length || busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
-          >
-            [SELECT_ALL]
-          </button>
-          <button
-            onClick={clearAll}
-            disabled={busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
-          >
-            [CLEAR]
-          </button>
-        </div>
-      </div>
+      <span className="text-[10px] uppercase tracking-widest text-emerald-400/80">
+        CLAIM_TOOL :: STOCK → WALLET
+      </span>
 
       <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        Each claim moves one ticker's accrued stock out of the desk NFT vault
-        into your own wallet. Every tx is simulated first; a failing sim is
-        skipped (no fee spent). The program enforces you own the NFT.
+        One click runs the full pipeline: open any missing ticker accounts,
+        distribute owed stock into each desk vault, then withdraw every
+        claimable ticker into your wallet. Every tx is simulated first; a
+        failing sim is skipped (no fee spent). The program enforces you own
+        the NFT.
       </p>
 
       {Object.keys(lifetime).length > 0 && (() => {
@@ -359,7 +267,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         );
       })()}
 
-      {/* Desk list */}
+      {/* Desk list (read-only status) */}
       <div className="mt-2 max-h-52 overflow-y-auto border border-green-500/20">
         {desks.length === 0 && (
           <div className="p-3 text-center text-[10px] text-green-500/40">
@@ -367,22 +275,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
           </div>
         )}
         {desks.map((d) => {
-          const sel = selected.has(d.asset_id);
           const deskPlan = plan?.find((p) => p.asset_id === d.asset_id);
           return (
-            <label
+            <div
               key={d.asset_id}
-              className={`flex cursor-pointer items-center gap-2 border-b border-green-500/10 px-2 py-1.5 ${
-                sel ? "bg-emerald-500/10" : "hover:bg-green-500/5"
-              }`}
+              className="flex items-center gap-2 border-b border-green-500/10 px-2 py-1.5"
             >
-              <input
-                type="checkbox"
-                checked={sel}
-                onChange={() => toggle(d.asset_id)}
-                disabled={busy}
-                className="accent-emerald-500"
-              />
               <div className="h-8 w-8 shrink-0 overflow-hidden border border-green-500/20">
                 {d.image_url ? (
                   <Image src={d.image_url} fittingType="fill" className="h-full w-full" />
@@ -443,40 +341,26 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                   </div>
                 )}
               </div>
-            </label>
+            </div>
           );
         })}
       </div>
 
-      {/* Actions */}
+      {/* Actions: a single scan + a single unified claim button */}
       <div className="mt-2 flex flex-wrap gap-1">
         <button
           onClick={() => scan(true)}
           disabled={scanning || busy || !address}
-          className="border border-emerald-500/50 px-2.5 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-30"
+          className="border border-green-500/40 px-2.5 py-1 text-[10px] text-green-400 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
         >
           {scanning ? "SCANNING..." : "[SCAN_DESKS]"}
         </button>
         <button
-          onClick={() => runClaim(false)}
-          disabled={!plan || busy || !totalClaimable}
-          className="border border-emerald-500/50 px-2.5 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-30"
+          onClick={runClaimAll}
+          disabled={!plan || busy || !desks.length}
+          className="border border-emerald-500/60 px-3 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
         >
-          {busy ? "CLAIMING..." : "[CLAIM_SELECTED]"}
-        </button>
-        <button
-          onClick={() => runActivate(false)}
-          disabled={!plan || busy || !totalNeedsActivation}
-          className="border border-cyan-500/50 px-2.5 py-1 text-[10px] text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-30"
-        >
-          {busy ? "..." : "[ACTIVATE_SELECTED]"}
-        </button>
-        <button
-          onClick={runDistribute}
-          disabled={!plan || busy || selectedDesks.length === 0}
-          className="border border-amber-500/50 px-2.5 py-1 text-[10px] text-amber-400 hover:bg-amber-500/10 disabled:opacity-30"
-        >
-          {busy ? "DISTRIBUTING..." : "[DISTRIBUTE_SELECTED]"}
+          {busy ? phaseLabel : "[CLAIM_ALL]"}
         </button>
       </div>
       {plan && (
@@ -487,13 +371,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
               {totalNeedsActivation} ticker(s) need activation
             </span>
           )}
-          {selectedDesks.length > 0 && (
-            <span className="text-emerald-400">
-              SELECTED {selectedDesks.length} :: {fmtSol(selectedSol, 4)} · {fmtUsd(selectedUsd)}
-            </span>
-          )}
           {totalClaimable > 0 && (
-            <span>
+            <span className="text-emerald-400">
               ALL_DESKS :: {fmtSol(allSol, 4)} · {fmtUsd(allUsd)}
             </span>
           )}
