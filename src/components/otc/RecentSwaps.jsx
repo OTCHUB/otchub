@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { fmtUsd } from "@/lib/format";
 
 // Recent $OTC swaps, decoded on-chain from the last transactions on the
 // OTC/SOL pair (see the getRecentOtcSwaps backend function). Polled every
@@ -23,7 +24,7 @@ const fmtUsd2 = (v) =>
     ? "—"
     : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function RecentSwaps({ latest }) {
+export default function RecentSwaps({ latest, unit = "SOL" }) {
   const [swaps, setSwaps] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,14 +71,21 @@ export default function RecentSwaps({ latest }) {
       <div className="grid grid-cols-[46px_1fr_1fr_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
         <span>SIDE</span>
         <span className="text-right">USD</span>
-        <span className="text-right">PRICE (SOL)</span>
+        <span className="text-right">PRICE ({unit})</span>
         <span className="text-right">WALLET</span>
       </div>
 
       <div className="max-h-56 overflow-y-auto">
         {list.length ? (
           list.map((s) => {
-            const price = s.price_sol ?? livePriceSol;
+            const priceSol = s.price_sol ?? livePriceSol;
+            // Column price follows the swap panel's shared USD/SOL unit toggle.
+            const price =
+              unit === "USD"
+                ? priceSol != null && solPriceUsd != null
+                  ? priceSol * solPriceUsd
+                  : null
+                : priceSol;
             const buy = s.side === "BUY";
             // Trade value in USD: prefer the decoded SOL leg × SOL spot,
             // fall back to the $OTC leg × $OTC spot.
@@ -107,7 +115,11 @@ export default function RecentSwaps({ latest }) {
                 </span>
                 <span className="truncate text-right text-amber-300">{fmtUsd2(usd)}</span>
                 <span className="text-right text-cyan-300">
-                  {price != null ? Number(price).toFixed(7) : "—"}
+                  {price == null
+                    ? "—"
+                    : unit === "USD"
+                    ? fmtUsd(price, 5)
+                    : `${Number(price).toFixed(7)} ◎`}
                 </span>
                 <span className="truncate text-right text-green-500/50" title={s.wallet}>
                   {short(s.wallet)}

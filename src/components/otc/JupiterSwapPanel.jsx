@@ -54,6 +54,7 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
   const [solBal, setSolBal] = useState(null);
   const [customSlip, setCustomSlip] = useState(""); // custom slippage % (overrides presets)
   const [prices, setPrices] = useState({}); // mint -> USD spot (SOL + $OTC)
+  const [priceUnit, setPriceUnit] = useState("USD"); // shared USD/SOL toggle for candles + trades feed
   const [txPhase, setTxPhase] = useState(null); // live swap phase for the status overlay
 
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
@@ -300,7 +301,12 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
       </div>
 
       {/* Mini price candles (bootstrap from snapshot history) */}
-      <PriceCandles latest={latest} history={history} />
+      <PriceCandles
+        latest={latest}
+        history={history}
+        unit={priceUnit}
+        onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
+      />
 
       {/* Direction toggle */}
       <div className="mt-2 flex gap-1">
@@ -556,7 +562,7 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
       )}
 
       {/* Recent on-chain swaps feed (public — shown even without a wallet) */}
-      <RecentSwaps latest={latest} />
+      <RecentSwaps latest={latest} unit={priceUnit} />
     </div>
   );
 }

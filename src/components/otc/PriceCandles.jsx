@@ -11,9 +11,10 @@ const TFS = [
   { id: "1D", ms: 24 * 3600 * 1000, keep: 30 },
 ];
 
-export default function PriceCandles({ latest, history }) {
+// `unit` + `onToggleUnit` are owned by the swap panel so the candles chart and
+// the recent-trades price column share one USD/SOL toggle.
+export default function PriceCandles({ latest, history, unit = "USD", onToggleUnit }) {
   const [tf, setTf] = useState("1H");
-  const [unit, setUnit] = useState("USD");
 
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 5) : `${Number(v).toFixed(7)} ◎`);
 
@@ -95,7 +96,7 @@ export default function PriceCandles({ latest, history }) {
             </button>
           ))}
           <button
-            onClick={() => setUnit((u) => (u === "USD" ? "SOL" : "USD"))}
+            onClick={() => onToggleUnit && onToggleUnit()}
             className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300 hover:border-cyan-400/70"
           >
             {unit === "USD" ? "$USD" : "◎SOL"}
