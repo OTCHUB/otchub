@@ -1,4 +1,5 @@
 import React from "react";
+import { Check } from "lucide-react";
 import { fmtSol, fmtUsd, fmtPct } from "@/lib/format";
 import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
 
@@ -137,7 +138,7 @@ export default function ArbitrageCard({ latest, holdings }) {
       <div className="mt-3 flex min-h-0 flex-1 flex-col border border-green-500/20">
         <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
           <span className="text-[9px] uppercase tracking-widest text-green-500/50">
-            NEAR_FLOOR :: TOP_{TOP_N} ({ranked.length}) · NET_ASC
+            NEAR_FLOOR :: TOP_{TOP_N} ({ranked.length}) · NET_ASC · LIVE_VAULT
           </span>
           {excludedEmpty > 0 && (
             <span className="text-[9px] text-red-400/60">
@@ -168,7 +169,13 @@ export default function ArbitrageCard({ latest, holdings }) {
                 </span>
                 <span>
                   STOCK{" "}
-                  <span className="text-emerald-400">{fmtSol(holdSol(h), 2)}</span>
+                  <span className="text-emerald-400">{fmtSol(holdSol(h), 2)}</span>{" "}
+                  <span
+                    className="inline-flex items-center gap-0.5 text-emerald-400/80"
+                    title="Vault balance read live on-chain — stock confirmed unclaimed at scan time"
+                  >
+                    <Check className="h-2.5 w-2.5" /> UNCLAIMED
+                  </span>
                 </span>
                 <span>
                   NET{" "}
