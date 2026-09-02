@@ -7,6 +7,7 @@ import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
+  const [selected, setSelected] = useState(() => new Set());
   const [tpMap, setTpMap] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [plan, setPlan] = useState(null);
@@ -55,6 +56,15 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }, 0);
   const deskSolValue = (dp) =>
     solPriceUsd ? deskUsdValue(dp) / solPriceUsd : null;
+
+  const toggle = (id) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const selectAll = () => setSelected(new Set(desks.map((d) => d.asset_id)));
+  const clearAll = () => setSelected(new Set());
 
   const applyScan = (scanned) => {
     const list = scanned || [];
@@ -140,14 +150,21 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       log({ type: "err", msg: "Nothing to claim — run a scan first." });
       return;
     }
+    // Operate on selected desks, or all owned desks if none are selected.
+    const targetIds = selected.size ? selected : new Set(plan.map((d) => d.asset_id));
+    const targets = plan.filter((d) => targetIds.has(d.asset_id));
+    if (!targets.length) {
+      log({ type: "err", msg: "Nothing to claim — run a scan first." });
+      return;
+    }
     setBusy(true);
     try {
       // ---- Phase 1: ACTIVATE (only if any ticker account is missing) ----
       const toActivate = [];
-      for (const d of plan) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
+      for (const d of targets) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
       if (toActivate.length) {
         log({ type: "info", msg: `PHASE 1/3 :: ACTIVATE :: opening ${toActivate.length} ticker account(s)...` });
-        const actIxs = await buildActivateInstructions(plan, address, tpMap);
+        const actIxs = await buildActivateInstructions(targets, address, tpMap);
         const actTxs = await packTxs(actIxs, address);
         log({ type: "info", msg: `Activate: ${actTxs.length} tx(s) to submit.` });
         const actRes = await executeClaimTxs(actTxs, signer.signTransactionRaw, log);
@@ -159,8 +176,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       }
 
       // ---- Phase 2: DISTRIBUTE (owed backlog → vault) ----
-      log({ type: "info", msg: `PHASE 2/3 :: DISTRIBUTE :: owed stock for ${plan.length} desk(s)...` });
-      const distIxs = await buildDistributeInstructions(plan, address, tpMap);
+      log({ type: "info", msg: `PHASE 2/3 :: DISTRIBUTE :: owed stock for ${targets.length} desk(s)...` });
+      const distIxs = await buildDistributeInstructions(targets, address, tpMap);
       const distTxs = await packTxs(distIxs, address);
       if (distTxs.length) {
         log({ type: "info", msg: `Distribute: ${distTxs.length} tx(s) to submit.` });
@@ -172,7 +189,9 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
 
       // ---- Phase 3: CLAIM (vault → wallet) ----
       const fresh = await scan({ force: true, silent: true });
-      const claimable = (fresh || []).filter((d) => d.claimable.length);
+      const claimable = (fresh || [])
+        .filter((d) => targetIds.has(d.asset_id))
+        .filter((d) => d.claimable.length);
       if (!claimable.length) {
         log({ type: "err", msg: "PHASE 3/3 :: CLAIM :: nothing claimable after distribute." });
         return;
@@ -245,9 +264,27 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
 
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
-      <span className="text-[10px] uppercase tracking-widest text-emerald-400/80">
-        CLAIM_TOOL :: STOCK → WALLET
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-widest text-emerald-400/80">
+          CLAIM_TOOL :: STOCK → WALLET
+        </span>
+        <div className="flex gap-1">
+          <button
+            onClick={selectAll}
+            disabled={!desks.length || busy}
+            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+          >
+            [SELECT_ALL]
+          </button>
+          <button
+            onClick={clearAll}
+            disabled={busy}
+            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+          >
+            [CLEAR]
+          </button>
+        </div>
+      </div>
 
       <p className="mt-2 text-[9px] leading-snug text-green-500/40">
         One click runs the full pipeline: open any missing ticker accounts,
@@ -274,13 +311,29 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
             NO_DESKS_OWNED
           </div>
         )}
-        {desks.map((d) => {
+        {[...desks]
+          .sort((a, b) => {
+            const va = deskUsdValue(plan?.find((p) => p.asset_id === a.asset_id)) || 0;
+            const vb = deskUsdValue(plan?.find((p) => p.asset_id === b.asset_id)) || 0;
+            return vb - va;
+          })
+          .map((d) => {
           const deskPlan = plan?.find((p) => p.asset_id === d.asset_id);
+          const sel = selected.has(d.asset_id);
           return (
-            <div
+            <label
               key={d.asset_id}
-              className="flex items-center gap-2 border-b border-green-500/10 px-2 py-1.5"
+              className={`flex cursor-pointer items-center gap-2 border-b border-green-500/10 px-2 py-1.5 ${
+                sel ? "bg-emerald-500/10" : "hover:bg-green-500/5"
+              }`}
             >
+              <input
+                type="checkbox"
+                checked={sel}
+                onChange={() => toggle(d.asset_id)}
+                disabled={busy}
+                className="accent-emerald-500"
+              />
               <div className="h-8 w-8 shrink-0 overflow-hidden border border-green-500/20">
                 {d.image_url ? (
                   <Image src={d.image_url} fittingType="fill" className="h-full w-full" />
@@ -341,7 +394,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                   </div>
                 )}
               </div>
-            </div>
+            </label>
           );
         })}
       </div>
@@ -360,7 +413,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
           disabled={!plan || busy || !desks.length}
           className="border border-emerald-500/60 px-3 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
         >
-          {busy ? phaseLabel : "[CLAIM_ALL]"}
+          {busy ? phaseLabel : selected.size ? `[CLAIM_SELECTED (${selected.size})]` : "[CLAIM_ALL]"}
         </button>
       </div>
       {plan && (
@@ -371,8 +424,13 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
               {totalNeedsActivation} ticker(s) need activation
             </span>
           )}
-          {totalClaimable > 0 && (
+          {selected.size > 0 && (
             <span className="text-emerald-400">
+              SELECTED {selected.size} desks
+            </span>
+          )}
+          {totalClaimable > 0 && (
+            <span>
               ALL_DESKS :: {fmtSol(allSol, 4)} · {fmtUsd(allUsd)}
             </span>
           )}
