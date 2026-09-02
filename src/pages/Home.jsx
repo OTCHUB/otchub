@@ -13,6 +13,7 @@ import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
 import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
+import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 
 export default function Home() {
@@ -168,6 +169,11 @@ export default function Home() {
             <ArbitrageCard latest={latest} holdings={data?.holdings} />
           </div>
           <ProtocolPanel latest={latest} />
+        </div>
+
+        {/* Jupiter SOL → OTC swap */}
+        <div className="mt-3">
+          <JupiterSwapPanel />
         </div>
 
         {/* Charts */}
