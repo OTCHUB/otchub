@@ -16,6 +16,7 @@ import HoldingsGallery from "@/components/otc/HoldingsGallery";
 import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
+import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
@@ -230,10 +231,15 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        {/* Jupiter SOL → OTC swap */}
-        <div className="mt-3">
-          <CollapsibleCard title="SWAP :: SOL → OTC" id="otc-swap">
-            <JupiterSwapPanel wallet={wallet} />
+        {/* Trade hub: two-way token swap + NFT desk trade routes */}
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className="lg:col-span-2" id="otc-swap">
+            <CollapsibleCard title="TRADE :: $OTC TOKEN">
+              <JupiterSwapPanel wallet={wallet} />
+            </CollapsibleCard>
+          </div>
+          <CollapsibleCard title="TRADE :: NFT DESKS">
+            <NftTradeCard />
           </CollapsibleCard>
         </div>
 

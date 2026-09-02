@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import {
   SOL_MINT,
@@ -7,6 +7,7 @@ import {
   getQuote,
   getSwapTx,
   executeSwap,
+  fetchOtcBalance,
 } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
 
@@ -23,7 +24,17 @@ function fmtOtc(raw) {
   return v.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS });
 }
 
+function fmtLamports(raw) {
+  if (raw == null) return "—";
+  const v = Number(raw) / LAMPORTS_PER_SOL;
+  return v.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
+// Two-way $OTC trading via Jupiter: BUY = SOL -> $OTC, SELL = $OTC -> SOL.
+// Same reliability model as before: every swap tx is simulated before the
+// wallet is asked to sign, so a failing sim aborts with no fee spent.
 export default function JupiterSwapPanel({ wallet }) {
+  const [mode, setMode] = useState("BUY"); // "BUY" | "SELL"
   const [amount, setAmount] = useState("0.1");
   const [slippageBps, setSlippageBps] = useState(100);
   const [quote, setQuote] = useState(null);
@@ -32,13 +43,43 @@ export default function JupiterSwapPanel({ wallet }) {
   const [logs, setLogs] = useState([]);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState(null);
+  const [otcBal, setOtcBal] = useState(null);
 
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
 
+  const loadBalance = async (w) => {
+    const bal = await fetchOtcBalance(w);
+    setOtcBal(bal);
+    return bal;
+  };
+
+  useEffect(() => {
+    if (wallet) loadBalance(wallet);
+    else setOtcBal(null);
+  }, [wallet]);
+
+  const isBuy = mode === "BUY";
+
+  // Raw integer amount for the quote (lamports for BUY, base units for SELL).
+  const rawAmount = () => {
+    const v = parseFloat(amount);
+    if (!v || v <= 0) return null;
+    return isBuy
+      ? Math.round(v * LAMPORTS_PER_SOL)
+      : Math.round(v * Math.pow(10, OTC_DECIMALS));
+  };
+
+  const switchMode = (m) => {
+    setMode(m);
+    setQuote(null);
+    setErr(null);
+    setAmount(m === "BUY" ? "0.1" : otcBal ? String(Math.floor(otcBal * 1000) / 1000) : "");
+  };
+
   const fetchQuote = async () => {
-    const sol = parseFloat(amount);
-    if (!sol || sol <= 0) {
-      setErr("Enter a SOL amount");
+    const raw = rawAmount();
+    if (!raw) {
+      setErr(isBuy ? "Enter a SOL amount" : "Enter an $OTC amount");
       setQuote(null);
       return;
     }
@@ -46,8 +87,10 @@ export default function JupiterSwapPanel({ wallet }) {
     setQuoting(true);
     setQuote(null);
     try {
-      const lamports = Math.round(sol * LAMPORTS_PER_SOL);
-      const q = await getQuote(lamports, slippageBps);
+      const [inputMint, outputMint] = isBuy
+        ? [SOL_MINT, OTC_MINT]
+        : [OTC_MINT, SOL_MINT];
+      const q = await getQuote(inputMint, outputMint, raw, slippageBps);
       setQuote(q);
     } catch (e) {
       setErr(e.message);
@@ -67,22 +110,34 @@ export default function JupiterSwapPanel({ wallet }) {
       setErr("Connect this wallet (above) to sign");
       return;
     }
-    const sol = parseFloat(amount);
-    if (!sol || sol <= 0) {
-      setErr("Enter a SOL amount");
+    const raw = rawAmount();
+    if (!raw) {
+      setErr(isBuy ? "Enter a SOL amount" : "Enter an $OTC amount");
+      return;
+    }
+    if (!isBuy && otcBal != null && parseFloat(amount) > otcBal) {
+      setErr(`$OTC balance too low (${otcBal.toLocaleString()})`);
       return;
     }
     setBusy(true);
     setLogs([]);
     try {
-      log({ type: "info", msg: `Quoting ${sol} SOL -> $OTC...` });
-      const lamports = Math.round(sol * LAMPORTS_PER_SOL);
-      const q = await getQuote(lamports, slippageBps);
+      const [inputMint, outputMint] = isBuy
+        ? [SOL_MINT, OTC_MINT]
+        : [OTC_MINT, SOL_MINT];
+      const payLabel = isBuy ? `${amount} SOL` : `${amount} $OTC`;
+      const recvLabel = isBuy ? "$OTC" : "SOL";
+      log({ type: "info", msg: `Quoting ${payLabel} -> ${recvLabel}...` });
+      const q = await getQuote(inputMint, outputMint, raw, slippageBps);
       setQuote(q);
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
       const built = await getSwapTx(q, wallet);
       const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet);
-      if (res.ok) log({ type: "ok", msg: "SWAP COMPLETE" });
+      if (res.ok) {
+        log({ type: "ok", msg: "SWAP COMPLETE" });
+        // refresh the on-chain $OTC balance once the swap confirms
+        setTimeout(() => wallet && loadBalance(wallet), 3000);
+      }
     } catch (e) {
       log({ type: "err", msg: `SWAP_ABORT: ${e.message}` });
       setErr(e.message);
@@ -105,7 +160,7 @@ export default function JupiterSwapPanel({ wallet }) {
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          SWAP :: SOL → $OTC
+          SWAP :: {isBuy ? "SOL → $OTC" : "$OTC → SOL"}
         </span>
         <button
           onClick={copyCa}
@@ -121,22 +176,70 @@ export default function JupiterSwapPanel({ wallet }) {
         $OTC :: <span className="text-green-300">{OTC_MINT}</span>
       </div>
 
+      {/* Direction toggle */}
+      <div className="mt-2 flex gap-1">
+        <button
+          onClick={() => switchMode("BUY")}
+          disabled={busy}
+          className={`flex-1 border py-1 font-mono text-[10px] font-bold disabled:opacity-30 ${
+            isBuy
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+              : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
+          }`}
+        >
+          [BUY $OTC]
+        </button>
+        <button
+          onClick={() => switchMode("SELL")}
+          disabled={busy}
+          className={`flex-1 border py-1 font-mono text-[10px] font-bold disabled:opacity-30 ${
+            !isBuy
+              ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300"
+              : "border-green-500/30 text-green-500/60 hover:border-cyan-400/40"
+          }`}
+        >
+          [SELL $OTC]
+        </button>
+      </div>
+
       {!wallet ? (
         <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] text-amber-400/80">
           CONNECT WALLET ABOVE TO SWAP
         </div>
       ) : (
         <>
+          {/* Balance row */}
+          <div className="mt-2 flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+            <span className="text-green-500/50">YOUR_$OTC_BALANCE</span>
+            <span className="text-emerald-300">
+              {otcBal == null ? "READING…" : otcBal.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS })}
+            </span>
+          </div>
+
           {/* Amount input */}
-          <div className="mt-3 border border-green-500/20 p-2">
-            <label className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
-              YOU PAY (SOL)
-            </label>
+          <div className="mt-2 border border-green-500/20 p-2">
+            <div className="flex items-center justify-between">
+              <label className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
+                YOU PAY ({isBuy ? "SOL" : "$OTC"})
+              </label>
+              {!isBuy && otcBal > 0 && (
+                <button
+                  onClick={() => {
+                    setAmount(String(otcBal));
+                    setQuote(null);
+                  }}
+                  disabled={busy}
+                  className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+                >
+                  [MAX]
+                </button>
+              )}
+            </div>
             <div className="mt-1 flex items-center gap-2">
               <input
                 type="number"
                 min="0"
-                step="0.01"
+                step={isBuy ? "0.01" : "1"}
                 value={amount}
                 onChange={(e) => {
                   setAmount(e.target.value);
@@ -146,7 +249,9 @@ export default function JupiterSwapPanel({ wallet }) {
                 className="w-full border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
                 placeholder="0.0"
               />
-              <span className="font-mono text-[10px] text-green-500/60">SOL</span>
+              <span className="font-mono text-[10px] text-green-500/60">
+                {isBuy ? "SOL" : "$OTC"}
+              </span>
             </div>
 
             <div className="mt-2 flex items-center justify-between">
@@ -179,7 +284,7 @@ export default function JupiterSwapPanel({ wallet }) {
           <div className="mt-2 border border-green-500/20 p-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
-                YOU RECEIVE ($OTC)
+                YOU RECEIVE ({isBuy ? "$OTC" : "SOL"})
               </span>
               <button
                 onClick={fetchQuote}
@@ -190,12 +295,21 @@ export default function JupiterSwapPanel({ wallet }) {
               </button>
             </div>
             <div className="mt-1 font-mono text-sm font-bold text-emerald-400">
-              {quote ? fmtOtc(quote.outAmount) : "—"}{" "}
-              <span className="text-[9px] font-normal text-green-500/50">$OTC</span>
+              {quote
+                ? isBuy
+                  ? fmtOtc(quote.outAmount)
+                  : fmtLamports(quote.outAmount)
+                : "—"}{" "}
+              <span className="text-[9px] font-normal text-green-500/50">
+                {isBuy ? "$OTC" : "SOL"}
+              </span>
             </div>
             {quote && (
               <div className="mt-1 space-y-0.5 font-mono text-[9px] text-green-500/60">
-                <div>MIN_RECV {fmtOtc(quote.otherAmountThreshold)} $OTC</div>
+                <div>
+                  MIN_RECV {isBuy ? fmtOtc(quote.otherAmountThreshold) : fmtLamports(quote.otherAmountThreshold)}{" "}
+                  {isBuy ? "$OTC" : "SOL"}
+                </div>
                 <div>PRICE_IMPACT {(Number(quote.priceImpactPct || 0) * 100).toFixed(3)}%</div>
                 <div className="text-green-500/40">
                   ROUTE {quote.routePlan?.map((r) => r.swapInfo?.label).join(" → ") || "—"}
@@ -208,13 +322,22 @@ export default function JupiterSwapPanel({ wallet }) {
           <button
             onClick={doSwap}
             disabled={busy || !wallet}
-            className="mt-3 w-full border border-emerald-500/60 py-2 font-mono text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
+            className={`mt-3 w-full border py-2 font-mono text-[11px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
+              isBuy
+                ? "border-emerald-500/60 text-emerald-300"
+                : "border-cyan-400/60 text-cyan-300"
+            }`}
           >
-            {busy ? "SWAPPING..." : "[SWAP SOL → $OTC]"}
+            {busy
+              ? "SWAPPING..."
+              : isBuy
+              ? "[SWAP SOL → $OTC]"
+              : "[SWAP $OTC → SOL]"}
           </button>
           <p className="mt-1.5 text-[9px] leading-snug text-green-500/40">
             Tx is simulated first; a failing sim aborts before signing (no fee
-            spent). Signs with your connected wallet.
+            spent). Signs with your connected wallet. Claims and buys both land
+            in the same $OTC token account shown above.
           </p>
 
           {err && (
