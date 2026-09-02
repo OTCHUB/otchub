@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { detectWallets, connectProvider } from "@/lib/solanaWallets";
+import { detectWallets, connectWallet } from "@/lib/solanaWallets";
 
 export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,7 @@ export default function WalletConnect({ onConnected }) {
     setBusy(true);
     setError(null);
     try {
-      const pk = await connectProvider(wallet.provider);
+      const pk = await connectWallet(wallet);
       if (!pk) throw new Error("No public key returned");
       onConnected?.(pk);
     } catch (e) {
