@@ -4,83 +4,9 @@
 // swaps). The wallet still signs locally; only quote/build requests and the
 // already-signed bytes are relayed.
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import {
-  VersionedTransaction,
-  TransactionMessage,
-  AddressLookupTableAccount,
-  PublicKey,
-  SystemProgram,
-} from "npm:@solana/web3.js@1.98.4";
-import { heliusRpc } from "../../shared/otcSources.ts";
 
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
-
-// Helius Sender (https://www.helius.dev/docs/sending-transactions/
-// jupiter-swap-api-via-sender) broadcasts across all pathways (Helius, Jito,
-// Harmonic, Rakurai...) for a much better landing rate, but REQUIRES the tx
-// to carry a tip transfer of >= 200,000 lamports to one of these Helius tip
-// wallets. The tip instruction is appended to the Jupiter swap tx here,
-// SERVER-SIDE, before the tx is returned to the browser — the user's wallet
-// still reviews and signs it (and the app simulates it) before it is sent.
-const HELIUS_TIP_LAMPORTS = 200_000;
-const HELIUS_TIP_ACCOUNTS = [
-  "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
-  "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
-  "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
-  "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
-  "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
-  "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
-  "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
-  "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
-  "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
-  "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or",
-];
-
-const b64ToBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-const bytesToB64 = (bytes) => {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 4096) {
-    s += String.fromCharCode(...bytes.subarray(i, i + 4096));
-  }
-  return btoa(s);
-};
-
-// Make a Jupiter swap tx Helius-Sender-ready: deserialize it, resolve its
-// address lookup tables, append the required Helius tip transfer, recompile.
-// The message (fee payer, blockhash, swap instructions) is unchanged apart
-// from the added tip — the wallet still signs locally after the app simulates.
-async function makeSenderReady(swapTransactionB64) {
-  const tx = VersionedTransaction.deserialize(b64ToBytes(swapTransactionB64));
-  const lookups = tx.message.addressTableLookups || [];
-  const altAccounts = [];
-  for (const l of lookups) {
-    const r = await heliusRpc("getAccountInfo", [l.accountKey, { encoding: "base64" }]);
-    const data = r?.value?.data?.[0];
-    if (!data) throw new Error("address lookup table fetch failed");
-    // web3.js 1.98 has no AddressLookupTableAccount.fromAccountData — its
-    // static deserialize(data) returns the STATE, which the constructor takes.
-    const state = AddressLookupTableAccount.deserialize(b64ToBytes(data));
-    altAccounts.push(new AddressLookupTableAccount({ key: new PublicKey(l.accountKey), state }));
-  }
-  const decompiled = TransactionMessage.decompile(tx.message, {
-    addressLookupTableAccounts: altAccounts,
-  });
-  const tipAccount = new PublicKey(
-    HELIUS_TIP_ACCOUNTS[Math.floor(Math.random() * HELIUS_TIP_ACCOUNTS.length)]
-  );
-  decompiled.instructions.push(
-    SystemProgram.transfer({
-      fromPubkey: decompiled.payerKey,
-      toPubkey: tipAccount,
-      lamports: HELIUS_TIP_LAMPORTS,
-    })
-  );
-  const ready = new VersionedTransaction(
-    decompiled.compileToV0Message(altAccounts)
-  );
-  return bytesToB64(ready.serialize());
-}
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -180,18 +106,9 @@ export default async function (req) {
       if (!swap?.swapTransaction) {
         return Response.json({ error: "SWAP_BUILD_FAIL: no transaction" }, { status: 502 });
       }
-      // Append the Helius Sender tip so the tx can broadcast through Sender
-      // (all-pathway send — see makeSenderReady). The browser still simulates
-      // and signs the final bytes.
-      try {
-        swap.swapTransaction = await makeSenderReady(swap.swapTransaction);
-        swap.heliusTipLamports = HELIUS_TIP_LAMPORTS;
-      } catch (e) {
-        return Response.json(
-          { error: `SENDER_READY_FAIL: ${e?.message || e}` },
-          { status: 502 }
-        );
-      }
+      // The serialized swap tx is returned UNMODIFIED — the wallet signs the
+      // exact bytes Jupiter built, and the browser broadcasts it through the
+      // app's Helius RPC relay (plain sendTransaction).
       return Response.json({ ok: true, swap });
     }
 

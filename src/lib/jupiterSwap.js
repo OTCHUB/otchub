@@ -139,12 +139,9 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
   }
 
   try {
-    // Broadcast through Helius Sender (multi-pathway send — better landing
-    // rate for swaps); the relay falls back to the regular RPC broadcast if
-    // Sender is unavailable.
-    const r = await relay("sendSender", { tx: Buffer.from(signedBytes).toString("base64") });
+    // Broadcast through the app's Helius RPC relay (plain sendTransaction).
+    const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
     const sig = r.sig;
-    if (r.via) onLog({ type: "info", msg: `BROADCAST_VIA :: ${r.via.toUpperCase()}` });
     onLog({ type: "ok", msg: `SWAP SENT ${sig}`, sig });
     // make sure the swap actually landed — re-broadcast if stuck pending
     onLog({ type: "info", msg: "Confirming landing..." });
