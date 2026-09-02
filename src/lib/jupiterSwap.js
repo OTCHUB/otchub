@@ -103,7 +103,8 @@ export async function simulateSwapTx(base64Tx) {
 // (guards against a tampered/baited transaction not meant for this user) or
 // if simulation fails (no wasted fee, no broken-tx signing).
 export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey) {
-  const unsignedTx = VersionedTransaction.from(Buffer.from(base64Tx, "base64"));
+  // VersionedTransaction has no static .from — the deserializer is .deserialize.
+  const unsignedTx = VersionedTransaction.deserialize(new Uint8Array(Buffer.from(base64Tx, "base64")));
 
   // Safety: the fee payer (first account key) must be the connected wallet.
   if (userPublicKey) {
