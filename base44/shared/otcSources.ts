@@ -83,6 +83,13 @@ export async function fetchAccountBalanceLamports(address) {
   return result?.value ?? null;
 }
 
+export async function fetchTokenSupply(tokenMint) {
+  const result = await heliusRpc("getTokenSupply", [tokenMint]);
+  return result?.value?.uiAmountString != null
+    ? parseFloat(result.value.uiAmountString)
+    : result?.value?.uiAmount ?? null;
+}
+
 export async function fetchCollectionAssets(collectionAddress) {
   const allAssets = [];
   let page = 1;

@@ -8,6 +8,7 @@ import {
   fetchMagicEdenStats,
   fetchMagicEdenListings,
   fetchProtocolStats,
+  fetchTokenSupply,
 } from "../../shared/otcSources.ts";
 
 const LAMPORTS_PER_SOL = 1e9;
@@ -74,15 +75,27 @@ export default async function (req) {
       tokenPriceSol = tokenPriceUsd / solPriceUsd;
     }
 
-    const [potLamports, meStats, listings, assets, stats] = await Promise.all([
+    const [potLamports, meStats, listings, assets, stats, tokenSupply] = await Promise.all([
       fetchAccountBalanceLamports(ADDRESSES.POT),
       fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
       fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL),
       fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
       fetchProtocolStats(),
+      fetchTokenSupply(ADDRESSES.OTC_TOKEN_MINT),
     ]);
 
     const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
+
+    // On-chain OTC supply vs TGE (1B). The gap is burnt forever via desk minting
+    // (100k OTC burned per mint) and ongoing usage.
+    const OTC_TGE_SUPPLY = 1_000_000_000;
+    const tokenTotalSupply = tokenSupply != null ? tokenSupply : null;
+    const tokenBurnt = tokenTotalSupply != null ? OTC_TGE_SUPPLY - tokenTotalSupply : null;
+
+    // Buyback treasury holds OTC tokens — value them in SOL and USD too.
+    const buybackOtc = stats?.buybackOtc
+      ? stats.buybackOtc / Math.pow(10, OTC_DECIMALS)
+      : null;
 
     const totalSupply = assets.length;
     const perDeskHistory = stats?.perDesk || [];
@@ -177,9 +190,14 @@ export default async function (req) {
       protocol_to_pot_sol: solOf(stats?.toPot),
       protocol_to_protocol_sol: solOf(stats?.toProtocol),
       protocol_buyback_sol: solOf(stats?.buybackBalance),
-      protocol_buyback_otc: stats?.buybackOtc
-        ? stats.buybackOtc / Math.pow(10, OTC_DECIMALS)
-        : null,
+      protocol_buyback_otc: buybackOtc,
+      protocol_buyback_otc_value_sol:
+        buybackOtc != null && tokenPriceSol != null ? buybackOtc * tokenPriceSol : null,
+      protocol_buyback_otc_value_usd:
+        buybackOtc != null && tokenPriceUsd != null ? buybackOtc * tokenPriceUsd : null,
+      token_total_supply: tokenTotalSupply,
+      token_burnt: tokenBurnt,
+      token_tge_supply: OTC_TGE_SUPPLY,
       protocol_owed_sol: solOf(stats?.owed),
       protocol_costs_sol: solOf(stats?.costs),
       protocol_coins: stats?.coins ?? null,
