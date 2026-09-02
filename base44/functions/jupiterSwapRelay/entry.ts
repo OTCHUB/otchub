@@ -3,8 +3,6 @@
 // Jupiter directly (browser-side calls hit CORS / rate limits, which broke
 // swaps). The wallet still signs locally; only quote/build requests and the
 // already-signed bytes are relayed.
-import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
 
@@ -37,15 +35,6 @@ const fetchJup = async (url, opts = {}, attempts = 3) => {
 
 export default async function (req) {
   try {
-    const base44 = createClientFromRequest(req);
-    let user = null;
-    try {
-      user = await base44.auth.me();
-    } catch {
-      /* fall through to 401 */
-    }
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-
     const args = await req.json().catch(() => ({}));
     const mode = String(args.mode || "");
 

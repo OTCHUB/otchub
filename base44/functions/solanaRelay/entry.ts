@@ -6,7 +6,6 @@
 // only the already-signed bytes are forwarded, so no private key ever leaves
 // the browser.
 
-import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { heliusRpc } from "../../shared/otcSources.ts";
 
 // Small concurrency-limited map used by the batched relay modes below.
@@ -47,17 +46,6 @@ const sendOne = async (tx) => {
 
 export default async function (req) {
   try {
-    // Auth gate: every relayed call runs against the app's server-side Helius
-    // API key. Without an authenticated-caller check, anonymous traffic could
-    // drain the Helius quota/rate limits (quota abuse) via any mode.
-    const base44 = createClientFromRequest(req);
-    let user = null;
-    try {
-      user = await base44.auth.me();
-    } catch {
-      /* fall through to 401 */
-    }
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const mode = body.mode;
 
