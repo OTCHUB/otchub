@@ -41,7 +41,7 @@ export default function Home() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      await base44.functions.invoke("fetchOtcData", {});
+      await base44.functions.invoke("fetchOtcData", { force: true });
       await load();
     } catch (e) {
       setError(e?.response?.data?.error || e.message || "Refresh failed (admin only)");

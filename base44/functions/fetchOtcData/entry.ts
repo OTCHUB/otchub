@@ -27,6 +27,35 @@ export default async function (req) {
       // no authenticated user — workflow context, allowed
     }
 
+    // Freshness gate (global cache): skip the expensive external RPC/API
+    // calls when a snapshot was ingested recently. The dashboard always
+    // serves the latest stored snapshot, so this avoids redundant on-chain
+    // / market fetches while still showing fresh data. Pass { force: true }
+    // to bypass (manual admin refresh).
+    const reqArgs =
+      req && typeof req === "object"
+        ? req.body && typeof req.body === "object"
+          ? req.body
+          : req
+        : {};
+    if (reqArgs.force !== true) {
+      const recent = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
+      const last = recent?.[0];
+      if (last?.created_date) {
+        const ageMs = Date.now() - new Date(last.created_date).getTime();
+        const FRESH_MS = 10 * 60 * 1000; // 10 minutes
+        if (ageMs < FRESH_MS) {
+          return Response.json({
+            ok: true,
+            cached: true,
+            skipped: true,
+            snapshot_id: last.id,
+            age_ms: ageMs,
+          });
+        }
+      }
+    }
+
     // DexScreener calls run sequentially to avoid concurrent rate-limiting
     const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
     let solPriceUsd = await fetchSolPriceUsd();
