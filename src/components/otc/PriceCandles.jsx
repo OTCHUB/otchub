@@ -1,74 +1,99 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { fmtUsd, fmtCompact } from "@/lib/format";
+import {
+  CANDLE_TFS,
+  tfBucketMs,
+  fetchOtcCandles,
+  buildSnapshotCandles,
+} from "@/lib/dexCandles";
 
-// Mini $OTC candlestick chart for the swap panel. BOOTSTRAP PHASE: candles
-// are aggregated (open/high/low/close) from the stored 5-minute snapshot
-// history — no OHLC feed exists yet, so depth grows as snapshots accumulate
-// (~288/day). The latest live price tick keeps the forming candle current.
-const TFS = [
-  { id: "15M", ms: 15 * 60 * 1000, keep: 96 },
-  { id: "1H", ms: 3600 * 1000, keep: 48 },
-  { id: "4H", ms: 4 * 3600 * 1000, keep: 42 },
-  { id: "1D", ms: 24 * 3600 * 1000, keep: 30 },
-  { id: "ALL", ms: 0, keep: Infinity }, // adaptive bucket, keeps the full history
-];
-
+// Mini $OTC candlestick chart for the swap panel. FULL SERIES: candles
+// bootstrap from the GeckoTerminal OHLCV feed for the OTC/SOL pumpswap pool
+// (the same pair as the DexScreener chart) — the entire history since pool
+// inception arrives in one request. The DexScreener live tick keeps the
+// forming candle current, and snapshot liquidity deltas still mark +/- events.
+//
 // `unit` + `onToggleUnit` are owned by the swap panel so the candles chart and
 // the recent-trades price column share one USD/SOL toggle.
 export default function PriceCandles({ latest, history, unit = "USD", onToggleUnit }) {
   const [tf, setTf] = useState("1H");
+  const [series, setSeries] = useState(null); // full OHLCV from the feed
+  const [src, setSrc] = useState("LOADING"); // LOADING | FULL | FAILED
 
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 5) : `${Number(v).toFixed(7)} ◎`);
 
-  const { candles, snapCount } = useMemo(() => {
-    const key = unit === "USD" ? "token_price_usd" : "token_price_sol";
-    const now = Date.now();
-    const pts = [];
-    let snapCount = 0;
+  // Fetch the full series whenever the timeframe or unit changes (the unit is
+  // a genuinely different series server-side: USD vs quote-token SOL).
+  useEffect(() => {
+    let dead = false;
+    setSrc("LOADING");
+    fetchOtcCandles(tf, unit)
+      .then((c) => {
+        if (!dead) {
+          setSeries(c);
+          setSrc("FULL");
+        }
+      })
+      .catch(() => {
+        if (!dead) setSrc("FAILED");
+      });
+    return () => {
+      dead = true;
+    };
+  }, [tf, unit]);
+
+  // Roll in freshly closed candles every 5 min; the live tick below keeps the
+  // forming candle current in between (the feed's 60s cache absorbs spam).
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchOtcCandles(tf, unit)
+        .then((c) => setSeries(c))
+        .catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [tf, unit]);
+
+  // Closing liquidity per candle bucket (drives the +/- liq markers).
+  const liqByBucket = useMemo(() => {
+    const ms = tfBucketMs(tf);
+    const m = new Map();
     for (const h of history || []) {
-      const v = parseFloat(h?.[key]);
-      const t = new Date(h?.t).getTime();
       const liq = parseFloat(h?.token_liquidity_usd);
-      if (v > 0 && Number.isFinite(t) && t <= now) {
-        pts.push({ t, v, liq: Number.isFinite(liq) ? liq : null });
-        snapCount++;
-      }
+      const t = new Date(h?.t).getTime();
+      if (!Number.isFinite(liq) || !Number.isFinite(t)) continue;
+      const b = Math.floor(t / ms) * ms;
+      const cur = m.get(b);
+      if (!cur || t > cur.t) m.set(b, { t, liq });
     }
-    // Live tick keeps the forming (right-most) candle current between snapshots
+    return m;
+  }, [history, tf]);
+
+  const candles = useMemo(() => {
+    const key = unit === "USD" ? "token_price_usd" : "token_price_sol";
+    let base = null;
+    if (src === "FULL" && series?.length) base = series;
+    else if (src === "FAILED")
+      base = buildSnapshotCandles(history, latest, key, tf); // feed offline -> old snapshot aggregation
+    if (!base?.length) return [];
+
+    const out = base.map((c) => ({ ...c, lc: liqByBucket.get(c.t)?.liq ?? null }));
+
+    // Live DexScreener tick keeps the forming (right-most) candle current.
     const live = parseFloat(latest?.[key]);
     if (live > 0) {
-      const liveLiq = parseFloat(latest?.token_liquidity_usd);
-      pts.push({ t: now, v: live, liq: Number.isFinite(liveLiq) ? liveLiq : null });
-    }
-    pts.sort((a, b) => a.t - b.t);
-
-    // ALL: adaptive bucket — start at 15m and double until the whole history
-    // fits in ~96 candles, so every snapshot since inception stays visible.
-    let ms;
-    let keep;
-    if (tf === "ALL") {
-      const span = pts.length > 1 ? pts[pts.length - 1].t - pts[0].t : 0;
-      ms = 15 * 60 * 1000;
-      while (span / ms > 96) ms *= 2;
-      keep = Infinity;
-    } else {
-      ({ ms, keep } = TFS.find((o) => o.id === tf) || TFS[0]);
-    }
-    const map = new Map();
-    for (const p of pts) {
-      const b = Math.floor(p.t / ms) * ms;
-      const c = map.get(b);
-      if (!c) map.set(b, { t: b, o: p.v, h: p.v, l: p.v, c: p.v, lo: p.liq, lc: p.liq });
-      else {
-        if (p.v > c.h) c.h = p.v;
-        if (p.v < c.l) c.l = p.v;
-        c.c = p.v;
-        if (p.liq != null) c.lc = p.liq;
+      const ms = tfBucketMs(tf);
+      const b = Math.floor(Date.now() / ms) * ms;
+      const last = out[out.length - 1];
+      if (last && b === last.t) {
+        last.c = live;
+        if (live > last.h) last.h = live;
+        if (live < last.l) last.l = live;
+      } else if (!last || b > last.t) {
+        out.push({ t: b, o: live, h: live, l: live, c: live, lc: null });
       }
     }
-    const candles = [...map.values()].sort((a, b) => a.t - b.t).slice(-keep);
-    return { candles, snapCount };
-  }, [history, latest, tf, unit]);
+    return out;
+  }, [series, src, history, latest, tf, unit, liqByBucket]);
 
   const scale = useMemo(() => {
     if (candles.length < 2) return null;
@@ -116,17 +141,17 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
           $OTC :: PRICE_CANDLES
         </span>
         <div className="flex items-center gap-1">
-          {TFS.map((o) => (
+          {Object.keys(CANDLE_TFS).map((id) => (
             <button
-              key={o.id}
-              onClick={() => setTf(o.id)}
+              key={id}
+              onClick={() => setTf(id)}
               className={`border px-1.5 py-0.5 font-mono text-[9px] ${
-                tf === o.id
+                tf === id
                   ? "border-emerald-500/60 text-emerald-400"
                   : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
               }`}
             >
-              [{o.id}]
+              [{id}]
             </button>
           ))}
           <button
@@ -237,14 +262,21 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
           </>
         ) : (
           <div className="flex h-full items-center justify-center font-mono text-[9px] text-green-500/40">
-            BUILDING CANDLES :: WAITING FOR SNAPSHOT DATA…
+            {src === "LOADING"
+              ? "BOOTSTRAPPING :: FETCHING FULL OHLCV SERIES…"
+              : "FEED OFFLINE :: WAITING FOR SNAPSHOT DATA…"}
           </div>
         )}
       </div>
 
-      {/* Bootstrap note */}
+      {/* Series note */}
       <div className="border-t border-green-500/10 px-2 py-1 font-mono text-[8px] text-green-500/40">
-        BOOTSTRAP :: {candles.length} {tf} CANDLE(S) · {snapCount} SNAPSHOTS · DEPTH GROWS OVER TIME
+        SERIES :: {candles.length} {tf} CANDLE(S) ·{" "}
+        {src === "FULL"
+          ? "FULL HISTORY SINCE POOL_INCEPTION :: GECKOTERMINAL OHLCV"
+          : src === "FAILED"
+          ? "FEED OFFLINE :: SNAPSHOT AGGREGATION"
+          : "FETCHING…"}
       </div>
       <div className="border-t border-green-500/10 px-2 pb-1 font-mono text-[8px] text-green-500/40">
         LIQ_MARKERS :: <span className="text-cyan-400">+ ADD</span> /{" "}
