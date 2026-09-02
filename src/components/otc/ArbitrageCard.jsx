@@ -1,5 +1,6 @@
 import React from "react";
 import { fmtSol, fmtUsd, fmtPct } from "@/lib/format";
+import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
 
 const ME_BASE = "https://magiceden.io/item-details";
 
@@ -18,22 +19,38 @@ export default function ArbitrageCard({ latest, holdings }) {
   const floorSol = latest?.secondary_cost_sol;
 
   // Best secondary opportunity: the listed desk whose bundled stock holding
-  // gives the lowest net cost (floor - accrued). Buying secondary acquires the
-  // desk AND its accrued claimable SOL, so net cost = listing - accrued.
-  const listed = (holdings || []).filter(
-    (h) => h.is_listed && h.listing_price_sol != null && h.accrued_value_sol != null
+  // gives the lowest net cost (floor - stock). Buying secondary acquires the
+  // desk AND the stock sitting in its vault — so use the REAL on-chain vault
+  // balance (live scan), not the snapshot's theoretical accrued estimate: a
+  // desk whose owner already claimed holds ZERO real stock, and crediting it
+  // with the stale estimate would recommend a misleading buy. Empty-vault
+  // desks are excluded from the snipe entirely (nothing to claim after buy).
+  const listedAll = (holdings || []).filter(
+    (h) => h.is_listed && h.listing_price_sol != null
   );
+  const { realHold, scanning: liveScanning } = useLiveVaultHoldings(listedAll);
+  const holdSol = (h) =>
+    realHold[h.asset_id]?.loaded
+      ? realHold[h.asset_id].holdingSol || 0
+      : h.accrued_value_sol || 0;
+  const holdIsLive = (h) => !!realHold[h.asset_id]?.loaded;
+  const vaultHasStock = (h) =>
+    realHold[h.asset_id]?.loaded ? !!realHold[h.asset_id].hasStock : true;
+  const listed = listedAll.filter((h) => vaultHasStock(h));
+
   const snipe = listed.length
     ? listed.reduce((best, h) => {
-        const net = h.listing_price_sol - h.accrued_value_sol;
+        const net = h.listing_price_sol - holdSol(h);
         return !best || net < best.net ? { ...h, net } : best;
       }, null)
     : null;
 
-  const bestAccrued = snipe?.accrued_value_sol ?? null;
+  const bestAccrued = snipe ? holdSol(snipe) : null;
   const bestFloor = snipe?.listing_price_sol ?? floorSol;
   const effectiveSecSol =
     bestFloor != null && bestAccrued != null ? bestFloor - bestAccrued : null;
+  // Listed desks skipped because their vaults were already claimed out.
+  const excludedEmpty = listedAll.filter((h) => !vaultHasStock(h)).length;
 
   // Recommendation: lower net cost wins. A fresh mint ships with 0 stock, so
   // its effective cost is the raw mint cost. Secondary net is floor - stock.
@@ -60,7 +77,7 @@ export default function ArbitrageCard({ latest, holdings }) {
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          ARBITRAGE :: MINT vs SECONDARY (+ STOCK)
+          ARBITRAGE :: MINT vs SECONDARY (+ STOCK){liveScanning ? " · SCANNING…" : ""}
         </span>
         <span className={`border px-2 py-0.5 font-mono text-[10px] ${rec.cls}`}>
           {rec.label}
@@ -77,7 +94,7 @@ export default function ArbitrageCard({ latest, holdings }) {
         <Field
           label="SECONDARY_FLOOR"
           value={fmtSol(bestFloor)}
-          sub={`incl. 2% fee + 5% royalty · stock ${fmtSol(bestAccrued, 3)}`}
+          sub={`incl. 2% fee + 5% royalty · stock ${fmtSol(bestAccrued, 3)} ${snipe ? (holdIsLive(snipe) ? "[LIVE]" : "[EST]") : ""}`}
           valueClass="text-cyan-400"
         />
         <Field
@@ -116,8 +133,13 @@ export default function ArbitrageCard({ latest, holdings }) {
       {snipe && (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border border-emerald-500/30 bg-emerald-500/5 p-2 font-mono text-[10px]">
           <span className="text-emerald-400/80">
-            BEST_SNIPES :: {snipe.name} · list {fmtSol(snipe.listing_price_sol, 3)} · stock {fmtSol(snipe.accrued_value_sol, 3)} · net {fmtSol(snipe.net, 3)}
+            BEST_SNIPES :: {snipe.name} · list {fmtSol(snipe.listing_price_sol, 3)} · stock {fmtSol(holdSol(snipe), 3)} [{holdIsLive(snipe) ? "LIVE" : "EST"}] · net {fmtSol(snipe.net, 3)}
           </span>
+          {excludedEmpty > 0 && (
+            <span className="w-full text-red-400/70">
+              {excludedEmpty} listed desk(s) skipped :: vault empty (claimed out)
+            </span>
+          )}
           <a
             href={`${ME_BASE}/${snipe.asset_id}`}
             target="_blank"
