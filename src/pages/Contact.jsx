@@ -46,7 +46,7 @@ export default function Contact() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; CONTACT :: OTC_PULSE
+                &gt; CONTACT :: OTC_HUB
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
@@ -133,7 +133,7 @@ export default function Contact() {
         )}
 
         <p className="mt-2 text-[10px] text-green-500/40">
-          OTC_PULSE is community tooling, not affiliated with otcdesks.cash.
+          OTC_HUB is community tooling, not affiliated with otcdesks.cash.
         </p>
       </div>
     </div>
