@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, executeClaimChunked } from "@/lib/otcClaim";
+import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildDistributeForClaimable, executeClaimChunked } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -163,9 +163,18 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       const orderedIxs = [];
       const claimable = targets.filter((d) => d.claimable.length);
 
+      // DISTRIBUTE is mandatory before CLAIM — the program rejects claim with
+      // UndistributedBalance if a ticker's owed share hasn't been pushed from
+      // the protocol pot into the desk vault yet. distribute(slot) is
+      // permissionless and a no-op for slots already current, so always safe.
+      //   PULL_OWED OFF: distribute only the claimable tickers' slots (minimum
+      //   to unblock their claims).
+      //   PULL_OWED ON: additionally activate missing accounts and distribute
+      //   ALL 13 slots per desk — pulling the full owed backlog into
+      //   currently-empty vaults so they become claimable on the next run.
       if (pullOwed) {
-        // 1. ACTIVATE — open missing ticker vault accounts (only when pulling
-        // owed, since distribute needs the account to deliver into it).
+        // 1. ACTIVATE — open missing ticker vault accounts so distribute can
+        // deliver into them. Must run before distribute.
         const toActivate = [];
         for (const d of targets) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
         if (toActivate.length) {
@@ -175,18 +184,18 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         } else {
           log({ type: "info", msg: `ACTIVATE :: all ticker accounts already open.` });
         }
-        // 2. DISTRIBUTE — pull owed backlog from the protocol pot into each desk
-        // vault (permissionless; no-op for tickers already current).
+        // 2. DISTRIBUTE all 13 slots per desk — pulls full owed backlog.
         const distIxs = await buildDistributeInstructions(targets, address, tpMap);
         orderedIxs.push(...distIxs);
-        log({ type: "info", msg: `DISTRIBUTE :: ${distIxs.length} ixs (${targets.length} desks × 13 slots).` });
-      } else {
-        log({ type: "info", msg: `MODE :: claim-only (vault stock already distributed). Toggle [PULL_OWED] to also pull the owed backlog first.` });
+        log({ type: "info", msg: `DISTRIBUTE_ALL :: ${distIxs.length} ixs (${targets.length} desks × 13 slots) — pulling owed backlog.` });
+      } else if (claimable.length) {
+        // DISTRIBUTE only the claimable tickers' slots — minimum to unblock claims.
+        const distIxs = await buildDistributeForClaimable(claimable, tpMap);
+        orderedIxs.push(...distIxs);
+        log({ type: "info", msg: `DISTRIBUTE :: ${distIxs.length} slot(s) to clear owed before claim.` });
       }
 
-      // 3. CLAIM — withdraw every claimable ticker (already in the vaults) to
-      // the wallet. With PULL_OWED on, distribute lands earlier in the same run
-      // so these claims also capture the freshly-distributed backlog.
+      // 3. CLAIM — withdraw every claimable ticker from the vault to the wallet.
       if (claimable.length) {
         const claimIxs = await buildClaimInstructions(claimable, address, tpMap);
         orderedIxs.push(...claimIxs);
@@ -254,7 +263,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const allSol = solPriceUsd ? allUsd / solPriceUsd : null;
 
   const targetCount = selected.size || (plan ? plan.length : 0);
-  const distIxEst = pullOwed ? 13 * targetCount : 0;
+  const distIxEst = pullOwed ? 13 * targetCount : totalClaimable;
   const estApprovals = Math.ceil((totalClaimable + distIxEst) / 60) || 0;
   const phaseLabel = busy ? "PROCESSING..." : pullOwed ? "PULL_OWED + CLAIM" : "CLAIM";
 
@@ -283,9 +292,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       </div>
 
       <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        Default (PULL_OWED OFF) claims only stock already in the desk vaults — smooth, a few
-        approvals. Turn PULL_OWED ON to also open missing accounts and pull the owed backlog from
-        the protocol pot first (more approvals; run occasionally). Large runs are split into
+        CLAIM always distributes each claimable ticker's owed share from the protocol pot into the
+        desk vault first (required by the program; permissionless, no-op if already current), then
+        withdraws it to your wallet. PULL_OWED ON additionally opens missing ticker accounts and
+        distributes ALL slots — pulling the full owed backlog into currently-empty vaults so they
+        become claimable next run (more approvals; run occasionally). Large runs are split into
         groups, each group = one wallet approval. Every tx is simulated first; a failing sim is
         skipped (no fee spent). The program enforces you own the NFT.
       </p>

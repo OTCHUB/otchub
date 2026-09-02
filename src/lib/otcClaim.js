@@ -470,7 +470,7 @@ export async function executeClaimChunked(
     try {
       signed = await signAllTransactionsRaw(passing);
     } catch (e) {
-      onLog({ type: "err", msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message}` });
+      onLog({ type: "err", msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message || "user rejected the prompt"}` });
       for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "rejected" });
       break; // user rejected — stop the whole run
     }
@@ -611,6 +611,26 @@ export async function buildDistributeInstructions(deskPlans, _user, tokenProgram
   for (const d of deskPlans) {
     for (const s of LINEUP_STOCKS) {
       ixs.push(buildDistributeIx(d.asset_id, s.slot, s.mint, tokenProgramMap));
+    }
+  }
+  return ixs;
+}
+
+const SLOT_BY_SYMBOL = Object.fromEntries(LINEUP_STOCKS.map((s) => [s.symbol, s]));
+
+// Build distribute(index) ixs ONLY for the claimable tickers' slots — the
+// minimum set needed to clear the program's UndistributedBalance guard so the
+// subsequent claims succeed. distribute is permissionless and a no-op for
+// slots already current, so it's always safe to run. Use this (vs the full
+// buildDistributeInstructions) when you want to unblock claims without pulling
+// the full owed backlog into currently-empty vaults.
+export async function buildDistributeForClaimable(deskPlans, tokenProgramMap) {
+  const ixs = [];
+  for (const d of deskPlans) {
+    for (const t of d.claimable || []) {
+      const slot = SLOT_BY_SYMBOL[t.symbol];
+      if (!slot) continue;
+      ixs.push(buildDistributeIx(d.asset_id, slot.slot, slot.mint, tokenProgramMap));
     }
   }
   return ixs;
