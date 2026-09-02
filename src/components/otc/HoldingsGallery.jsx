@@ -105,29 +105,34 @@ export default function HoldingsGallery({ holdings, byStock }) {
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <div className="flex items-center justify-between">
+      {/* Title and controls stack vertically so nothing overflows on narrow
+          screens; buttons wrap and keep a comfortable 36px tap target. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          NFT_HOLDINGS :: {all.length} · LISTED {listed.length} · PRICES INCL. 2% FEE + 5% ROYALTY
+          NFT_HOLDINGS :: {all.length} · LISTED {listed.length}
         </span>
-        <div className="flex items-center gap-1">
-          {["LISTED", "STOCK", "SNIPE"].map((m) => (
+        <span className="text-[9px] text-green-500/40">PRICES INCL. 2% FEE + 5% ROYALTY</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="inline-flex overflow-hidden border border-green-500/30">
+          {["LISTED", "STOCK", "SNIPE"].map((m, i) => (
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={`border px-2 py-0.5 font-mono text-[10px] ${mode === m ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"}`}
+              className={`min-h-[36px] px-3 font-mono text-[10px] ${i > 0 ? "border-l border-green-500/30" : ""} ${mode === m ? "bg-emerald-500/15 text-emerald-400" : "text-green-500/60 hover:text-green-400"}`}
             >
-              [{m}]
+              {m}
             </button>
           ))}
-          <button
-            onClick={() => scanReal(true)}
-            disabled={scanning || !listed.length}
-            className="border border-cyan-500/40 px-2 py-0.5 font-mono text-[10px] text-cyan-400 hover:border-cyan-400 disabled:opacity-30"
-            title="Re-read real on-chain vault balances for listed desks"
-          >
-            {scanning ? "[LIVE…]" : "[RESCAN_LIVE]"}
-          </button>
         </div>
+        <button
+          onClick={() => scanReal(true)}
+          disabled={scanning || !listed.length}
+          className="ml-auto min-h-[36px] border border-cyan-500/40 px-3 font-mono text-[10px] text-cyan-400 hover:border-cyan-400 disabled:opacity-30"
+          title="Re-read real on-chain vault balances for listed desks"
+        >
+          {scanning ? "[LIVE…]" : "[RESCAN_LIVE]"}
+        </button>
       </div>
       <p className="mt-1 font-mono text-[9px] leading-snug text-cyan-500/60">
         STK_HLD shows REAL on-chain vault stock (LIVE), not the snapshot estimate. SNIPE only
@@ -171,7 +176,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className={`mt-1 inline-block border px-1.5 py-0.5 font-mono text-[9px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
+                      className={`mt-1.5 block border px-1.5 py-1.5 text-center font-mono text-[9px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
                     >
                       [BUY_ON_ME ↗]
                     </a>
