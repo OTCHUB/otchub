@@ -43,6 +43,7 @@ const SYSTEM_PROGRAM_ID = new PublicKey(
 const CLAIM_DISC = Buffer.from([62, 198, 214, 193, 213, 159, 108, 210]);
 const OPEN_DISC = Buffer.from([146, 211, 204, 136, 189, 212, 73, 196]);
 const OPEN_EXT_DISC = Buffer.from([218, 121, 110, 45, 87, 244, 170, 225]);
+const DISTRIBUTE_DISC = Buffer.from([191, 44, 223, 207, 164, 236, 126, 61]);
 
 export const STOCKS = [
   { index: 0, symbol: "ANDURIL", mint: "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB", decimals: 9, extended: false },
@@ -351,6 +352,64 @@ export async function buildActivateInstructions(deskPlans, user, tokenProgramMap
   for (const d of deskPlans) {
     for (const t of d.tickers || []) {
       if (!t.exists) ixs.push(buildOpenTickerIx(user, d.asset_id, t, tokenProgramMap));
+    }
+  }
+  return ixs;
+}
+
+// On-chain distribution lineup (slot index -> stock). Recovered from the
+// program's config/config_ext accounts — NOT the same order as STOCKS above.
+// distribute(slot) credits a desk's owed share of that stock from the
+// protocol pool (ATA of the config PDA) into the desk vault's nft_stock ATA.
+// All 13 mints are Token-2022. Permissionless: the fee payer signs the tx but
+// is not an instruction signer, so anyone can trigger delivery for any desk.
+export const LINEUP_STOCKS = [
+  { slot: 0,  symbol: "AAPLx",      mint: "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp", decimals: 8 },
+  { slot: 1,  symbol: "MSFTx",      mint: "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX", decimals: 8 },
+  { slot: 2,  symbol: "NVDAx",      mint: "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", decimals: 8 },
+  { slot: 3,  symbol: "AMZNx",      mint: "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg", decimals: 8 },
+  { slot: 4,  symbol: "CRCLx",      mint: "XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1", decimals: 8 },
+  { slot: 5,  symbol: "SPCXx",      mint: "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8", decimals: 8 },
+  { slot: 6,  symbol: "ANTHROPIC",  mint: "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw", decimals: 9 },
+  { slot: 7,  symbol: "POLYMARKET", mint: "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP", decimals: 9 },
+  { slot: 8,  symbol: "KALSHI",     mint: "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua", decimals: 9 },
+  { slot: 9,  symbol: "NEURALINK",   mint: "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S", decimals: 9 },
+  { slot: 10, symbol: "OTC",        mint: "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump", decimals: 6 },
+  { slot: 11, symbol: "ANDURIL",    mint: "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB", decimals: 9 },
+  { slot: 12, symbol: "OPENAI",     mint: "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF", decimals: 9 },
+];
+
+function buildDistributeIx(assetId, slot, mint, tokenProgramMap) {
+  const vault = vaultPda(new PublicKey(assetId));
+  const tp = new PublicKey(tokenProgramMap?.[mint] || TOKEN_2022_PROGRAM_ID);
+  const stockMint = new PublicKey(mint);
+  // pool = ATA of the config PDA (protocol's holding of this stock).
+  const pool = stockAta(configPda(), mint, tp);
+  const nftStock = nftStockAta(vault, mint, tp);
+  const keys = [
+    { pubkey: configPda(), isSigner: false, isWritable: true },
+    { pubkey: configExtPda(), isSigner: false, isWritable: true },
+    { pubkey: vault, isSigner: false, isWritable: true },
+    { pubkey: vaultExtPda(vault), isSigner: false, isWritable: true },
+    { pubkey: stockMint, isSigner: false, isWritable: false },
+    { pubkey: pool, isSigner: false, isWritable: true },
+    { pubkey: nftStock, isSigner: false, isWritable: true },
+    { pubkey: tp, isSigner: false, isWritable: false },
+    { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+  ];
+  const data = Buffer.concat([DISTRIBUTE_DISC, Buffer.from([slot])]);
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys, data });
+}
+
+// Build distribute(index) ixs for every lineup slot for each selected desk.
+// Permissionless delivery: triggers the desk's owed stock backlog into its
+// vault so it becomes claimable. No-op (succeeds, delivers 0) for slots the
+// desk is already current on.
+export async function buildDistributeInstructions(deskPlans, _user, tokenProgramMap) {
+  const ixs = [];
+  for (const d of deskPlans) {
+    for (const s of LINEUP_STOCKS) {
+      ixs.push(buildDistributeIx(d.asset_id, s.slot, s.mint, tokenProgramMap));
     }
   }
   return ixs;
