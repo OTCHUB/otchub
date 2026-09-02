@@ -57,7 +57,7 @@ export default function Home() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black font-mono">
         <span className="text-green-400">
-          <span className="animate-pulse">▋</span> LOADING OTC_PULSE...
+          <span className="animate-pulse">▋</span> LOADING OTC_HUB...
         </span>
       </div>
     );
@@ -71,21 +71,35 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; OTC_PULSE :: SOLANA
+                &gt; OTC_HUB :: SOLANA
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
                 LAST_UPDATE {timeAgo(latest?.created_date)} · {data?.snapshot_count || 0} SNAPSHOTS
               </p>
             </div>
-            <button
-              onClick={refresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1.5 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10 disabled:opacity-40"
-            >
-              <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
-              [REFRESH]
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href="https://otcdesks.cash"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+                title="Official otcdesks.cash protocol app"
+              >
+                [OTC_APP ↗]
+              </a>
+              <button
+                onClick={refresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-1.5 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+                [REFRESH]
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-400/80">
+            COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH · UNOFFICIAL ANALYTICS DASHBOARD
           </div>
           {error && (
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-400">
@@ -201,8 +215,9 @@ export default function Home() {
           <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} />
         </div>
 
-        <footer className="mt-4 text-center text-[10px] text-green-500/30">
-          OTC_PULSE v1.0 · DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH
+        <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
+          <div>OTC_HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTCDESKS.CASH</div>
+          <div>DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH · OFFICIAL APP: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
         </footer>
       </div>
     </div>
