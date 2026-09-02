@@ -20,6 +20,9 @@
     "accrued_value_usd": {
       "type": "number"
     },
+    "mint_day": {
+      "type": "string"
+    },
     "is_listed": {
       "type": "boolean"
     },

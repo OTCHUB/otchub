@@ -185,16 +185,39 @@ export default async function (req) {
       const m = l.tokenMint || l.token_mint || l.id;
       if (m && l.price) priceMap.set(m, l.price);
     }
+    // Accurate per-desk accrued PDA value: each desk earns the daily per-desk
+    // distribution from the day it was minted. Mint day is derived from the
+    // desk's number (e.g. "OTC Desk #1108") against the cumulative desks/day.
+    const dayRows = perDeskHistory.map((d) => ({
+      day: d.day,
+      cumDesks: d.desks || 0,
+      perDeskSol: d.lamports ? d.lamports / LAMPORTS_PER_SOL : 0,
+    }));
+    const accruedForDesk = (num) => {
+      let idx = dayRows.findIndex((r) => r.cumDesks >= num);
+      if (idx < 0) idx = dayRows.length - 1;
+      if (idx < 0) return { mintDay: null, accrued: perDeskAccruedSol };
+      let acc = 0;
+      for (let i = idx; i < dayRows.length; i++) acc += dayRows[i].perDeskSol;
+      return { mintDay: dayRows[idx].day, accrued: acc };
+    };
+
     const holdings = assets.map((a) => {
       const id = a.id || a.address || "";
       const lp = priceMap.get(id);
+      const name = a.content?.metadata?.name || a.name || "OTC Desk";
+      const nm = name.match(/#(\d+)/);
+      const { mintDay, accrued } = nm
+        ? accruedForDesk(parseInt(nm[1], 10))
+        : { mintDay: null, accrued: perDeskAccruedSol };
       return {
         asset_id: id,
-        name: a.content?.metadata?.name || a.name || "OTC Desk",
+        name,
         owner: a.ownership?.owner || null,
         image_url: a.content?.files?.[0]?.uri || a.content?.links?.image || null,
-        accrued_value_sol: perDeskAccruedSol,
-        accrued_value_usd: perDeskAccruedUsd,
+        accrued_value_sol: accrued,
+        accrued_value_usd: accrued != null && solPriceUsd ? accrued * solPriceUsd : null,
+        mint_day: mintDay,
         is_listed: listedSet.has(id),
         listing_price_sol: lp != null ? lp / LAMPORTS_PER_SOL : null,
         listing_price_usd: lp != null && solPriceUsd ? (lp / LAMPORTS_PER_SOL) * solPriceUsd : null,
