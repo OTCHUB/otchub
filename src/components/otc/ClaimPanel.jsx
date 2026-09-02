@@ -139,17 +139,37 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       log({ type: "err", msg: "Nothing to claim — run a scan first." });
       return;
     }
-    const claimable = targets.filter((d) => d.claimable.length);
-    if (!claimable.length) {
+    const withClaimable = targets.filter((d) => d.claimable.length);
+    if (!withClaimable.length) {
       log({ type: "err", msg: "No desks with claimable balance." });
       return;
     }
     setBusy(true);
     try {
-      log({
-        type: "info",
-        msg: `Building claim ixs for ${claimable.length} desk(s)...`,
-      });
+      // Pre-distribute owed backlog so every ticker is current. Claim refuses
+      // ("UndistributedBalance") on tickers whose vault hasn't received the
+      // latest round. Distribute is permissionless; a no-op (delivers 0) for
+      // tickers already current, so this is safe to run unconditionally.
+      log({ type: "info", msg: `Pre-distributing owed stock for ${withClaimable.length} desk(s)...` });
+      const distIxs = await buildDistributeInstructions(withClaimable, address, tpMap);
+      if (distIxs.length) {
+        const distTxs = await packTxs(distIxs, address);
+        log({ type: "info", msg: `Distribute: ${distTxs.length} tx(s) to submit.` });
+        const distRes = await executeClaimTxs(distTxs, signer.signTransactionRaw, log);
+        const distOk = distRes.filter((r) => r.ok).length;
+        log({ type: distRes.length - distOk ? "err" : "ok", msg: `Distribute done: ${distOk}/${distRes.length} confirmed.` });
+        if (distOk > 0) await new Promise((r) => setTimeout(r, 5000));
+      }
+      // Re-scan to read fresh post-distribute balances, then build claims.
+      const fresh = await scan({ force: true, silent: true });
+      const claimable = (fresh || [])
+        .filter((d) => (allDesks ? true : selected.has(d.asset_id)))
+        .filter((d) => d.claimable.length);
+      if (!claimable.length) {
+        log({ type: "err", msg: "Nothing claimable after distribute." });
+        return;
+      }
+      log({ type: "info", msg: `Building claim ixs for ${claimable.length} desk(s)...` });
       const ixs = await buildClaimInstructions(claimable, address, tpMap);
       log({ type: "info", msg: `Packing ${ixs.length} instruction(s) into txs...` });
       const txs = await packTxs(ixs, address);

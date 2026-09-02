@@ -184,24 +184,23 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
   const nftStock = nftStockAta(vault, ticker.mint, tp);
   const userStock = userStockAta(userPk, ticker.mint, tp);
 
+  // The claim instruction ALWAYS requires config_ext + vault_ext, even for
+  // non-extended tickers — without them the program reads the next account
+  // (the Metaplex Core asset) as config_ext and fails AccountOwnedByWrongProgram.
   const keys = [
     { pubkey: userPk, isSigner: true, isWritable: true },
     { pubkey: configPda(), isSigner: false, isWritable: false },
+    { pubkey: configExtPda(), isSigner: false, isWritable: false },
+    { pubkey: assetPk, isSigner: false, isWritable: false },
+    { pubkey: vault, isSigner: false, isWritable: true },
+    { pubkey: vaultExtPda(vault), isSigner: false, isWritable: true },
+    { pubkey: new PublicKey(ticker.mint), isSigner: false, isWritable: false },
+    { pubkey: nftStock, isSigner: false, isWritable: true },
+    { pubkey: userStock, isSigner: false, isWritable: true },
+    { pubkey: tp, isSigner: false, isWritable: false },
+    { pubkey: ATA_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
   ];
-  if (ticker.extended) {
-    keys.push({ pubkey: configExtPda(), isSigner: false, isWritable: false });
-  }
-  keys.push({ pubkey: assetPk, isSigner: false, isWritable: false });
-  keys.push({ pubkey: vault, isSigner: false, isWritable: true });
-  if (ticker.extended) {
-    keys.push({ pubkey: vaultExtPda(vault), isSigner: false, isWritable: true });
-  }
-  keys.push({ pubkey: new PublicKey(ticker.mint), isSigner: false, isWritable: false });
-  keys.push({ pubkey: nftStock, isSigner: false, isWritable: true });
-  keys.push({ pubkey: userStock, isSigner: false, isWritable: true });
-  keys.push({ pubkey: tp, isSigner: false, isWritable: false });
-  keys.push({ pubkey: ATA_PROGRAM_ID, isSigner: false, isWritable: false });
-  keys.push({ pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false });
 
   const data = Buffer.concat([CLAIM_DISC, Buffer.from([ticker.index])]);
   return new TransactionInstruction({
@@ -285,7 +284,12 @@ export async function executeClaimTxs(txs, signTransactionRaw, onLog) {
     onLog({ type: "info", msg: `TX ${i + 1}/${txs.length} :: simulating...` });
     const sim = await simulate(tx);
     if (!sim.ok) {
-      onLog({ type: "err", msg: `TX ${i + 1} SIM_FAIL: ${sim.err}` });
+      const errLine = (sim.logs || []).find((l) => l.includes("Error Message")) ||
+        (sim.logs || []).find((l) => l.includes("Error Code"));
+      onLog({
+        type: "err",
+        msg: `TX ${i + 1} SIM_FAIL: ${sim.err}${errLine ? ` :: ${errLine.replace("Program log: ", "")}` : ""}`,
+      });
       results.push({ ok: false, reason: sim.err });
       continue;
     }
