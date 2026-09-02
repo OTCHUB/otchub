@@ -111,14 +111,24 @@ export async function fetchMagicEdenStats(symbol) {
   }
 }
 
-export async function fetchMagicEdenListings(symbol, limit = 20) {
+export async function fetchMagicEdenListings(symbol, limit = 1000) {
   try {
-    const res = await fetch(
-      `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=0`
-    );
-    if (!res.ok) return [];
-    const json = await res.json();
-    return Array.isArray(json) ? json : [];
+    const all = [];
+    let offset = 0;
+    // Paginate the entire listings set so every listed desk gets its true
+    // current Magic Eden price — not just the first page.
+    while (offset < 10000) {
+      const res = await fetch(
+        `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=${offset}`
+      );
+      if (!res.ok) break;
+      const json = await res.json();
+      const page = Array.isArray(json) ? json : [];
+      all.push(...page);
+      if (page.length < limit) break;
+      offset += limit;
+    }
+    return all;
   } catch (e) {
     return [];
   }

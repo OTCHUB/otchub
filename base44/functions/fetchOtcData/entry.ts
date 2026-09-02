@@ -79,7 +79,7 @@ export default async function (req) {
     const [potLamports, meStats, listings, assets, stats] = await Promise.all([
       fetchAccountBalanceLamports(ADDRESSES.POT),
       fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
-      fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL, 50),
+      fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL),
       fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
       fetchProtocolStats(),
     ]);
