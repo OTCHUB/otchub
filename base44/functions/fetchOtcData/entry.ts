@@ -38,7 +38,7 @@ export default async function (req) {
       const last = recent?.[0];
       if (last?.created_date) {
         const ageMs = Date.now() - new Date(last.created_date).getTime();
-        const FRESH_MS = 10 * 60 * 1000; // 10 minutes
+        const FRESH_MS = 4 * 60 * 1000; // 4 minutes (5-min cadence, allow jitter)
         if (ageMs < FRESH_MS) {
           return Response.json({
             ok: true,
