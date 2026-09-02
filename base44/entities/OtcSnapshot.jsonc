@@ -1,0 +1,70 @@
+{
+  "name": "OtcSnapshot",
+  "type": "object",
+  "properties": {
+    "sol_price_usd": {
+      "type": "number"
+    },
+    "token_price_usd": {
+      "type": "number"
+    },
+    "token_price_sol": {
+      "type": "number"
+    },
+    "token_market_cap": {
+      "type": "number"
+    },
+    "token_volume_24h": {
+      "type": "number"
+    },
+    "token_liquidity_usd": {
+      "type": "number"
+    },
+    "token_price_change_24h": {
+      "type": "number"
+    },
+    "nft_floor_sol": {
+      "type": "number"
+    },
+    "nft_floor_usd": {
+      "type": "number"
+    },
+    "nft_listed_count": {
+      "type": "integer"
+    },
+    "nft_total_supply": {
+      "type": "integer"
+    },
+    "nft_mint_price_sol": {
+      "type": "number"
+    },
+    "nft_mint_price_usd": {
+      "type": "number"
+    },
+    "pot_token_balance": {
+      "type": "number"
+    },
+    "pot_token_value_usd": {
+      "type": "number"
+    },
+    "protocol_wallet_balance": {
+      "type": "number"
+    },
+    "mint_cost_usd": {
+      "type": "number"
+    },
+    "secondary_cost_usd": {
+      "type": "number"
+    },
+    "spread_usd": {
+      "type": "number"
+    },
+    "spread_pct": {
+      "type": "number"
+    },
+    "recommendation": {
+      "type": "string"
+    }
+  },
+  "required": []
+}

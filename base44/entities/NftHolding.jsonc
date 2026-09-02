@@ -1,0 +1,30 @@
+{
+  "name": "NftHolding",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "stock_token_balance": {
+      "type": "number"
+    },
+    "stock_token_value_usd": {
+      "type": "number"
+    },
+    "is_listed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "asset_id"
+  ]
+}
