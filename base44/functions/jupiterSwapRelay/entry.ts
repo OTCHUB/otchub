@@ -10,10 +10,40 @@ const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
+// Jupiter's lite API intermittently 429s (rate limit) or throws (timeouts /
+// connection resets) — a single attempt surfaced as user-facing quote/swap
+// failures. Retry transient failures a few times with backoff; only give up
+// after the retries are exhausted.
+const fetchJup = async (url, opts = {}, attempts = 3) => {
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(12000) });
+      if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        continue;
+      }
+    }
+  }
+  throw lastErr || new Error("Jupiter request failed");
+};
+
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch {
+      /* fall through to 401 */
+    }
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const args = await req.json().catch(() => ({}));
@@ -35,7 +65,7 @@ export default async function (req) {
       const url =
         `${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}` +
         `&amount=${amount}&slippageBps=${slippageBps}&swapMode=ExactIn`;
-      const res = await fetch(url);
+      const res = await fetchJup(url);
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         return Response.json(
@@ -53,13 +83,14 @@ export default async function (req) {
         return Response.json({ error: "Invalid swap params" }, { status: 400 });
       }
       // Jupiter's /quote returns swapInfo.updateContextSlot as a NUMBER but
-      // its own /swap endpoint requires it as a STRING — a verbatim round-trip
-      // fails with 422 "invalid type: integer, expected a string" on every
-      // swap build. Normalize it (and any other slot field) to a string.
+      // its own /swap endpoint requires it as a STRING. The TOP-LEVEL
+      // contextSlot is the opposite — it must stay a NUMBER (u64). A verbatim
+      // round-trip fails with 422 on every swap build, so normalize ONLY
+      // updateContextSlot; leave every other field untouched.
       const normalized = JSON.parse(JSON.stringify(quoteResponse), (key, value) =>
-        /slot$/i.test(key) && typeof value === "number" ? String(value) : value
+        key === "updateContextSlot" && typeof value === "number" ? String(value) : value
       );
-      const res = await fetch(SWAP_URL, {
+      const res = await fetchJup(SWAP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quoteResponse: normalized, userPublicKey }),
