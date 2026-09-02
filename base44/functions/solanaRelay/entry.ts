@@ -49,6 +49,18 @@ export default async function (req) {
       return Response.json({ ok: true, sig });
     }
 
+    if (mode === "accounts") {
+      const pubkeys = body.pubkeys;
+      if (!Array.isArray(pubkeys)) return Response.json({ error: "pubkeys required" }, { status: 400 });
+      const r = await heliusRpc("getMultipleAccounts", [pubkeys, { encoding: "base64" }]);
+      const value = r?.value || [];
+      const accounts = value.map((a, i) => {
+        if (!a) return null;
+        return { pubkey: pubkeys[i], owner: a.owner || null, data: a.data?.[0] || null };
+      });
+      return Response.json({ ok: true, accounts });
+    }
+
     return Response.json({ error: "unknown mode" }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e?.message || "relay failed" }, { status: 500 });

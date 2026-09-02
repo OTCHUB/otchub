@@ -8,19 +8,14 @@
 
 import { Buffer } from "buffer";
 import "@/lib/bufferPolyfill";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js";
+import { relay } from "@/lib/otcClaim";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 export const OTC_DECIMALS = 6;
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
-
-let _conn = null;
-function conn() {
-  if (!_conn) _conn = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-  return _conn;
-}
 
 // Fetch a SOL -> OTC quote for a given amount of lamports.
 export async function getQuote(solLamports, slippageBps = 100) {
@@ -52,15 +47,11 @@ export async function getSwapTx(quoteResponse, userPublicKey) {
 // Simulate the (unsigned) versioned swap tx before asking the wallet to sign.
 export async function simulateSwapTx(base64Tx) {
   try {
-    const tx = VersionedTransaction.from(Buffer.from(base64Tx, "base64"));
-    const res = await conn().simulateTransaction(tx, {
-      replaceRecentConnectedBlockhash: true,
-      sigVerify: false,
-    });
-    if (res.value.err) {
-      return { ok: false, err: JSON.stringify(res.value.err), logs: res.value.logs };
+    const r = await relay("simulate", { tx: base64Tx });
+    if (r.err) {
+      return { ok: false, err: r.err, logs: r.logs };
     }
-    return { ok: true, units: res.value.unitsConsumed, logs: res.value.logs };
+    return { ok: true, units: r.units, logs: r.logs };
   } catch (e) {
     return { ok: false, err: e.message, logs: [] };
   }
@@ -103,10 +94,8 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
   }
 
   try {
-    const sig = await conn().sendRawTransaction(Buffer.from(signedBytes), {
-      skipPreflight: true,
-      maxRetries: 3,
-    });
+    const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
+    const sig = r.sig;
     onLog({ type: "ok", msg: `SWAP SENT ${sig}`, sig });
     return { ok: true, sig };
   } catch (e) {

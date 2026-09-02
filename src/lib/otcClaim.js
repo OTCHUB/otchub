@@ -75,7 +75,7 @@ function conn() {
 // The public api.mainnet-beta endpoint rate-limits / 403s from the browser,
 // which broke packing and sending. The wallet still signs locally; only the
 // already-signed bytes are relayed.
-async function relay(mode, payload = {}) {
+export async function relay(mode, payload = {}) {
   const res = await base44.functions.invoke("solanaRelay", { mode, ...payload });
   const data = res?.data || {};
   if (data.error) throw new Error(data.error);
@@ -110,44 +110,45 @@ function userStockAta(user, mint, tokenProgram) {
 
 // Resolve which token program owns each stock mint (Token-2022 vs standard).
 export async function resolveTokenPrograms() {
-  const c = conn();
-  const mints = STOCKS.map((s) => new PublicKey(s.mint));
-  const infos = await c.getMultipleAccountsInfo(mints);
+  const mints = STOCKS.map((s) => s.mint);
+  const r = await relay("accounts", { pubkeys: mints });
+  const accounts = r.accounts || [];
   const map = {};
+  const t22 = TOKEN_2022_PROGRAM_ID.toBase58();
   STOCKS.forEach((s, i) => {
-    const owner = infos[i]?.owner;
-    map[s.mint] =
-      owner && owner.equals(TOKEN_2022_PROGRAM_ID)
-        ? TOKEN_2022_PROGRAM_ID
-        : TOKEN_PROGRAM_ID;
+    const owner = accounts[i]?.owner;
+    map[s.mint] = owner === t22 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
   });
   return map;
 }
 
 // Scan desks: for each asset + ticker, read the on-chain nft_stock balance.
 export async function scanDesks(assets, tokenProgramMap) {
-  const c = conn();
   const result = [];
   for (const a of assets) {
     const assetPk = new PublicKey(a.asset_id);
     const vault = vaultPda(assetPk);
-    const tickerRows = [];
     const nftStockAddrs = STOCKS.map((s) =>
-      nftStockAta(vault, s.mint, tokenProgramMap[s.mint])
+      nftStockAta(vault, s.mint, tokenProgramMap[s.mint]).toBase58()
     );
-    const infos = await c.getMultipleAccountsInfo(nftStockAddrs);
+    const r = await relay("accounts", { pubkeys: nftStockAddrs });
+    const accounts = r.accounts || [];
+    const tickerRows = [];
     for (let i = 0; i < STOCKS.length; i++) {
       const s = STOCKS[i];
-      const acc = infos[i];
+      const acc = accounts[i];
       let amount = 0n;
       let exists = false;
-      if (acc && acc.data && acc.data.length >= ACCOUNT_SIZE) {
+      if (acc?.data) {
         try {
-          const decoded = AccountLayout.decode(acc.data);
-          // owner field must be the vault for it to be the right account
-          if (decoded.owner.equals(vault)) {
-            amount = decoded.amount;
-            exists = true;
+          const buf = Buffer.from(acc.data, "base64");
+          if (buf.length >= ACCOUNT_SIZE) {
+            const decoded = AccountLayout.decode(buf);
+            // owner field must be the vault for it to be the right account
+            if (decoded.owner.equals(vault)) {
+              amount = decoded.amount;
+              exists = true;
+            }
           }
         } catch {
           /* not a token account */
