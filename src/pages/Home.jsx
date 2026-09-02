@@ -19,7 +19,6 @@ import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
-import DistributeCrank from "@/components/otc/DistributeCrank";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
@@ -304,27 +303,6 @@ export default function Home() {
           <CollapsibleCard title="BUYBACKS">
             <BuybacksPanel latest={latest} />
           </CollapsibleCard>
-        </div>
-
-        {/* Permissionless global distribute crank + code-stream terminal filler (desktop) */}
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <CollapsibleCard title="☢ DISTRIBUTE :: GLOBAL CRANK">
-              <DistributeCrank wallet={wallet} allDesks={data?.holdings} latest={latest} />
-            </CollapsibleCard>
-          </div>
-          <div className="hidden border border-green-500/30 bg-black lg:flex lg:flex-col">
-            <div className="flex items-center justify-between border-b border-green-500/20 px-3 py-2 text-[10px] uppercase tracking-widest text-green-500/70">
-              <span>TERMINAL :: CODE_STREAM</span>
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                COMPILING
-              </span>
-            </div>
-            <div className="min-h-0 flex-1">
-              <TerminalVisual variant="code" />
-            </div>
-          </div>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
