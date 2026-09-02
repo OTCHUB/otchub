@@ -8,6 +8,7 @@ import {
   getSwapTx,
   executeSwap,
   fetchOtcBalance,
+  fetchSolBalance,
 } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
@@ -46,6 +47,8 @@ export default function JupiterSwapPanel({ wallet }) {
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState(null);
   const [otcBal, setOtcBal] = useState(null);
+  const [solBal, setSolBal] = useState(null);
+  const [customSlip, setCustomSlip] = useState(""); // custom slippage % (overrides presets)
   const [prices, setPrices] = useState({}); // mint -> USD spot (SOL + $OTC)
 
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
@@ -63,14 +66,18 @@ export default function JupiterSwapPanel({ wallet }) {
   }, [OTC_MINT]);
 
   const loadBalance = async (w) => {
-    const bal = await fetchOtcBalance(w);
+    const [bal, sol] = await Promise.all([fetchOtcBalance(w), fetchSolBalance(w)]);
     setOtcBal(bal);
+    setSolBal(sol);
     return bal;
   };
 
   useEffect(() => {
     if (wallet) loadBalance(wallet);
-    else setOtcBal(null);
+    else {
+      setOtcBal(null);
+      setSolBal(null);
+    }
   }, [wallet]);
 
   const isBuy = mode === "BUY";
@@ -132,6 +139,19 @@ export default function JupiterSwapPanel({ wallet }) {
       setQuoting(false);
     }
   };
+
+  // Auto-quote: debounce 500ms after the amount/mode/slippage changes so the
+  // trade size updates live without pressing [QUOTE] (manual button kept).
+  useEffect(() => {
+    if (!wallet || busy) return;
+    const raw = rawAmount();
+    if (!raw) return;
+    const t = setTimeout(() => {
+      fetchQuote();
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount, mode, slippageBps, wallet]);
 
   const doSwap = async () => {
     setErr(null);
@@ -242,13 +262,24 @@ export default function JupiterSwapPanel({ wallet }) {
         </div>
       ) : (
         <>
-          {/* Balance row */}
-          <div className="mt-2 flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
-            <span className="text-green-500/50">YOUR_$OTC_BALANCE</span>
-            <span className="text-emerald-300">
-              {otcBal == null ? "READING…" : otcBal.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS })}
-              {balUsd != null && <span className="ml-1 text-green-500/50">≈ {fmtUsd(balUsd)}</span>}
-            </span>
+          {/* Balance rows: native SOL + $OTC, both with live USD equivalents */}
+          <div className="mt-2 grid grid-cols-2 gap-1">
+            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+              <span className="text-green-500/50">SOL_BAL</span>
+              <span className="text-emerald-300">
+                {solBal == null ? "READING…" : solBal.toFixed(4)}
+                {solBal != null && solUsd != null && (
+                  <span className="ml-1 text-green-500/50">≈ {fmtUsd(solBal * solUsd)}</span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+              <span className="text-green-500/50">$OTC_BAL</span>
+              <span className="text-emerald-300">
+                {otcBal == null ? "READING…" : otcBal.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS })}
+                {balUsd != null && <span className="ml-1 text-green-500/50">≈ {fmtUsd(balUsd)}</span>}
+              </span>
+            </div>
           </div>
 
           {/* Amount input */}
@@ -302,11 +333,12 @@ export default function JupiterSwapPanel({ wallet }) {
                     key={s.bps}
                     onClick={() => {
                       setSlippageBps(s.bps);
+                      setCustomSlip("");
                       setQuote(null);
                     }}
                     disabled={busy}
                     className={`border px-1.5 py-0.5 font-mono text-[9px] disabled:opacity-30 ${
-                      slippageBps === s.bps
+                      slippageBps === s.bps && !customSlip
                         ? "border-emerald-500/60 text-emerald-400"
                         : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
                     }`}
@@ -314,6 +346,27 @@ export default function JupiterSwapPanel({ wallet }) {
                     {s.label}
                   </button>
                 ))}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="cust %"
+                  value={customSlip}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomSlip(v);
+                    const pct = parseFloat(v);
+                    if (pct > 0) setSlippageBps(Math.round(pct * 100));
+                    setQuote(null);
+                  }}
+                  disabled={busy}
+                  title="Custom slippage in %"
+                  className={`w-16 border bg-black px-1.5 py-0.5 font-mono text-[9px] outline-none disabled:opacity-30 ${
+                    customSlip
+                      ? "border-cyan-400/60 text-cyan-300"
+                      : "border-green-500/30 text-green-500/60 focus:border-cyan-400/60"
+                  }`}
+                />
               </div>
             </div>
           </div>

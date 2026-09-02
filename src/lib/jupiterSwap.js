@@ -60,6 +60,17 @@ export async function fetchOtcBalance(wallet) {
   }
 }
 
+// On-chain native SOL balance of a wallet (relayed via Helius server-side,
+// since the public RPC endpoint rate-limits the browser).
+export async function fetchSolBalance(wallet) {
+  try {
+    const r = await relay("balance", { pubkey: wallet });
+    return Number(r.lamports ?? 0) / 1e9;
+  } catch {
+    return 0;
+  }
+}
+
 // Ask Jupiter to build the serialized swap transaction for this user.
 export async function getSwapTx(quoteResponse, userPublicKey) {
   const res = await fetch(SWAP_URL, {

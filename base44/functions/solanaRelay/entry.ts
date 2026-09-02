@@ -113,6 +113,17 @@ export default async function (req) {
       return Response.json({ ok: true, statuses });
     }
 
+    if (mode === "balance") {
+      // Native SOL balance of a wallet (lamports) — used by the swap panel to
+      // show the spendable SOL alongside the $OTC balance.
+      const pubkey = body.pubkey;
+      if (typeof pubkey !== "string") {
+        return Response.json({ error: "pubkey required" }, { status: 400 });
+      }
+      const r = await heliusRpc("getBalance", [pubkey, { commitment: "confirmed" }]);
+      return Response.json({ ok: true, lamports: r?.value ?? null });
+    }
+
     return Response.json({ error: "unknown mode" }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e?.message || "relay failed" }, { status: 500 });
