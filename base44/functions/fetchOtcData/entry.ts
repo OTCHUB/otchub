@@ -67,7 +67,7 @@ export default async function (req) {
       meStats?.floorPrice != null
         ? meStats.floorPrice / LAMPORTS_PER_SOL
         : listings.length
-        ? Math.min(...listings.map((l) => (l.price || 0) / LAMPORTS_PER_SOL))
+        ? Math.min(...listings.map((l) => l.price || 0))
         : null;
     const floorUsd = floorSol != null && solPriceUsd ? floorSol * solPriceUsd : null;
 
@@ -219,8 +219,8 @@ export default async function (req) {
         accrued_value_usd: accrued != null && solPriceUsd ? accrued * solPriceUsd : null,
         mint_day: mintDay,
         is_listed: listedSet.has(id),
-        listing_price_sol: lp != null ? lp / LAMPORTS_PER_SOL : null,
-        listing_price_usd: lp != null && solPriceUsd ? (lp / LAMPORTS_PER_SOL) * solPriceUsd : null,
+        listing_price_sol: lp != null ? lp : null,
+        listing_price_usd: lp != null && solPriceUsd ? lp * solPriceUsd : null,
       };
     });
 
