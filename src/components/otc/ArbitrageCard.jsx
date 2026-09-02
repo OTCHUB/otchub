@@ -38,6 +38,9 @@ export default function ArbitrageCard({ latest, holdings }) {
     .map((h) => ({ ...h, net: h.listing_price_sol - holdSol(h) }))
     .sort((a, b) => a.net - b.net);
   const snipe = ranked[0] || null;
+  // Cap the near-floor list so the panel never bloats the screen.
+  const TOP_N = 15;
+  const shown = ranked.slice(0, TOP_N);
 
   const bestAccrued = snipe ? holdSol(snipe) : null;
   const bestFloor = snipe?.listing_price_sol ?? floorSol;
@@ -131,7 +134,7 @@ export default function ArbitrageCard({ latest, holdings }) {
       <div className="mt-3 flex min-h-0 flex-1 flex-col border border-green-500/20">
         <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
           <span className="text-[9px] uppercase tracking-widest text-green-500/50">
-            NEAR_FLOOR :: ALL_LISTED ({ranked.length}) · NET_ASC
+            NEAR_FLOOR :: TOP_{TOP_N} ({ranked.length}) · NET_ASC
           </span>
           {excludedEmpty > 0 && (
             <span className="text-[9px] text-red-400/60">
@@ -139,10 +142,12 @@ export default function ArbitrageCard({ latest, holdings }) {
             </span>
           )}
         </div>
-        {/* Full near-floor list scrolls inside the panel's allocated space */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-        {ranked.length ? (
-          ranked.map((h, i) => (
+        {/* Near-floor list scrolls inside the panel; bounded height on mobile so
+            the panel stacks cleanly in the vertical page flow instead of
+            stretching to fit every entry. */}
+        <div className="min-h-0 flex-1 overflow-y-auto max-h-72 lg:max-h-none">
+        {shown.length ? (
+          shown.map((h, i) => (
             <a
               key={h.asset_id}
               href={`${ME_BASE}/${h.asset_id}`}
