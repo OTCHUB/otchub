@@ -32,6 +32,12 @@ export default function EarningsChart({ latest }) {
       };
     });
 
+  const latestDailySol = raw.length
+    ? [...raw].sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")))[0]?.per_desk_sol
+    : null;
+  const floorSol = latest?.nft_floor_sol || 0;
+  const breakevenDays = latestDailySol && latestDailySol > 0 ? floorSol / latestDailySol : null;
+
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
@@ -41,6 +47,9 @@ export default function EarningsChart({ latest }) {
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
             bars = total into desks · line = avg / desk · bootstrap excluded from avg
+          </div>
+          <div className="mt-1 text-[10px] text-emerald-400/80">
+            BREAKEVEN: {breakevenDays != null ? `${breakevenDays.toFixed(1)} days` : "—"} @ floor {fmtSol(floorSol, 2)}
           </div>
         </div>
         <div className="flex gap-1">
