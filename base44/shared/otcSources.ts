@@ -160,6 +160,34 @@ export async function fetchCollectionAssets(collectionAddress) {
   }
 }
 
+// A wallet's owned OTC desks, fetched LIVE on-chain via the same Helius DAS
+// searchAssets call the snapshot uses for the collection gallery, but scoped
+// to one owner + collection. This is the "same logic" as the listings gallery
+// and reflects true on-chain ownership (independent of the NftHolding DB,
+// which goes stale when the scheduler misses and whose owner field is the
+// marketplace escrow for listed desks).
+export async function fetchAssetsByOwner(ownerAddress, collectionAddress) {
+  try {
+    const allAssets = [];
+    let page = 1;
+    while (page <= 20) {
+      const result = await heliusRpc("searchAssets", {
+        ownerAddress,
+        grouping: ["collection", collectionAddress],
+        page,
+        limit: 1000,
+      });
+      const items = result?.items || [];
+      allAssets.push(...items);
+      if (items.length < 1000) break;
+      page++;
+    }
+    return allAssets;
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function fetchMagicEdenStats(symbol) {
   try {
     const res = await fetch(`https://api-mainnet.magiceden.dev/v2/collections/${symbol}/stats`);
