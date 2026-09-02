@@ -17,7 +17,7 @@ function heliusUrl() {
   return `https://mainnet.helius-rpc.com/?api-key=${secrets.get("HELIUS_API_KEY")}`;
 }
 
-async function heliusRpc(method, params) {
+export async function heliusRpc(method, params) {
   const res = await fetch(heliusUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

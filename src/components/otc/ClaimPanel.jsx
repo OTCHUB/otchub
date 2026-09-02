@@ -1,13 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import {
-  resolveTokenPrograms,
-  scanDesks,
-  buildClaimInstructions,
-  packTxs,
-  executeClaimTxs,
-} from "@/lib/otcClaim";
+import { buildClaimInstructions, packTxs, executeClaimTxs } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
+import { base44 } from "@/api/base44Client";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [selected, setSelected] = useState(() => new Set());
@@ -29,25 +24,63 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const selectAll = () => setSelected(new Set(desks.map((d) => d.asset_id)));
   const clearAll = () => setSelected(new Set());
 
-  const scan = async () => {
-    if (!selected.size) return;
-    setScanning(true);
-    setPlan(null);
-    setLogs([]);
-    log({ type: "info", msg: `Resolving token programs...` });
-    const map = await resolveTokenPrograms();
+  const applyScan = (scanned) => {
+    const list = scanned || [];
+    const map = {};
+    for (const d of list) {
+      for (const t of d.tickers || []) {
+        if (t.token_program) map[t.mint] = t.token_program;
+      }
+    }
     setTpMap(map);
-    log({ type: "info", msg: `Scanning ${selected.size} desk(s) on-chain...` });
-    const chosen = desks.filter((d) => selected.has(d.asset_id));
-    const result = await scanDesks(chosen, map);
-    setPlan(result);
-    const totalClaimable = result.reduce((a, d) => a + d.claimable.length, 0);
-    log({
-      type: totalClaimable ? "ok" : "err",
-      msg: `Scan done: ${totalClaimable} claimable ticker(s) across ${result.length} desk(s).`,
-    });
-    setScanning(false);
+    setPlan(list);
+    return list;
   };
+
+  const scan = async (force = true) => {
+    if (!address) return;
+    setScanning(true);
+    setLogs([]);
+    log({ type: "info", msg: `Requesting claim scan from server...` });
+    try {
+      const res = await base44.functions.invoke("scanWalletClaims", { wallet: address, force });
+      if (res?.error) throw new Error(res.error);
+      const list = applyScan(res.desks);
+      const totalClaimable = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
+      log({
+        type: totalClaimable ? "ok" : "info",
+        msg: `${res.cached ? "CACHED" : "FRESH"} scan: ${totalClaimable} claimable ticker(s) across ${list.length} desk(s).`,
+      });
+    } catch (e) {
+      log({ type: "err", msg: `SCAN_FAIL: ${e.message}` });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Auto-load a fresh cached scan on mount so returning users see claimable
+  // counts instantly without clicking SCAN. cacheOnly never triggers a scan.
+  useEffect(() => {
+    if (!address) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await base44.functions.invoke("scanWalletClaims", {
+          wallet: address,
+          cacheOnly: true,
+        });
+        if (cancelled || !res?.desks?.length) return;
+        const list = applyScan(res.desks);
+        const total = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
+        if (total) log({ type: "info", msg: `CACHED scan loaded: ${total} claimable ticker(s).` });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   const runClaim = async (allDesks) => {
     const signer = getSignerForAddress(address);
@@ -82,7 +115,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         type: fail ? "err" : "ok",
         msg: `DONE: ${ok} confirmed, ${fail} failed.`,
       });
-      if (ok > 0 && onClaimed) onClaimed();
+      if (ok > 0) {
+        if (onClaimed) onClaimed();
+        // Refresh the on-chain scan so claimable reflects the claimed amounts.
+        scan(true);
+      }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
     } finally {
@@ -186,11 +223,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       {/* Actions */}
       <div className="mt-2 flex flex-wrap gap-1">
         <button
-          onClick={scan}
-          disabled={!selected.size || scanning || busy}
+          onClick={() => scan(true)}
+          disabled={scanning || busy || !address}
           className="border border-emerald-500/50 px-2.5 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-30"
         >
-          {scanning ? "SCANNING..." : "[SCAN_SELECTED]"}
+          {scanning ? "SCANNING..." : "[SCAN_DESKS]"}
         </button>
         <button
           onClick={() => runClaim(false)}

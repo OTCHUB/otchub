@@ -1,0 +1,15 @@
+{
+  "name": "ClaimCache",
+  "type": "object",
+  "properties": {
+    "wallet": {
+      "type": "string"
+    },
+    "desks": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "wallet"
+  ]
+}
