@@ -27,16 +27,17 @@ export default async function (req) {
       // no authenticated user — workflow context, allowed
     }
 
-    const [pair, solPriceUsd, potLamports, meStats, listings, assets, stats] =
-      await Promise.all([
-        fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT),
-        fetchSolPriceUsd(),
-        fetchAccountBalanceLamports(ADDRESSES.POT),
-        fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
-        fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL, 50),
-        fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
-        fetchProtocolStats(),
-      ]);
+    // DexScreener calls run sequentially to avoid concurrent rate-limiting
+    const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
+    const solPriceUsd = await fetchSolPriceUsd();
+
+    const [potLamports, meStats, listings, assets, stats] = await Promise.all([
+      fetchAccountBalanceLamports(ADDRESSES.POT),
+      fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
+      fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL, 50),
+      fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
+      fetchProtocolStats(),
+    ]);
 
     const tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
     const tokenPriceSol = pair

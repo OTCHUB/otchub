@@ -29,10 +29,22 @@ async function heliusRpc(method, params) {
   return json.result;
 }
 
+async function fetchJsonWithRetry(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+  }
+  return null;
+}
+
 export async function fetchDexScreenerToken(tokenMint) {
-  const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);
-  if (!res.ok) return null;
-  const json = await res.json();
+  const json = await fetchJsonWithRetry(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);
+  if (!json) return null;
   const pairs = json.pairs || [];
   let pair = pairs.find((p) => p.pairAddress === ADDRESSES.DEXSCREENER_PAIR);
   if (!pair && pairs.length) {
@@ -42,11 +54,10 @@ export async function fetchDexScreenerToken(tokenMint) {
 }
 
 export async function fetchSolPriceUsd() {
-  const res = await fetch(
+  const json = await fetchJsonWithRetry(
     `https://api.dexscreener.com/latest/dex/tokens/${ADDRESSES.WRAPPED_SOL}`
   );
-  if (!res.ok) return null;
-  const json = await res.json();
+  if (!json) return null;
   const pairs = json.pairs || [];
   const solUsd =
     pairs.find((p) => p.chainId === "solana" && (p.quoteToken?.symbol === "USDC" || p.quoteToken?.symbol === "USDT")) ||
