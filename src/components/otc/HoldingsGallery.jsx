@@ -3,6 +3,7 @@ import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
+import HelpNote from "@/components/otc/HelpNote";
 
 const ME_BASE = "https://magiceden.io/item-details";
 
@@ -77,11 +78,11 @@ export default function HoldingsGallery({ holdings, byStock }) {
           {scanning ? "[LIVE…]" : "[RESCAN_LIVE]"}
         </button>
       </div>
-      <p className="mt-1 font-mono text-[9px] leading-snug text-cyan-500/60">
-        STK_HLD shows REAL on-chain vault stock (LIVE), not the snapshot estimate. SNIPE only
-        flags listed desks that actually hold stock — empty vaults are marked NO_STOCK so you
-        don't buy a desk that's already been claimed out.
-      </p>
+      <HelpNote label="[?] STK_HLD / SNIPE LEGEND">
+        STK_HLD shows REAL on-chain vault stock [LIVE], not the snapshot estimate. SNIPE only flags
+        listed desks that actually hold stock — empty vaults are marked NO_STOCK so you don't buy a
+        desk that's already been claimed out.
+      </HelpNote>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         {list.map((h) => {

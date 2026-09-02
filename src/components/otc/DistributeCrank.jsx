@@ -6,6 +6,7 @@ import {
 } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fmtSol, fmtNum } from "@/lib/format";
+import HelpNote from "@/components/otc/HelpNote";
 
 const SLOTS = 13; // lineup slots (distribute(index) u8 arg)
 const CHUNK_IX = 300; // ixs per wallet approval group
@@ -117,13 +118,13 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
         )}
       </div>
 
-      <p className="mt-2 text-[9px] leading-snug text-amber-500/60">
-        The protocol NEVER auto-distributes — <span className="text-amber-300">distribute(index)</span> is a
-        permissionless crank anyone can call for ANY desk. Each call advances a desk ONE round per slot;
-        a desk behind R rounds needs R calls. Launching here cranks every desk in the collection so the
-        global owed backlog flows into vaults (claimants then claim their own desks). Slots whose vault
-        ticker account isn't open yet fail sim and are dropped (no fee). No-op cranks deliver 0 safely.
-      </p>
+      <HelpNote tone="amber" label="[?] CRANK DETAILS" className="mt-2">
+        The protocol NEVER auto-distributes — distribute(index) is a permissionless crank anyone
+        can call for ANY desk. Each call advances a desk ONE round per slot; a desk behind R rounds
+        needs R calls. Launching here cranks every desk so the owed backlog flows into vaults.
+        Slots whose vault ticker account isn't open yet fail sim and are dropped (no fee); no-op
+        cranks deliver 0 safely.
+      </HelpNote>
 
       {!desks.length ? (
         <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center text-[11px] text-amber-400/80">

@@ -13,6 +13,7 @@ import {
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
 import { fmtUsd } from "@/lib/format";
+import HelpNote from "@/components/otc/HelpNote";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -440,11 +441,11 @@ export default function JupiterSwapPanel({ wallet }) {
               ? "[SWAP SOL → $OTC]"
               : "[SWAP $OTC → SOL]"}
           </button>
-          <p className="mt-1.5 text-[9px] leading-snug text-green-500/40">
-            Tx is simulated first; a failing sim aborts before signing (no fee
-            spent). Signs with your connected wallet. Claims and buys both land
-            in the same $OTC token account shown above.
-          </p>
+          <HelpNote label="[?] SWAP SAFETY">
+            Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with
+            your connected wallet. Claims and buys both land in the same $OTC token account shown
+            above.
+          </HelpNote>
 
           {err && (
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[10px] text-amber-400">

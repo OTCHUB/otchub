@@ -1,4 +1,5 @@
 import React from "react";
+import HelpNote from "@/components/otc/HelpNote";
 
 // Official protocol mint app — minting is protocol-owned (100,000 OTC burned +
 // 0.5 SOL surcharge), so this links out rather than reimplementing it.
@@ -44,14 +45,12 @@ export default function NftTradeCard() {
         </a>
       </div>
 
-      <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        Desks trade on Magic Eden. A listed desk keeps earning until sold —
-        unclaimed vault stock transfers WITH the desk to the buyer, so claim
-        first (WALLET :: CLAIM_TOOL) if you want the stock, or sell with it
-        bundled for a premium. Use SNIPE_LISTINGS to verify a desk's REAL vault
-        holding before buying — the bundled stock is what makes a listing cheap
-        or expensive.
-      </p>
+      <HelpNote label="[?] CLAIM BEFORE SELLING" className="mt-2">
+        Desks trade on Magic Eden. A listed desk keeps earning until sold — unclaimed vault stock
+        transfers WITH the desk to the buyer, so claim first (WALLET :: CLAIM_TOOL) if you want
+        the stock, or sell with it bundled for a premium. Verify a desk's REAL vault holding
+        before buying — the bundled stock is what makes a listing cheap or expensive.
+      </HelpNote>
     </div>
   );
 }

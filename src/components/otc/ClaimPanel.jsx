@@ -5,6 +5,7 @@ import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
+import HelpNote from "@/components/otc/HelpNote";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [selected, setSelected] = useState(() => new Set());
@@ -68,6 +69,16 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     });
   const selectAll = () => setSelected(new Set(desks.map((d) => d.asset_id)));
   const clearAll = () => setSelected(new Set());
+  // Recommended batch: the top 3 desks by claimable value. Large all-at-once
+  // runs can fail/timeout at the wallet prompt, so the panel nudges toward
+  // small batches — but the user can still claim everything if they choose.
+  const selectRecommended = () => {
+    if (!plan) return;
+    const ranked = [...plan]
+      .filter((d) => d.claimable?.length)
+      .sort((a, b) => deskUsdValue(b) - deskUsdValue(a));
+    setSelected(new Set(ranked.slice(0, 3).map((d) => d.asset_id)));
+  };
 
   const applyScan = (scanned) => {
     const list = scanned || [];
@@ -264,6 +275,14 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         </span>
         <div className="flex gap-1">
           <button
+            onClick={selectRecommended}
+            disabled={busy || !plan}
+            title="Select the top 3 desks by claimable value — recommended batch size"
+            className="border border-amber-500/40 px-2 py-0.5 text-[10px] text-amber-400 hover:border-amber-400/60 disabled:opacity-30"
+          >
+            [REC_TOP3]
+          </button>
+          <button
             onClick={selectAll}
             disabled={!desks.length || busy}
             className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
@@ -280,15 +299,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         </div>
       </div>
 
-      <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        Default first probes each ticker (unsigned, no fee) to find how many distribute calls it
-        needs — a desk behind R rounds needs R distributes before its claim clears, so the right
-        count is packed with each claim. Tickers with nothing to withdraw, or too far behind, are
-        skipped automatically. Each tx is then simulated, signed in a few large batches, and sent.
-        PULL_OWED ON instead opens missing accounts and distributes ALL slots per desk first (more
-        approvals; run occasionally). Every tx is simulated first; a failing sim is skipped (no fee
-        spent). The program enforces you own the NFT.
-      </p>
+      <HelpNote label="[?] HOW_IT_WORKS" className="mt-2">
+        Each ticker is probed unsigned (no fee) for how many distributes its claim needs; failing
+        sims are skipped (no fee spent); the program enforces you own the NFT. PULL_OWED ON also
+        opens missing accounts and pulls the full owed backlog first (more approvals; run
+        occasionally).
+      </HelpNote>
 
       {Object.keys(lifetime).length > 0 && (() => {
         const tSol = Object.values(lifetime).reduce((a, d) => a + (d.value_sol || 0), 0);
@@ -428,6 +444,9 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       </div>
       {plan && (
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-green-500/60">
+          <span className="text-amber-400/80">
+            REC :: ≤3 DESKS PER RUN — larger batches may fail/timeout
+          </span>
           <span>{totalClaimable} claimable ticker(s)</span>
           {totalNeedsActivation > 0 && (
             <span className="text-cyan-400">
