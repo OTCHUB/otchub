@@ -88,7 +88,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
     setScanning(true);
     try {
-      const res = await base44.functions.invoke("scanWalletClaims", { wallet: address, force });
+      const res = await base44.functions.invoke("scanWalletClaims", {
+        wallet: address,
+        force,
+        assets: desks.map((d) => ({ asset_id: d.asset_id, name: d.name, image_url: d.image_url })),
+      });
       if (res?.error) throw new Error(res.error);
       const list = applyScan(res.desks);
       if (!silent) {
@@ -107,28 +111,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
   };
 
-  // Auto-load a fresh cached scan on mount so returning users see claimable
-  // counts instantly without clicking SCAN. cacheOnly never triggers a scan.
+  // Auto-scan on mount so each NFT's unclaimed claim value shows immediately.
+  // force=false returns a fresh cache if within TTL, else scans on-chain.
   useEffect(() => {
-    if (!address) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await base44.functions.invoke("scanWalletClaims", {
-          wallet: address,
-          cacheOnly: true,
-        });
-        if (cancelled || !res?.desks?.length) return;
-        const list = applyScan(res.desks);
-        const total = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
-        if (total) log({ type: "info", msg: `CACHED scan loaded: ${total} claimable ticker(s).` });
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (!address || !desks.length) return;
+    scan({ force: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
   // Load this wallet's per-desk lifetime claimed totals on mount.
@@ -310,28 +298,28 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                 </div>
               </div>
               <div className="text-right">
-                {deskPlan && (
-                  <div
-                    className={`font-mono text-[9px] ${
-                      deskPlan.claimable.length
-                        ? "text-emerald-400"
-                        : "text-green-500/40"
-                    }`}
-                  >
-                    {deskPlan.claimable.length
-                      ? `${deskPlan.claimable.length} CLAIM`
-                      : "—"}
-                  </div>
-                )}
-                {deskPlan && deskPlan.claimable.length > 0 && (
-                  <div className="font-mono text-[8px] leading-tight text-green-500/60">
-                    {fmtSol(deskSolValue(deskPlan), 4)}
-                  </div>
-                )}
-                {deskPlan && deskPlan.claimable.length > 0 && (
-                  <div className="font-mono text-[8px] leading-tight text-cyan-400/70">
-                    {fmtUsd(deskUsdValue(deskPlan), 2)}
-                  </div>
+                {deskPlan ? (
+                  <>
+                    <div
+                      className={`font-mono text-[11px] font-bold leading-tight ${
+                        deskPlan.claimable.length ? "text-emerald-300" : "text-green-500/40"
+                      }`}
+                    >
+                      {fmtUsd(deskUsdValue(deskPlan), 2)}
+                    </div>
+                    <div className="font-mono text-[8px] leading-tight text-green-500/60">
+                      {fmtSol(deskSolValue(deskPlan), 4)}
+                    </div>
+                    <div
+                      className={`font-mono text-[8px] leading-tight ${
+                        deskPlan.claimable.length ? "text-cyan-400/70" : "text-green-500/30"
+                      }`}
+                    >
+                      {deskPlan.claimable.length} CLAIMABLE
+                    </div>
+                  </>
+                ) : (
+                  <div className="font-mono text-[9px] text-green-500/30">SCAN…</div>
                 )}
                 {lifetime[d.asset_id] && (
                   <div className="mt-0.5 border-t border-amber-500/20 pt-0.5">

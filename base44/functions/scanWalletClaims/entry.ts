@@ -86,12 +86,24 @@ export default async function (req) {
     const cacheOnly = body.cacheOnly === true;
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
 
-    const holdings = await base44.asServiceRole.entities.NftHolding.filter({ owner: wallet });
-    const desks = (holdings || []).map((h) => ({
-      asset_id: h.asset_id,
-      name: h.name,
-      image_url: h.image_url,
-    }));
+    // The caller already knows which desks the wallet owns (from the portfolio
+    // fetch). Accept that list directly so the scan covers exactly the NFTs
+    // shown in the panel — falling back to NftHolding-by-owner only when the
+    // caller didn't pass assets.
+    const assetsIn = Array.isArray(body.assets) ? body.assets : null;
+    let desks;
+    if (assetsIn && assetsIn.length) {
+      desks = assetsIn
+        .filter((a) => a && a.asset_id)
+        .map((a) => ({ asset_id: a.asset_id, name: a.name, image_url: a.image_url }));
+    } else {
+      const holdings = await base44.asServiceRole.entities.NftHolding.filter({ owner: wallet });
+      desks = (holdings || []).map((h) => ({
+        asset_id: h.asset_id,
+        name: h.name,
+        image_url: h.image_url,
+      }));
+    }
 
     // Cache lookup
     const cachedRows = await base44.asServiceRole.entities.ClaimCache.filter({ wallet });
