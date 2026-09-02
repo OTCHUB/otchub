@@ -187,6 +187,12 @@ export default function JupiterSwapPanel({ wallet }) {
       setQuote(q);
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
       const built = await getSwapTx(q, wallet);
+      if (built.heliusTipLamports) {
+        log({
+          type: "info",
+          msg: `HELIUS_SENDER_TIP :: +${(built.heliusTipLamports / 1e9).toFixed(4)} SOL (multi-pathway broadcast)`,
+        });
+      }
       const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });

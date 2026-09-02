@@ -58,7 +58,10 @@ async function makeSenderReady(swapTransactionB64) {
     const r = await heliusRpc("getAccountInfo", [l.accountKey, { encoding: "base64" }]);
     const data = r?.value?.data?.[0];
     if (!data) throw new Error("address lookup table fetch failed");
-    altAccounts.push(AddressLookupTableAccount.fromAccountData(b64ToBytes(data)));
+    // web3.js 1.98 has no AddressLookupTableAccount.fromAccountData — its
+    // static deserialize(data) returns the STATE, which the constructor takes.
+    const state = AddressLookupTableAccount.deserialize(b64ToBytes(data));
+    altAccounts.push(new AddressLookupTableAccount({ key: new PublicKey(l.accountKey), state }));
   }
   const decompiled = TransactionMessage.decompile(tx.message, {
     addressLookupTableAccounts: altAccounts,
@@ -68,7 +71,7 @@ async function makeSenderReady(swapTransactionB64) {
   );
   decompiled.instructions.push(
     SystemProgram.transfer({
-      fromPubkey: decompiled.payer,
+      fromPubkey: decompiled.payerKey,
       toPubkey: tipAccount,
       lamports: HELIUS_TIP_LAMPORTS,
     })
