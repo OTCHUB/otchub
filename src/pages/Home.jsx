@@ -259,7 +259,7 @@ export default function Home() {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
             <CollapsibleCard title="TRADE :: $OTC TOKEN">
-              <JupiterSwapPanel wallet={wallet} />
+              <JupiterSwapPanel wallet={wallet} latest={latest} history={data?.history} />
             </CollapsibleCard>
           </div>
           <CollapsibleCard title="TRADE :: NFT DESKS">

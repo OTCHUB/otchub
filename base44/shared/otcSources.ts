@@ -2,7 +2,7 @@ import { secrets } from "base44:runtime";
 
 export const ADDRESSES = {
   OTC_TOKEN_MINT: "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump",
-  DEXSCREENER_PAIR: "da4pm4xsdy4m9v4cgakkbvh1pw1ysctqqa5nekghukpt",
+  DEXSCREENER_PAIR: "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt",
   NFT_COLLECTION: "D7sLW9uKZG3G7bNbWfMHvKSgVhU9nXdv7huTfepF5Jrh",
   PROGRAM: "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW",
   POT: "BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR",

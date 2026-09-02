@@ -12,9 +12,10 @@ import {
 } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
-import { fmtUsd } from "@/lib/format";
+import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
+import RecentSwaps from "@/components/otc/RecentSwaps";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -38,7 +39,7 @@ function fmtLamports(raw) {
 // Two-way $OTC trading via Jupiter: BUY = SOL -> $OTC, SELL = $OTC -> SOL.
 // Same reliability model as before: every swap tx is simulated before the
 // wallet is asked to sign, so a failing sim aborts with no fee spent.
-export default function JupiterSwapPanel({ wallet }) {
+export default function JupiterSwapPanel({ wallet, latest, history }) {
   const [mode, setMode] = useState("BUY"); // "BUY" | "SELL"
   const [amount, setAmount] = useState("0.1");
   const [slippageBps, setSlippageBps] = useState(100);
@@ -103,6 +104,27 @@ export default function JupiterSwapPanel({ wallet }) {
       : (Number(quote.outAmount) / LAMPORTS_PER_SOL) * px;
   })();
   const balUsd = otcBal != null && otcUsd != null ? otcBal * otcUsd : null;
+
+  // Market stats strip: live market cap, 1h change (DexScreener), and 2h
+  // change computed from the stored snapshot history (5-min granularity).
+  const mcap = latest?.token_market_cap ?? null;
+  const ch1h = latest?.token_price_change_1h ?? null;
+  const ch2h = (() => {
+    const nowPx = parseFloat(latest?.token_price_usd);
+    if (!nowPx || !Array.isArray(history) || !history.length) return null;
+    const cutoff = Date.now() - 2 * 3600 * 1000;
+    let base = null;
+    for (const h of history) {
+      // history is sorted oldest → newest; stop at "now", keep the last
+      // priced point at/before the 2h cutoff
+      const t = new Date(h.t).getTime();
+      if (!Number.isFinite(t) || t > Date.now()) break;
+      if (t <= cutoff && h.token_price_usd != null) base = h;
+    }
+    if (!base) return null;
+    const then = base.token_price_usd;
+    return then > 0 ? ((nowPx - then) / then) * 100 : null;
+  })();
 
   // Raw integer amount for the quote (lamports for BUY, base units for SELL).
   const rawAmount = () => {
@@ -253,6 +275,28 @@ export default function JupiterSwapPanel({ wallet }) {
 
       <div className="mt-2 break-all border border-green-500/20 bg-black px-2 py-1.5 font-mono text-[11px] text-emerald-400">
         $OTC :: <span className="text-green-300">{OTC_MINT}</span>
+      </div>
+
+      {/* Market stats: mcap + 1h/2h price change */}
+      <div className="mt-2 grid grid-cols-3 gap-1">
+        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
+          <div className="text-emerald-300">
+            {mcap != null ? `$${fmtCompact(mcap)}` : "—"}
+          </div>
+        </div>
+        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">1H</div>
+          <div className={ch1h == null ? "text-green-500/40" : ch1h >= 0 ? "text-emerald-400" : "text-red-400"}>
+            {ch1h != null ? `${ch1h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch1h))}` : "—"}
+          </div>
+        </div>
+        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">2H</div>
+          <div className={ch2h == null ? "text-green-500/40" : ch2h >= 0 ? "text-emerald-400" : "text-red-400"}>
+            {ch2h != null ? `${ch2h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch2h))}` : "—"}
+          </div>
+        </div>
       </div>
 
       {/* Direction toggle */}
@@ -507,6 +551,9 @@ export default function JupiterSwapPanel({ wallet }) {
           )}
         </>
       )}
+
+      {/* Recent on-chain swaps feed (public — shown even without a wallet) */}
+      <RecentSwaps latest={latest} />
     </div>
   );
 }

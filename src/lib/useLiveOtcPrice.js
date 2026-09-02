@@ -109,6 +109,7 @@ export function useLiveOtcPrice(snapshot) {
         token_volume_24h: pair?.volume?.h24 ? parseFloat(pair.volume.h24) : null,
         token_liquidity_usd: pair?.liquidity?.usd ? parseFloat(pair.liquidity.usd) : null,
         token_price_change_24h: pair?.priceChange?.h24 ? parseFloat(pair.priceChange.h24) : null,
+        token_price_change_1h: pair?.priceChange?.h1 ? parseFloat(pair.priceChange.h1) : null,
         nft_floor_usd: floorUsd,
         mint_cost_sol: mintCostSol,
         mint_cost_usd: mintCostUsd,
