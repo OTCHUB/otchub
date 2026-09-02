@@ -74,6 +74,45 @@ export default async function (req) {
       return Response.json({ ok: true, accounts });
     }
 
+    if (mode === "fee") {
+      // Helius priority-fee estimate (µlamports/CU) for the accounts the
+      // caller is about to write. Passing accountKeys makes the estimate
+      // reflect contention on the actual PDAs a claim batch touches.
+      const accountKeys = Array.isArray(body.pubkeys)
+        ? body.pubkeys.filter((k) => typeof k === "string").slice(0, 128)
+        : [];
+      const params = [
+        {
+          ...(accountKeys.length ? { accountKeys } : {}),
+          options: { recommended: true },
+        },
+      ];
+      const r = await heliusRpc("getPriorityFeeEstimate", params);
+      const est = r?.priorityFeeEstimate;
+      return Response.json({ ok: true, microLamports: est ?? null });
+    }
+
+    if (mode === "confirm") {
+      // Post-send landing check: which of these signatures have actually been
+      // processed (slot set) vs still pending (null). Used to re-broadcast
+      // stuck transactions before their blockhash expires.
+      const sigs = body.sigs;
+      if (!Array.isArray(sigs) || !sigs.length) {
+        return Response.json({ error: "sigs required" }, { status: 400 });
+      }
+      const r = await heliusRpc("getSignatureStatuses", [sigs, { searchTransactionHistory: true }]);
+      const statuses = (r?.value || []).map((s) =>
+        s
+          ? {
+              slot: s.slot ?? null,
+              err: s.err ?? null,
+              confirmationStatus: s.confirmationStatus ?? null,
+            }
+          : null
+      );
+      return Response.json({ ok: true, statuses });
+    }
+
     return Response.json({ error: "unknown mode" }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e?.message || "relay failed" }, { status: 500 });

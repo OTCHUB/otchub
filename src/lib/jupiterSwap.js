@@ -14,7 +14,7 @@ import {
   ACCOUNT_SIZE,
   AccountLayout,
 } from "@solana/spl-token";
-import { relay } from "@/lib/otcClaim";
+import { relay, ensureConfirmed } from "@/lib/otcClaim";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
@@ -127,6 +127,12 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
     const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
     const sig = r.sig;
     onLog({ type: "ok", msg: `SWAP SENT ${sig}`, sig });
+    // make sure the swap actually landed — re-broadcast if stuck pending
+    onLog({ type: "info", msg: "Confirming landing..." });
+    await ensureConfirmed(
+      [{ sig, b64: Buffer.from(signedBytes).toString("base64") }],
+      onLog
+    );
     return { ok: true, sig };
   } catch (e) {
     onLog({ type: "err", msg: `SEND_FAIL: ${e.message}` });

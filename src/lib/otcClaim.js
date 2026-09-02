@@ -82,6 +82,34 @@ export async function relay(mode, payload = {}) {
   return data;
 }
 
+// ---- Priority fee policy ----
+// Ask Helius for the current recommended µlamports/CU for the accounts we're
+// about to write (contended desk vault / config PDAs can need more than the
+// global average), then clamp into a sane band so gas stays reasonable:
+//   floor 2,000 µ/CU — high enough to beat zero-fee spam when the network is quiet
+//   cap 1,000,000 µ/CU — a 200k-CU claim tx costs at most ~0.0002 SOL
+// This keeps claim txs from sitting PENDING forever on congested networks
+// without overpaying on quiet ones.
+const FEE_FLOOR_UL = 2_000;
+const FEE_CAP_UL = 1_000_000;
+
+export async function currentPriorityFee(accountKeys = []) {
+  try {
+    const r = await relay("fee", { pubkeys: accountKeys.slice(0, 128) });
+    const est = Number(r.microLamports);
+    if (!Number.isFinite(est) || est <= 0) return FEE_FLOOR_UL;
+    return Math.min(FEE_CAP_UL, Math.max(FEE_FLOOR_UL, Math.round(est)));
+  } catch {
+    return FEE_FLOOR_UL;
+  }
+}
+
+// Writable account keys across a set of instructions — fed to the fee
+// estimator so the estimate reflects contention on the PDAs being written.
+function writableKeys(ixs) {
+  return [...new Set(ixs.flatMap((ix) => ix.keys.filter((k) => k.isWritable).map((k) => k.pubkey.toBase58())))];
+}
+
 const pda = (seeds) =>
   PublicKey.findProgramAddressSync(seeds, PROGRAM_ID)[0];
 const configPda = () => pda([Buffer.from("config")]);
@@ -214,7 +242,7 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
 // limit ~1232 bytes). Each tx gets a compute-budget instruction up front.
 const MAX_MSG_BYTES = 1000;
 
-async function packTxs(ixs, user) {
+async function packTxs(ixs, user, microLamports = FEE_FLOOR_UL) {
   const bh = await relay("blockhash");
   const blockhash = bh.blockhash;
   const userPk = new PublicKey(user);
@@ -231,7 +259,7 @@ async function packTxs(ixs, user) {
       cur.recentBlockhash = blockhash;
       cur.add(
         ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports })
       );
     }
     cur.add(ix);
@@ -246,7 +274,7 @@ async function packTxs(ixs, user) {
         cur.recentBlockhash = blockhash;
         cur.add(
           ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports })
         );
         cur.add(ix);
       }
@@ -343,6 +371,47 @@ async function withTimeout(promise, ms, label) {
       timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+// A broadcast the RPC accepted can still sit PENDING forever on a congested
+// network — the tx was accepted but landed in no block. Poll each sent
+// signature; as soon as all have landed, return (usually one short poll).
+// Anything still unseen after the polls is RE-BROADCAST once with the same
+// signed bytes (idempotent — Helius returns "already processed" if it just
+// landed) while the blockhash is still valid, which normally unsticks it.
+async function ensureConfirmed(entries, onLog) {
+  if (!entries || !entries.length) return;
+  const pending = new Map(entries.map((e) => [e.sig, e.b64]));
+  for (const delay of [4000, 6000, 8000]) {
+    await new Promise((r) => setTimeout(r, delay));
+    let statuses = [];
+    try {
+      const r = await relay("confirm", { sigs: [...pending.keys()] });
+      statuses = r.statuses || [];
+    } catch {
+      continue;
+    }
+    [...pending.keys()].forEach((sig, i) => {
+      const st = statuses[i];
+      if (!st) return; // null → not seen on-chain yet
+      if (st.slot != null) {
+        // landed. If it errored on-chain, re-sending the same tx can't help.
+        if (st.err) {
+          onLog({ type: "err", msg: `TX ${sig.slice(0, 8)} FAILED_ON_CHAIN: ${JSON.stringify(st.err)}` });
+        }
+        pending.delete(sig);
+      }
+    });
+    if (!pending.size) return;
+  }
+  onLog({ type: "info", msg: `PEND :: ${pending.size} tx(s) unconfirmed — re-broadcasting...` });
+  for (const [sig, b64] of pending) {
+    try {
+      await withTimeout(relay("send", { tx: b64 }), 30000, "rebroadcast");
+    } catch (e) {
+      onLog({ type: "err", msg: `PEND ${sig.slice(0, 8)} RESEND_FAIL: ${e.message}` });
+    }
+  }
 }
 
 // Batch execution: simulate ALL txs first, then request ONE wallet signature
@@ -444,7 +513,12 @@ export async function executeClaimChunked(
   for (let c = 0, g = 0; c < ixs.length; c += chunkSize, g++) {
     const groupNo = g + 1;
     const groupIxs = ixs.slice(c, c + chunkSize);
-    const txs = await packTxs(groupIxs, user); // fresh blockhash per group
+    // Helius-recommended priority fee for this group's writable accounts,
+    // clamped to a sane band — keeps txs from sitting pending on congestion
+    // without overpaying when the network is quiet.
+    const fee = await currentPriorityFee(writableKeys(groupIxs));
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: PRIORITY_FEE ${fee} µlamports/CU (helius est.)` });
+    const txs = await packTxs(groupIxs, user, fee); // fresh blockhash per group
     onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${txs.length} tx(s) :: simulating...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "sim", desks: [], signaturesLeft: totalGroups - groupNo + 1 });
     const sims = await mapLimit(txs, 8, (t) => simulate(t));
@@ -485,20 +559,21 @@ export async function executeClaimChunked(
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "send", desks: [], signaturesLeft: totalGroups - groupNo });
+    const sentEntries = [];
     for (let k = 0; k < signed.length; k++) {
       try {
-        const r = await withTimeout(
-          relay("send", { tx: Buffer.from(signed[k]).toString("base64") }),
-          60000,
-          `G${groupNo} TX ${k + 1} broadcast`
-        );
+        const b64 = Buffer.from(signed[k]).toString("base64");
+        const r = await withTimeout(relay("send", { tx: b64 }), 60000, `G${groupNo} TX ${k + 1} broadcast`);
         onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
+        sentEntries.push({ sig: r.sig, b64 });
         results.push({ ok: true, sig: r.sig });
       } catch (e) {
         onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
         results.push({ ok: false, reason: e.message });
       }
     }
+    // make sure the whole group actually LANDED before the next one starts
+    await ensureConfirmed(sentEntries, onLog);
     // brief pause so the next group's blockhash is fresh and prior state committed
     if (c + chunkSize < ixs.length) await new Promise((r) => setTimeout(r, 2000));
   }
@@ -787,7 +862,7 @@ async function resolveDistCounts(pairs, user, onLog) {
 // are bigger and cost more CU, so fewer fit per tx. Returns {txs, members}
 // where members[ti] is the list of pair indices packed into tx ti (used by the
 // resolve probe to attribute packed-sim results to individual tickers).
-function packPairedTxs(pairs, user, blockhash) {
+function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
   const userPk = new PublicKey(user);
   const CU_PER_DIST = 40_000;
   const CU_PER_CLAIM = 120_000;
@@ -803,7 +878,7 @@ function packPairedTxs(pairs, user, blockhash) {
     cur.feePayer = userPk;
     cur.recentBlockhash = blockhash;
     cur.add(ComputeBudgetProgram.setComputeUnitLimit({ units: MAX_CU }));
-    cur.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }));
+    cur.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports }));
     curCu = CU_BASE;
     curMembers = [];
   };
@@ -918,7 +993,13 @@ export async function executePairedClaim(
     // Fresh blockhash per group — one blockhash for all groups expires before
     // later groups are signed/sent, causing every tx in them to 500 on send.
     const bh = await relay("blockhash");
-    const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash).txs;
+    // Helius-recommended priority fee for this group's writable accounts,
+    // clamped to a sane band (see currentPriorityFee).
+    const fee = await currentPriorityFee(
+      writableKeys(groupPairs.flatMap((p) => [p.distIx, p.claimIx]))
+    );
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: PRIORITY_FEE ${fee} µlamports/CU (helius est.)` });
+    const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash, fee).txs;
     onLog({
       type: "info",
       msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: ${desks.length} desk(s) :: simulating...`,
@@ -989,24 +1070,25 @@ export async function executePairedClaim(
       desks,
       signaturesLeft: totalGroups - groupNo,
     });
+    const sentEntries = [];
     for (let k = 0; k < signed.length; k++) {
       try {
-        const r = await withTimeout(
-          relay("send", { tx: Buffer.from(signed[k]).toString("base64") }),
-          60000,
-          `G${groupNo} TX ${k + 1} broadcast`
-        );
+        const b64 = Buffer.from(signed[k]).toString("base64");
+        const r = await withTimeout(relay("send", { tx: b64 }), 60000, `G${groupNo} TX ${k + 1} broadcast`);
         onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
+        sentEntries.push({ sig: r.sig, b64 });
         results.push({ ok: true, sig: r.sig });
       } catch (e) {
         onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
         results.push({ ok: false, reason: e.message });
       }
     }
+    // make sure the whole group actually LANDED before the next one starts
+    await ensureConfirmed(sentEntries, onLog);
     // brief pause so prior sends commit and the next group's blockhash is fresh
     if (g + 1 < totalGroups) await new Promise((r) => setTimeout(r, 1500));
   }
   return results;
 }
 
-export { packTxs };
+export { packTxs, ensureConfirmed };
