@@ -218,6 +218,13 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         log({ type: "info", msg: "Refreshing lifetime totals from on-chain history..." });
         await loadLifetime(address, true);
         log({ type: "ok", msg: "Lifetime totals refreshed from on-chain claim history." });
+        // Re-scan the vault balances (force bypasses the 5-min scan cache).
+        // Claims are already confirmed on-chain, so just-claimed tickers now
+        // read ZERO — without this the stale plan keeps listing them as
+        // claimable and invites a pointless re-claim of empty vaults.
+        log({ type: "info", msg: "Refreshing desk claimable balances..." });
+        await scan({ force: true, silent: true });
+        log({ type: "ok", msg: "Claimable balances refreshed — cleared desks now show 0." });
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
