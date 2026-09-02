@@ -129,18 +129,21 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     loadLifetime(address);
   }, [address]);
 
-  // Single unified claim pipeline. Runs three phases in order, each building
-  // and sending its own txs (all simulated before signing, so a failing tx is
-  // skipped with no fee spent):
-  //   1. ACTIVATE  — open any ticker vault accounts that aren't open yet
-  //                  (badge "NEEDS ACTIVATE"). Without these, distribute can't
-  //                  deliver and claim can't withdraw. Skipped if all open.
-  //   2. DISTRIBUTE — push each desk's owed backlog from the protocol pool into
-  //                  its vault so balances are current. Permissionless; a no-op
-  //                  (delivers 0) for tickers already current.
-  //   3. CLAIM     — withdraw every claimable ticker from each vault into the
-  //                  signer's own wallet. The program enforces NFT ownership.
-  // A re-scan runs between phases so each phase reads fresh on-chain state.
+  // Single unified claim pipeline — ONE wallet approval for the whole run.
+  // Builds every instruction (activate → distribute → claim) up front in
+  // execution order, packs them into transactions, simulates ALL of them, then
+  // asks the wallet to sign the entire batch with a single signAllTransactions
+  // prompt (Phantom / Solflare / Backpack approve all at once). Txs are sent in
+  // order so on-chain they execute activate → distribute → claim; the claim
+  // instruction moves the desk vault's FULL post-distribute balance to the
+  // signer, so the owed backlog distribute just pulled in is captured in the
+  // same batch. Every tx is simulated first — a failing sim is dropped, so the
+  // wallet never signs a tx that would fail (no fee spent on it). This collapses
+  // what used to be 2–3 separate signing prompts down to a single one.
+  //   ACTIVATE   — open missing ticker vault accounts (skipped if all open).
+  //   DISTRIBUTE — pull each desk's owed backlog from the protocol pot into its
+  //                vault (permissionless; no-op for tickers already current).
+  //   CLAIM      — withdraw every claimable ticker from each vault to the wallet.
   const runClaimAll = async () => {
     const signer = getSignerForAddress(address);
     if (!signer) {
@@ -160,81 +163,70 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
     setBusy(true);
     try {
-      // ---- Phase 1: ACTIVATE (only if any ticker account is missing) ----
+      const allIxs = [];
+
+      // 1. ACTIVATE — only ticker vault accounts that aren't open yet.
       const toActivate = [];
       for (const d of targets) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
       if (toActivate.length) {
-        log({ type: "info", msg: `PHASE 1/3 :: ACTIVATE :: opening ${toActivate.length} ticker account(s)...` });
         const actIxs = await buildActivateInstructions(targets, address, tpMap);
-        const actTxs = await packTxs(actIxs, address);
-        log({ type: "info", msg: `Activate: ${actTxs.length} tx(s) to submit.` });
-        const actRes = await executeClaimTxsBatch(actTxs, signer.signAllTransactionsRaw, log);
-        const actOk = actRes.filter((r) => r.ok).length;
-        log({ type: actRes.length - actOk ? "err" : "ok", msg: `Activate done: ${actOk}/${actRes.length} confirmed.` });
-        if (actOk > 0) await new Promise((r) => setTimeout(r, 5000));
+        allIxs.push(...actIxs);
+        log({ type: "info", msg: `ACTIVATE :: ${toActivate.length} ticker account(s) to open.` });
       } else {
-        log({ type: "info", msg: `PHASE 1/3 :: ACTIVATE :: all ticker accounts already open.` });
+        log({ type: "info", msg: `ACTIVATE :: all ticker accounts already open.` });
       }
 
-      // ---- Phase 2: DISTRIBUTE (owed backlog → vault) ----
-      log({ type: "info", msg: `PHASE 2/3 :: DISTRIBUTE :: owed stock for ${targets.length} desk(s)...` });
+      // 2. DISTRIBUTE — owed backlog → vault. All 13 lineup slots per desk.
+      // The bulk of the tx count comes from here (desks × 13); it's required to
+      // pull owed stock out of the protocol pot so claim can move it.
       const distIxs = await buildDistributeInstructions(targets, address, tpMap);
-      const distTxs = await packTxs(distIxs, address);
-      if (distTxs.length) {
-        log({ type: "info", msg: `Distribute: ${distTxs.length} tx(s) to submit.` });
-        const distRes = await executeClaimTxsBatch(distTxs, signer.signAllTransactionsRaw, log);
-        const distOk = distRes.filter((r) => r.ok).length;
-        log({ type: distRes.length - distOk ? "err" : "ok", msg: `Distribute done: ${distOk}/${distRes.length} confirmed.` });
-        if (distOk > 0) await new Promise((r) => setTimeout(r, 5000));
+      allIxs.push(...distIxs);
+      log({ type: "info", msg: `DISTRIBUTE :: ${distIxs.length} ixs (${targets.length} desks × 13 slots).` });
+
+      // 3. CLAIM — vault → wallet. Claimable tickers from the pre-scan. The
+      // claim ix transfers the vault's full balance AT EXECUTION (after
+      // distribute lands), so it captures the owed backlog too. Tickers that
+      // are empty now but owed get distributed into the vault this run and
+      // become claimable on the next run — no stock is lost, just deferred.
+      const claimable = targets.filter((d) => d.claimable.length);
+      if (claimable.length) {
+        const claimIxs = await buildClaimInstructions(claimable, address, tpMap);
+        allIxs.push(...claimIxs);
+        log({ type: "info", msg: `CLAIM :: ${claimable.length} desk(s), ${claimIxs.length} claimable ticker(s).` });
       }
 
-      // ---- Phase 3: CLAIM (vault → wallet) ----
-      const fresh = await scan({ force: true, silent: true });
-      const claimable = (fresh || [])
-        .filter((d) => targetIds.has(d.asset_id))
-        .filter((d) => d.claimable.length);
-      if (!claimable.length) {
-        log({ type: "err", msg: "PHASE 3/3 :: CLAIM :: nothing claimable after distribute." });
+      if (!allIxs.length) {
+        log({ type: "err", msg: "Nothing to do — no activate/distribute/claim needed." });
         return;
       }
-      // Capture pre-claim balances for lifetime delta logging.
-      const pre = {};
-      for (const d of claimable) {
-        pre[d.asset_id] = {};
-        for (const t of d.claimable) pre[d.asset_id][t.mint] = t.amount;
-      }
-      log({ type: "info", msg: `PHASE 3/3 :: CLAIM :: ${claimable.length} desk(s), building ixs...` });
-      const ixs = await buildClaimInstructions(claimable, address, tpMap);
-      const txs = await packTxs(ixs, address);
-      log({ type: "info", msg: `Claim: ${txs.length} tx(s) to submit.` });
+
+      const txs = await packTxs(allIxs, address);
+      log({ type: "info", msg: `BATCH :: ${txs.length} tx(s) :: 1 wallet approval.` });
       const results = await executeClaimTxsBatch(txs, signer.signAllTransactionsRaw, log);
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
-      log({ type: fail ? "err" : "ok", msg: `CLAIM DONE: ${ok} confirmed, ${fail} failed.` });
+      log({ type: fail ? "err" : "ok", msg: `DONE :: ${ok} confirmed, ${fail} failed (of ${results.length} tx).` });
+
       if (ok > 0) {
         if (onClaimed) onClaimed();
-        // Re-scan on-chain and log the per-ticker deltas (claimed = pre − post)
-        // as lifetime history for this wallet.
-        const postPlan = await scan({ force: true, silent: true });
+        // Lifetime log: value the claimable tickers we sent claims for at their
+        // pre-distribute vault balances. The on-chain claim actually moves the
+        // full post-distribute balance (≥ this), so this is a conservative
+        // (lower-bound) lifetime record.
         const claimed = [];
-        for (const d of postPlan || []) {
-          const preD = pre[d.asset_id];
-          if (!preD) continue;
-          for (const t of d.tickers || []) {
-            const diff = (preD[t.mint] || 0) - (t.amount || 0);
-            if (diff > 0) {
-              const amountHuman = diff / 10 ** t.decimals;
-              const valueUsd = amountHuman * (prices?.[t.mint] || 0);
-              const valueSol = solPriceUsd ? valueUsd / solPriceUsd : 0;
-              claimed.push({
-                asset_id: d.asset_id,
-                symbol: t.symbol,
-                mint: t.mint,
-                amount: amountHuman,
-                value_usd: valueUsd,
-                value_sol: valueSol,
-              });
-            }
+        for (const d of claimable) {
+          for (const t of d.claimable) {
+            const amountHuman = t.amount / 10 ** t.decimals;
+            const valueUsd = amountHuman * (prices?.[t.mint] || 0);
+            const valueSol = solPriceUsd ? valueUsd / solPriceUsd : 0;
+            claimed.push({
+              asset_id: d.asset_id,
+              symbol: t.symbol,
+              mint: t.mint,
+              amount: amountHuman,
+              value_usd: valueUsd,
+              value_sol: valueSol,
+            });
           }
         }
         if (claimed.length) {
@@ -266,7 +258,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const allUsd = plan ? plan.reduce((s, d) => s + deskUsdValue(d), 0) : 0;
   const allSol = solPriceUsd ? allUsd / solPriceUsd : null;
 
-  const phaseLabel = busy ? "PROCESSING..." : totalNeedsActivation > 0 ? "ACTIVATE → DISTRIBUTE → CLAIM" : "DISTRIBUTE → CLAIM";
+  const phaseLabel = busy ? "PROCESSING... (1 SIGN)" : "ACTIVATE → DIST → CLAIM (1 SIGN)";
 
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
