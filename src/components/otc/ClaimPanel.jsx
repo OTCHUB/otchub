@@ -6,6 +6,7 @@ import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
+import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [selected, setSelected] = useState(() => new Set());
@@ -267,6 +268,25 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     ? "PULL_OWED + CLAIM"
     : "CLAIM";
 
+  // Global status overlay: map the claim pipeline's internal phase to the
+  // fixed bottom banner so the app never looks frozen during a run.
+  const overlayPhase = busy
+    ? progress && progress.phase !== "start"
+      ? progress.phase
+      : "prep"
+    : null;
+  const overlayDetail = progress
+    ? progress.phase === "send" && progress.txCur
+      ? `TX ${progress.txCur}/${progress.txTotal}`
+      : progress.phase === "confirm"
+      ? `${progress.pending ?? 0} tx(s) awaiting block`
+      : progress.phase === "sign"
+      ? `${progress.signaturesLeft} approval(s) left`
+      : progress.group
+      ? `GROUP ${progress.group}/${progress.totalGroups}`
+      : null
+    : null;
+
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
@@ -481,10 +501,18 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                 ? "RESOLVING TICKERS…"
                 : progress.phase === "start"
                 ? `INIT · ${progress.totalGroups} GROUP(S)`
-                : `GROUP ${progress.group}/${progress.totalGroups} · ${progress.phase.toUpperCase()}`}
+                : progress.phase === "confirm"
+                ? `CONFIRMING :: ${progress.pending ?? 0} TX ON-CHAIN`
+                : `GROUP ${progress.group}/${progress.totalGroups} · ${progress.phase.toUpperCase()}${
+                    progress.phase === "send" && progress.txCur ? ` ${progress.txCur}/${progress.txTotal}` : ""
+                  }`}
             </span>
             <span className="text-cyan-300">
-              {progress.phase === "resolve" ? "PROBING" : `${progress.signaturesLeft} SIG LEFT`}
+              {progress.phase === "resolve"
+                ? "PROBING"
+                : progress.phase === "confirm"
+                ? "WAITING FOR BLOCK"
+                : `${progress.signaturesLeft} SIG LEFT`}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full bg-green-500/10">
@@ -503,6 +531,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
           )}
         </div>
       )}
+
+      {overlayPhase && <TxStatusOverlay phase={overlayPhase} detail={overlayDetail} />}
 
       {/* Log */}
       {logs.length > 0 && (

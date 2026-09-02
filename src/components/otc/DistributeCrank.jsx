@@ -7,6 +7,7 @@ import { executeCrank } from "@/lib/otcCrank";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fmtSol, fmtNum } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
+import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
 const SLOTS = 13; // lineup slots (distribute(index) u8 arg)
 const TXS_PER_WAVE = 100; // signed txs per wallet approval (1 prompt per wave)
@@ -103,6 +104,21 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
         : `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()} · ${progress.signaturesLeft ?? ""}SIG`
       : "PROCESSING…"
     : "PROCESSING…";
+
+  // Global status overlay: map the crank's internal phase to the fixed bottom
+  // banner so the app never looks frozen during broadcast/confirmation waits.
+  const overlayPhase = busy
+    ? progress && progress.phase !== "start"
+      ? progress.phase
+      : "prep"
+    : null;
+  const overlayDetail = progress
+    ? progress.phase === "confirm"
+      ? `${progress.pending ?? 0} tx(s) awaiting block`
+      : progress.phase === "sign"
+      ? `${progress.signaturesLeft} approval(s) left`
+      : `WAVE ${progress.group}/${progress.totalGroups}`
+    : null;
 
   return (
     <div className="border border-amber-500/30 bg-black p-3">
@@ -205,9 +221,15 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
                 <span className="text-red-300">
                   {progress.phase === "start"
                     ? `INIT · ${progress.totalGroups} GROUP(S)`
+                    : progress.phase === "confirm"
+                    ? `CONFIRMING :: ${progress.pending ?? 0} TX ON-CHAIN`
                     : `GROUP ${progress.group}/${progress.totalGroups} · ${progress.phase.toUpperCase()}`}
                 </span>
-                <span className="text-amber-300">{progress.signaturesLeft ?? 0} SIG LEFT</span>
+                <span className="text-amber-300">
+                  {progress.phase === "confirm"
+                    ? "WAITING FOR BLOCK"
+                    : `${progress.signaturesLeft ?? 0} SIG LEFT`}
+                </span>
               </div>
               <div className="mt-1 h-1.5 w-full bg-red-500/10">
                 <div
@@ -223,6 +245,8 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
               </div>
             </div>
           )}
+
+          {overlayPhase && <TxStatusOverlay phase={overlayPhase} detail={overlayDetail} />}
 
           {/* Log */}
           {logs.length > 0 && (

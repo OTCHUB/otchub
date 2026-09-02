@@ -14,6 +14,7 @@ import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
 import { fmtUsd } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
+import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -51,6 +52,7 @@ export default function JupiterSwapPanel({ wallet }) {
   const [solBal, setSolBal] = useState(null);
   const [customSlip, setCustomSlip] = useState(""); // custom slippage % (overrides presets)
   const [prices, setPrices] = useState({}); // mint -> USD spot (SOL + $OTC)
+  const [txPhase, setTxPhase] = useState(null); // live swap phase for the status overlay
 
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
 
@@ -176,6 +178,7 @@ export default function JupiterSwapPanel({ wallet }) {
     }
     setBusy(true);
     setLogs([]);
+    setTxPhase("quote");
     try {
       const [inputMint, outputMint] = isBuy
         ? [SOL_MINT, OTC_MINT]
@@ -186,8 +189,9 @@ export default function JupiterSwapPanel({ wallet }) {
       const q = await getQuote(inputMint, outputMint, raw, slippageBps);
       setQuote(q);
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
+      setTxPhase("build");
       const built = await getSwapTx(q, wallet);
-      const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet);
+      const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet, setTxPhase);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });
         // refresh the on-chain $OTC balance once the swap confirms
@@ -198,6 +202,7 @@ export default function JupiterSwapPanel({ wallet }) {
       setErr(e.message);
     } finally {
       setBusy(false);
+      setTxPhase(null);
     }
   };
 
@@ -460,6 +465,13 @@ export default function JupiterSwapPanel({ wallet }) {
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[10px] text-amber-400">
               ERR: {err}
             </div>
+          )}
+
+          {busy && (
+            <TxStatusOverlay
+              phase={txPhase || "prep"}
+              detail={isBuy ? "SOL → $OTC" : "$OTC → SOL"}
+            />
           )}
 
           {/* Log */}
