@@ -79,7 +79,11 @@ export default function BootScreen({ onComplete }) {
     return () => clearInterval(id);
   }, [built, onComplete]);
 
-  const progress = built ? Math.round((lines.length / built.length) * 100) : 0;
+  // Clamp to exactly 0–100 so the bar can never overflow its frame and always
+  // finishes at 100% when the boot sequence completes.
+  const progress = built?.length
+    ? Math.max(0, Math.min(100, Math.round((lines.length / built.length) * 100)))
+    : 0;
 
   return (
     <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black font-mono text-green-400">
@@ -131,9 +135,9 @@ export default function BootScreen({ onComplete }) {
               <span>BOOT_SEQ</span>
               <span>{progress}%</span>
             </div>
-            <div className="mt-1 h-1.5 w-full bg-green-500/10">
+            <div className="mt-1 h-1.5 w-full overflow-hidden bg-green-500/10">
               <div
-                className="h-full bg-green-500/60 transition-all duration-100"
+                className="h-full max-w-full bg-green-500/60 transition-all duration-100"
                 style={{ width: `${progress}%` }}
               />
             </div>
