@@ -81,7 +81,7 @@ export default function JupiterSwapPanel({ wallet }) {
       setQuote(q);
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
       const built = await getSwapTx(q, wallet);
-      const res = await executeSwap(built.swapTransaction, provider, log);
+      const res = await executeSwap(built.swapTransaction, provider, log, wallet);
       if (res.ok) log({ type: "ok", msg: "SWAP COMPLETE" });
     } catch (e) {
       log({ type: "err", msg: `SWAP_ABORT: ${e.message}` });

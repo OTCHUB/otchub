@@ -66,9 +66,27 @@ export async function simulateSwapTx(base64Tx) {
   }
 }
 
-// Full swap lifecycle: simulate -> sign -> send. Aborts on sim failure so the
-// wallet is never asked to sign a tx that would fail (no wasted fee).
-export async function executeSwap(base64Tx, provider, onLog) {
+// Full swap lifecycle: verify fee payer -> simulate -> sign -> send.
+// Aborts before signing if the tx's fee payer isn't the connected wallet
+// (guards against a tampered/baited transaction not meant for this user) or
+// if simulation fails (no wasted fee, no broken-tx signing).
+export async function executeSwap(base64Tx, provider, onLog, userPublicKey) {
+  const unsignedTx = VersionedTransaction.from(Buffer.from(base64Tx, "base64"));
+
+  // Safety: the fee payer (first account key) must be the connected wallet.
+  if (userPublicKey) {
+    try {
+      const feePayer = unsignedTx.message.staticAccountKeys[0];
+      if (!feePayer || feePayer.toString() !== userPublicKey) {
+        onLog({ type: "err", msg: "ABORT: tx fee payer != connected wallet" });
+        return { ok: false, reason: "fee_payer_mismatch" };
+      }
+    } catch (e) {
+      onLog({ type: "err", msg: `ABORT: could not verify fee payer (${e.message})` });
+      return { ok: false, reason: "fee_payer_unknown" };
+    }
+  }
+
   onLog({ type: "info", msg: "Simulating swap tx..." });
   const sim = await simulateSwapTx(base64Tx);
   if (!sim.ok) {
@@ -76,8 +94,6 @@ export async function executeSwap(base64Tx, provider, onLog) {
     return { ok: false, reason: sim.err };
   }
   onLog({ type: "sim", msg: `Sim OK (${sim.units} CU). Requesting signature...` });
-
-  const unsignedTx = VersionedTransaction.from(Buffer.from(base64Tx, "base64"));
   let signed;
   try {
     signed = await provider.signTransaction(unsignedTx);
