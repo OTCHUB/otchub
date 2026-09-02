@@ -38,13 +38,18 @@ export default function ProtocolPanel({ latest }) {
       </div>
 
       <Section title="SUPPLY :: BURN (ON-CHAIN)">
-        <Row label="TGE_SUPPLY" value={`${fmtNum(latest?.token_tge_supply ?? tge)} OTC`} desc="Genesis total supply" />
-        <Row label="CURRENT_SUPPLY" value={`${fmtNum(latest?.token_total_supply)} OTC`} desc="On-chain circulating supply" />
-        <Row
-          label="BURNT_FOREVER"
-          value={burnt != null ? `${fmtNum(burnt)} OTC` : "—"}
-          desc={`burned via minting + usage${burntPct != null ? ` · ${burntPct}% of TGE` : ""}`}
-        />
+        <Row label="TGE_SUPPLY" value={`${fmtNum(latest?.token_tge_supply ?? tge)} OTC`} desc="Genesis total supply (1B)" />
+        <Row label="CURRENT_SUPPLY" value={`${fmtNum(latest?.token_total_supply)} OTC`} desc="Live on-chain circulating supply" />
+        <Row label="BURNT_FOREVER" value={burnt != null ? `${fmtNum(burnt)} OTC` : "—"} desc="Burned via desk mints + usage" />
+        <div className="py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-green-500/60">BURNT_PCT</span>
+            <span className="font-mono text-xs text-amber-400">{burntPct != null ? `${burntPct}%` : "—"}</span>
+          </div>
+          <div className="mt-1 h-1.5 w-full border border-green-500/20 bg-black">
+            <div className="h-full bg-amber-500/70" style={{ width: `${Math.min(100, Math.max(0, parseFloat(burntPct) || 0))}%` }} />
+          </div>
+        </div>
       </Section>
 
       <Section title="BUYBACK TREASURY">

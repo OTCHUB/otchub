@@ -103,6 +103,15 @@ export default async function (req) {
       String(a.t || "").localeCompare(String(b.t || ""))
     );
 
+    // Inject true on-chain supply/burn into the served latest so the protocol
+    // panel always reflects real on-chain state, even if the stored snapshot
+    // predates the supply-fetch addition or a run failed mid-field.
+    if (latest && liveSupply != null) {
+      latest.token_total_supply = liveSupply;
+      latest.token_burnt = OTC_TGE_SUPPLY - liveSupply;
+      latest.token_tge_supply = OTC_TGE_SUPPLY;
+    }
+
     return Response.json({
       addresses: ADDRESSES,
       latest,

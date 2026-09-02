@@ -1,7 +1,7 @@
 import React from "react";
 import {
   ComposedChart,
-  Line,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -29,26 +29,39 @@ export default function SupplyChart({ history }) {
             SUPPLY vs DESKS MINTED
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
-            OTC circulating supply (left) · desks minted vs 5,000 cap (right) · burn: 1M OTC/desk early → 100k/desk now (on-chain anchored)
+            OTC circulating supply (↓ left) · desks minted (↑ right, 5,000 cap) · on-chain anchored
           </div>
         </div>
       </div>
-      <div className="mt-3 h-52 sm:h-64">
+      <div className="mt-3 h-56 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: -8 }}>
+          <ComposedChart data={data} margin={{ top: 4, right: 12, bottom: 0, left: -4 }}>
+            <defs>
+              <linearGradient id="supplyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.55} />
+                <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.05} />
+              </linearGradient>
+              <linearGradient id="desksGrad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stopColor="#4ade80" stopOpacity={0.05} />
+                <stop offset="100%" stopColor="#4ade80" stopOpacity={0.55} />
+              </linearGradient>
+            </defs>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="label" stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} minTickGap={24} />
             <YAxis
               yAxisId="supply"
+              orientation="left"
+              domain={["dataMin", "dataMax"]}
               stroke="#1a6b3a"
               fontSize={9}
               tick={{ fill: "#2a8b4a" }}
               tickFormatter={(v) => fmtCompact(v)}
-              width={46}
+              width={48}
             />
             <YAxis
               yAxisId="desks"
               orientation="right"
+              domain={[0, DESK_CAP]}
               stroke="#1a6b3a"
               fontSize={9}
               tick={{ fill: "#2a8b4a" }}
@@ -58,7 +71,9 @@ export default function SupplyChart({ history }) {
             <Tooltip
               contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
               labelStyle={{ color: "#22c55e" }}
-              formatter={(v, n) => [fmtNum(v), n]}
+              formatter={(v, n) =>
+                [n === "OTC_SUPPLY" ? `${fmtNum(v)} OTC` : n === "DESKS_MINTED" ? `${fmtNum(v)} desks` : v, n]
+              }
             />
             <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
             <ReferenceLine
@@ -68,8 +83,8 @@ export default function SupplyChart({ history }) {
               strokeDasharray="4 3"
               label={{ value: `CAP ${DESK_CAP}`, fill: "#fbbf24", fontSize: 9, position: "insideTopRight" }}
             />
-            <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke="#60a5fa" dot={false} strokeWidth={1.5} connectNulls />
-            <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS_MINTED" stroke="#4ade80" dot={false} strokeWidth={1.5} connectNulls />
+            <Area yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke="#60a5fa" strokeWidth={2} fill="url(#supplyGrad)" connectNulls />
+            <Area yAxisId="desks" type="monotone" dataKey="desks" name="DESKS_MINTED" stroke="#4ade80" strokeWidth={2} fill="url(#desksGrad)" connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
