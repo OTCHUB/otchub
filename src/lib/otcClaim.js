@@ -11,6 +11,7 @@
 
 import { Buffer } from "buffer";
 import "@/lib/bufferPolyfill";
+import { base44 } from "@/api/base44Client";
 import {
   Connection,
   PublicKey,
@@ -67,6 +68,18 @@ let _conn = null;
 function conn() {
   if (!_conn) _conn = new Connection(RPC_URL, "confirmed");
   return _conn;
+}
+
+// Route all client-side Solana RPC (blockhash / simulate / send) through the
+// backend solanaRelay function, which uses the app's Helius key server-side.
+// The public api.mainnet-beta endpoint rate-limits / 403s from the browser,
+// which broke packing and sending. The wallet still signs locally; only the
+// already-signed bytes are relayed.
+async function relay(mode, payload = {}) {
+  const res = await base44.functions.invoke("solanaRelay", { mode, ...payload });
+  const data = res?.data || {};
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 const pda = (seeds) =>
@@ -202,8 +215,8 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
 const MAX_MSG_BYTES = 1000;
 
 async function packTxs(ixs, user) {
-  const c = conn();
-  const blockhash = (await c.getLatestBlockhash()).blockhash;
+  const bh = await relay("blockhash");
+  const blockhash = bh.blockhash;
   const userPk = new PublicKey(user);
   const txs = [];
   let cur = null;
@@ -246,14 +259,14 @@ async function packTxs(ixs, user) {
 // Simulate a tx (unsigned) before asking the wallet to sign.
 async function simulate(tx) {
   try {
-    const res = await conn().simulateTransaction(tx, {
-      replaceRecentConnectedBlockhash: true,
-      sigVerify: false,
-    });
-    if (res.value.err) {
-      return { ok: false, err: JSON.stringify(res.value.err), logs: res.value.logs };
+    const b64 = tx
+      .serialize({ requireAllSignatures: false, verifySignatures: false })
+      .toString("base64");
+    const r = await relay("simulate", { tx: b64 });
+    if (r.err) {
+      return { ok: false, err: r.err, logs: r.logs };
     }
-    return { ok: true, units: res.value.unitsConsumed, logs: res.value.logs };
+    return { ok: true, units: r.units, logs: r.logs };
   } catch (e) {
     return { ok: false, err: e.message, logs: [] };
   }
@@ -285,10 +298,8 @@ export async function executeClaimTxs(txs, signTransactionRaw, onLog) {
       break; // user rejected — stop the batch
     }
     try {
-      const sig = await conn().sendRawTransaction(Buffer.from(signedBytes), {
-        skipPreflight: true,
-        maxRetries: 3,
-      });
+      const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
+      const sig = r.sig;
       onLog({ type: "ok", msg: `TX ${i + 1} SENT ${sig}`, sig });
       results.push({ ok: true, sig });
     } catch (e) {
