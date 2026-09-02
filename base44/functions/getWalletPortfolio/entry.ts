@@ -96,6 +96,7 @@ export default async function (req) {
       otc_value_usd: otcValueUsd,
       sol_price_usd: solPriceUsd,
       token_price_usd: tokenPriceUsd,
+      nft_floor_sol: latest?.nft_floor_sol ?? null,
       desks_owned: holdings.length,
       listed_count: listedCount,
       total_earning_sol: totalEarningSol,

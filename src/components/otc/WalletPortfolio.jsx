@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { fmtSol, fmtUsd, fmtNum } from "@/lib/format";
+import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
 import ClaimPanel from "@/components/otc/ClaimPanel";
 
@@ -20,6 +21,8 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [lifetime, setLifetime] = useState(null); // on-chain lifetime claim totals
+  const [claim, setClaim] = useState(null); // { sol, usd } live vault-scan claimable
 
   const load = React.useCallback(() => {
     let active = true;
@@ -46,6 +49,55 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
 
   useEffect(() => load(), [load]);
 
+  // LIFETIME_EARN: authoritative — decoded from the wallet's real on-chain
+  // OTC claim transactions (server-cached, incremental scan).
+  useEffect(() => {
+    let active = true;
+    base44.functions
+      .invoke("getLifetimeClaims", { wallet: address })
+      .then((r) => {
+        if (active && r?.data && !r.data.error) setLifetime(r.data);
+      })
+      .catch(() => {
+        /* lifetime stays hidden on failure */
+      });
+    return () => {
+      active = false;
+    };
+  }, [address]);
+
+  // Called by ClaimPanel with its live desk-vault scan: the exact on-chain
+  // stock amounts a claim would deliver right now, priced at spot.
+  const handleScan = (desks) => {
+    const mints = new Set([SOL_MINT]);
+    for (const d of desks || []) {
+      for (const t of d.claimable || []) mints.add(t.mint);
+    }
+    (async () => {
+      try {
+        const prices = await fetchTokenPricesUsd([...mints]);
+        let usd = 0;
+        for (const d of desks || []) {
+          for (const t of d.claimable || []) {
+            usd += (t.amount / 10 ** t.decimals) * (prices?.[t.mint] || 0);
+          }
+        }
+        const solUsd = prices?.[SOL_MINT] || null;
+        setClaim({ usd, sol: solUsd ? usd / solUsd : null });
+      } catch {
+        /* keep previous totals */
+      }
+    })();
+  };
+
+  const desks = data?.desks_owned || 0;
+  const solUsd = data?.sol_price_usd || null;
+  const estPerDaySol = desks * (perDeskPerDaySol || 0);
+  // Raw ME floor (no fees) × owned desks
+  const floorSol = data?.nft_floor_sol ?? null;
+  const nftValueSol = floorSol != null ? desks * floorSol : null;
+  const nftValueUsd = nftValueSol != null && solUsd ? nftValueSol * solUsd : null;
+
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
@@ -69,7 +121,7 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
 
       {data && !loading && (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Metric
               label="OTC_BALANCE"
               value={fmtNum(data.otc_balance)}
@@ -83,40 +135,32 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
               accent="text-cyan-400"
             />
             <Metric
-              label="TOTAL_EARN_SOL"
-              value={fmtSol(data.total_earning_sol, 4)}
-              accent="text-emerald-400"
+              label="LIFETIME_EARN"
+              value={lifetime ? fmtSol(lifetime.total_sol, 4) : "SCANNING…"}
+              sub={
+                lifetime
+                  ? `≈ ${fmtUsd(lifetime.total_usd)} · ${fmtNum(lifetime.count)} CLAIMS · ON-CHAIN`
+                  : "DECODING CLAIM HISTORY…"
+              }
+              accent="text-amber-400"
             />
-            <Metric
-              label="TOTAL_EARN_USD"
-              value={fmtUsd(data.total_earning_usd)}
-              accent="text-emerald-400"
-            />
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Metric
               label="EARN_TO_CLAIM"
-              value={fmtSol(data.total_earning_sol, 4)}
-              sub={`≈ ${fmtUsd(data.total_earning_usd)}`}
+              value={claim ? fmtSol(claim.sol, 4) : "SCANNING…"}
+              sub={claim ? `≈ ${fmtUsd(claim.usd)} · LIVE VAULT SCAN` : "READING VAULTS…"}
               accent="text-emerald-400"
+            />
+            <Metric
+              label="NFT_VALUE"
+              value={nftValueSol != null ? fmtSol(nftValueSol, 3) : "—"}
+              sub={`≈ ${fmtUsd(nftValueUsd)} · RAW FLOOR · NO FEES`}
+              accent="text-cyan-300"
             />
             <Metric
               label="EST_EARN_PER_DAY"
-              value={fmtSol((data.desks_owned || 0) * (perDeskPerDaySol || 0), 4)}
-              sub={`≈ ${fmtUsd((data.desks_owned || 0) * (perDeskPerDaySol || 0) * (data.sol_price_usd || 0))} · ${fmtNum(data.desks_owned)} desks`}
+              value={fmtSol(estPerDaySol, 4)}
+              sub={`≈ ${fmtUsd(solUsd ? estPerDaySol * solUsd : null)} · ${fmtNum(desks)} desks · 7d avg`}
               accent="text-emerald-400"
-            />
-            <Metric
-              label="STOCK_HOLDING"
-              value={fmtSol(data.total_earning_sol, 4)}
-              sub={`${(data.by_stock?.items || []).length} symbols`}
-              accent="text-emerald-400"
-            />
-            <Metric
-              label="LISTED_DESKS"
-              value={fmtNum(data.listed_count)}
-              sub={`of ${fmtNum(data.desks_owned)}`}
-              accent="text-amber-400"
             />
           </div>
           <div className="mt-3">
@@ -127,6 +171,7 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
               address={address}
               holdings={data.holdings}
               onClaimed={load}
+              onScan={handleScan}
             />
           </div>
         </>

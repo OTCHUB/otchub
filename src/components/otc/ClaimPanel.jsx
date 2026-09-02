@@ -8,7 +8,7 @@ import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
-export default function ClaimPanel({ address, holdings, onClaimed }) {
+export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
   const [selected, setSelected] = useState(() => new Set());
   const [tpMap, setTpMap] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -91,6 +91,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
     setTpMap(map);
     setPlan(list);
+    // Bubble the live scan up so the portfolio's EARN_TO_CLAIM total tracks it.
+    if (onScan) onScan(list);
     return list;
   };
 
