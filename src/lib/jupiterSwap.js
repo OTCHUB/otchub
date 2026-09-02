@@ -145,7 +145,10 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
     onPhase?.("send");
     const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
     const sig = r.sig;
-    onLog({ type: "ok", msg: `SWAP SENT ${sig}`, sig });
+    // Log a short sig preview only — the full base58 signature is an
+    // unbreakable ~88-char string that blows the panel out past the mobile
+    // viewport. The [SCAN] link carries the full signature.
+    onLog({ type: "ok", msg: `SWAP SENT ${sig.slice(0, 8)}…`, sig });
     // make sure the swap actually landed — re-broadcast if stuck pending
     onPhase?.("confirm");
     onLog({ type: "info", msg: "Confirming landing..." });

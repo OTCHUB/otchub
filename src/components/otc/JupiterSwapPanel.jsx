@@ -550,7 +550,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               {logs.map((l, i) => (
                 <div
                   key={i}
-                  className={`font-mono text-[9px] leading-snug ${
+                  className={`break-all font-mono text-[9px] leading-snug ${
                     l.type === "ok"
                       ? "text-emerald-400"
                       : l.type === "err"
