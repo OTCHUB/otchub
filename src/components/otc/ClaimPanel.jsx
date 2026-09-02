@@ -14,9 +14,22 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState([]);
   const [prices, setPrices] = useState({});
+  const [lifetime, setLifetime] = useState({}); // asset_id -> {value_sol, value_usd, count, tickers}
 
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
+
+  const loadLifetime = async (w) => {
+    try {
+      const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w });
+      if (res?.error) return;
+      const map = {};
+      for (const d of res.by_desk || []) map[d.asset_id] = d;
+      setLifetime(map);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // USD spot price per mint, plus SOL spot (keyed by SOL_MINT). Re-fetched
   // whenever the scan plan changes so claim values stay current.
@@ -65,22 +78,30 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     return list;
   };
 
-  const scan = async (force = true) => {
-    if (!address) return;
+  const scan = async (opts = {}) => {
+    const force = opts.force !== false; // default true
+    const silent = opts.silent === true;
+    if (!address) return null;
+    if (!silent) {
+      setLogs([]);
+      log({ type: "info", msg: `Requesting claim scan from server...` });
+    }
     setScanning(true);
-    setLogs([]);
-    log({ type: "info", msg: `Requesting claim scan from server...` });
     try {
       const res = await base44.functions.invoke("scanWalletClaims", { wallet: address, force });
       if (res?.error) throw new Error(res.error);
       const list = applyScan(res.desks);
-      const totalClaimable = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
-      log({
-        type: totalClaimable ? "ok" : "info",
-        msg: `${res.cached ? "CACHED" : "FRESH"} scan: ${totalClaimable} claimable ticker(s) across ${list.length} desk(s).`,
-      });
+      if (!silent) {
+        const totalClaimable = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
+        log({
+          type: totalClaimable ? "ok" : "info",
+          msg: `${res.cached ? "CACHED" : "FRESH"} scan: ${totalClaimable} claimable ticker(s) across ${list.length} desk(s).`,
+        });
+      }
+      return list;
     } catch (e) {
-      log({ type: "err", msg: `SCAN_FAIL: ${e.message}` });
+      if (!silent) log({ type: "err", msg: `SCAN_FAIL: ${e.message}` });
+      return null;
     } finally {
       setScanning(false);
     }
@@ -108,6 +129,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     return () => {
       cancelled = true;
     };
+  }, [address]);
+
+  // Load this wallet's per-desk lifetime claimed totals on mount.
+  useEffect(() => {
+    if (!address) return;
+    loadLifetime(address);
   }, [address]);
 
   const runClaim = async (allDesks) => {
@@ -145,8 +172,44 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       });
       if (ok > 0) {
         if (onClaimed) onClaimed();
-        // Refresh the on-chain scan so claimable reflects the claimed amounts.
-        scan(true);
+        // Capture pre-claim balances, re-scan on-chain, and log the per-ticker
+        // deltas (claimed = pre − post) as lifetime history for this wallet.
+        const pre = {};
+        for (const d of claimable) {
+          pre[d.asset_id] = {};
+          for (const t of d.claimable) pre[d.asset_id][t.mint] = t.amount;
+        }
+        const postPlan = await scan({ force: true, silent: true });
+        const claimed = [];
+        for (const d of postPlan || []) {
+          const preD = pre[d.asset_id];
+          if (!preD) continue;
+          for (const t of d.tickers || []) {
+            const diff = (preD[t.mint] || 0) - (t.amount || 0);
+            if (diff > 0) {
+              const amountHuman = diff / 10 ** t.decimals;
+              const valueUsd = amountHuman * (prices?.[t.mint] || 0);
+              const valueSol = solPriceUsd ? valueUsd / solPriceUsd : 0;
+              claimed.push({
+                asset_id: d.asset_id,
+                symbol: t.symbol,
+                mint: t.mint,
+                amount: amountHuman,
+                value_usd: valueUsd,
+                value_sol: valueSol,
+              });
+            }
+          }
+        }
+        if (claimed.length) {
+          try {
+            await base44.functions.invoke("logClaims", { wallet: address, claims: claimed });
+            log({ type: "ok", msg: `Logged ${claimed.length} claim(s) to lifetime history.` });
+            loadLifetime(address);
+          } catch (e) {
+            log({ type: "err", msg: `LOG_FAIL: ${e.message}` });
+          }
+        }
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
@@ -194,6 +257,16 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         into your own wallet. Every tx is simulated first; a failing sim is
         skipped (no fee spent). The program enforces you own the NFT.
       </p>
+
+      {Object.keys(lifetime).length > 0 && (() => {
+        const tSol = Object.values(lifetime).reduce((a, d) => a + (d.value_sol || 0), 0);
+        const tUsd = Object.values(lifetime).reduce((a, d) => a + (d.value_usd || 0), 0);
+        return (
+          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[9px] text-amber-400/80">
+            LIFETIME_CLAIMED_BY_THIS_WALLET :: {fmtSol(tSol, 3)} · {fmtUsd(tUsd)} · {Object.keys(lifetime).length} desk(s)
+          </div>
+        );
+      })()}
 
       {/* Desk list */}
       <div className="mt-2 max-h-52 overflow-y-auto border border-green-500/20">
@@ -258,6 +331,16 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                 {deskPlan && deskPlan.claimable.length > 0 && (
                   <div className="font-mono text-[8px] leading-tight text-cyan-400/70">
                     {fmtUsd(deskUsdValue(deskPlan), 2)}
+                  </div>
+                )}
+                {lifetime[d.asset_id] && (
+                  <div className="mt-0.5 border-t border-amber-500/20 pt-0.5">
+                    <div className="font-mono text-[8px] leading-tight text-amber-400/70">
+                      LT {fmtSol(lifetime[d.asset_id].value_sol, 3)}
+                    </div>
+                    <div className="font-mono text-[8px] leading-tight text-amber-300/60">
+                      {fmtUsd(lifetime[d.asset_id].value_usd)}
+                    </div>
                   </div>
                 )}
               </div>
