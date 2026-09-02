@@ -15,6 +15,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [logs, setLogs] = useState([]);
   const [prices, setPrices] = useState({});
   const [lifetime, setLifetime] = useState({}); // asset_id -> {value_sol, value_usd, count, tickers}
+  const [cleared, setCleared] = useState(() => new Set()); // desks claimed & emptied this session
 
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
@@ -237,6 +238,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
           }
         }
         if (claimed.length) {
+          setCleared((prev) => {
+            const n = new Set(prev);
+            for (const c of claimed) n.add(c.asset_id);
+            return n;
+          });
           try {
             await base44.functions.invoke("logClaims", { wallet: address, claims: claimed });
             log({ type: "ok", msg: `Logged ${claimed.length} claim(s) to lifetime history.` });
@@ -364,13 +370,19 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                     <div className="font-mono text-[8px] leading-tight text-green-500/60">
                       {fmtSol(deskSolValue(deskPlan), 4)}
                     </div>
-                    <div
-                      className={`font-mono text-[8px] leading-tight ${
-                        deskPlan.claimable.length ? "text-cyan-400/70" : "text-green-500/30"
-                      }`}
-                    >
-                      {deskPlan.claimable.length} CLAIMABLE
-                    </div>
+                    {deskPlan.claimable.length > 0 ? (
+                      <div className="font-mono text-[8px] leading-tight text-cyan-400/70">
+                        {deskPlan.claimable.length} CLAIMABLE
+                      </div>
+                    ) : cleared.has(d.asset_id) ? (
+                      <div className="font-mono text-[8px] leading-tight text-emerald-400">
+                        ✓ CLEARED
+                      </div>
+                    ) : (
+                      <div className="font-mono text-[8px] leading-tight text-green-500/30">
+                        0 CLAIMABLE
+                      </div>
+                    )}
                     {(() => {
                       const need = (deskPlan.tickers || []).filter((t) => !t.exists).length;
                       return need > 0 ? (
