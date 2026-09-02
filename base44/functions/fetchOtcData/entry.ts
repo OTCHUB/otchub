@@ -6,6 +6,25 @@ export default async function (req) {
     const base44 = createClientFromRequest(req);
     const reqArgs = await req.json().catch(() => ({}));
 
+    // Force ingest is admin-only: it runs the full on-chain + market sweep and
+    // rewrites the holdings table, so anonymous callers must not be able to
+    // spam it (RPC quota burn / DB churn). The 5-minute scheduler invokes this
+    // function WITHOUT force, and the Helius webhook ingests through
+    // shared/otcSnapshot directly — both are unaffected by this gate. The
+    // lightweight priceOnly path stays public.
+    if (reqArgs.force === true) {
+      let isAdmin = false;
+      try {
+        const user = await base44.auth.me();
+        isAdmin = user?.role === "admin";
+      } catch {
+        isAdmin = false;
+      }
+      if (!isAdmin) {
+        return Response.json({ error: "Force ingest is admin-only" }, { status: 403 });
+      }
+    }
+
     // Lightweight price-only refresh: recompute price-derived fields on the
     // latest snapshot in place (see shared/otcSnapshot.ts). Falls through to a
     // full fetch when no snapshot exists yet.

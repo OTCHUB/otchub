@@ -122,11 +122,15 @@ export default async function (req) {
     // fetch). Accept that list directly so the scan covers exactly the NFTs
     // shown in the panel — falling back to NftHolding-by-owner only when the
     // caller didn't pass assets.
-    const assetsIn = Array.isArray(body.assets) ? body.assets : null;
+    // Bounded, validated input: cap the caller-supplied desk list (defensive
+    // against oversized payloads burning RPC quota) and require plausible
+    // base58 asset ids so a malformed id can't reach the PDA derivation.
+    const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    const assetsIn = Array.isArray(body.assets) ? body.assets.slice(0, 100) : null;
     let desks;
     if (assetsIn && assetsIn.length) {
       desks = assetsIn
-        .filter((a) => a && a.asset_id)
+        .filter((a) => a && a.asset_id && BASE58_RE.test(a.asset_id))
         .map((a) => ({ asset_id: a.asset_id, name: a.name, image_url: a.image_url }));
     } else {
       const holdings = await base44.asServiceRole.entities.NftHolding.filter({ owner: wallet });
