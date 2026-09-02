@@ -53,18 +53,6 @@ export default function SupplyChart({ history, latest }) {
   const deskDeposits = desksNow != null ? desksNow * 100_000 : null;
   const desksPct = desksNow != null ? ((desksNow / DESK_CAP) * 100).toFixed(0) : null;
 
-  const firstHourBurn = useMemo(() => {
-    const iso = (history || [])
-      .filter((p) => p.t && /T/.test(p.t))
-      .sort((a, b) => String(a.t).localeCompare(String(b.t)));
-    if (iso.length < 2) return null;
-    const t0 = new Date(iso[0].t).getTime();
-    const s0 = iso[0].token_total_supply;
-    const p1 = iso.find((p) => new Date(p.t).getTime() >= t0 + 3600 * 1000);
-    if (p1 && s0 != null && p1.token_total_supply != null) return s0 - p1.token_total_supply;
-    return null;
-  }, [history]);
-
   const { supplyDomain, desksDomain } = useMemo(() => {
     const sv = data.map((d) => d.supply).filter((v) => v != null);
     const dv = data.map((d) => d.desks).filter((v) => v != null);
@@ -122,7 +110,6 @@ export default function SupplyChart({ history, latest }) {
         <MetricCard label="SUPPLY_NOW" value={supplyNow != null ? `${fmtM(supplyNow)} OTC` : "—"} sub={burnPct != null ? `-${burnPct}%` : null} subRed />
         <MetricCard label="TOTAL_BURNED" value={fmtM(totalBurned)} sub={deskDeposits != null ? `${fmtM(deskDeposits)} desk_deposits` : null} />
         <MetricCard label="DESKS" value={fmtK(desksNow)} sub={desksPct != null ? `${desksPct}% of ${DESK_CAP.toLocaleString()}` : null} />
-        <MetricCard label="FIRST_HOUR" value={firstHourBurn != null ? `${fmtM(firstHourBurn)} burned` : "—"} />
       </div>
 
       {/* Chart + legend */}
