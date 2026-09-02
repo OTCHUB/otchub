@@ -12,11 +12,16 @@ import {
 import { fmtUsd } from "@/lib/format";
 
 export default function TrendChart({ history }) {
-  const data = (history || []).map((h) => ({
-    t: new Date(h.t).getTime(),
-    token: h.token_price_usd,
-    floor: h.nft_floor_usd,
-  }));
+  const data = (history || []).map((h) => {
+    const token = h.token_price_usd;
+    const floor = h.nft_floor_usd;
+    return {
+      t: new Date(h.t).getTime(),
+      token,
+      floor,
+      diff: token != null && floor != null ? floor - token : null,
+    };
+  });
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -45,6 +50,7 @@ export default function TrendChart({ history }) {
             <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Line type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
             <Line type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="diff" name="DIFF_USD" stroke="#22d3ee" dot={false} strokeWidth={1.5} strokeDasharray="4 3" />
           </LineChart>
         </ResponsiveContainer>
       </div>
