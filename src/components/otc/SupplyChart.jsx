@@ -33,18 +33,28 @@ function MetricCard({ label, value, sub, subRed }) {
 }
 
 export default function SupplyChart({ history, latest }) {
-  const data = useMemo(
-    () =>
-      (history || [])
-        .map((h) => ({
-          t: h.t,
-          label: h.t ? new Date(h.t).toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "",
-          supply: h.token_total_supply ?? null,
-          desks: h.desks_minted ?? null,
-        }))
-        .filter((d) => d.t),
-    [history]
-  );
+  // Daily datapoints: collapse the dense snapshot history to ONE point per UTC
+  // day (the day's last snapshot = end-of-day reading), so the chart shows a
+  // clean smooth supply-burn vs desk-mint trend instead of a jagged intraday
+  // series.
+  const data = useMemo(() => {
+    const byDay = new Map();
+    for (const h of history || []) {
+      if (!h.t) continue;
+      const d = new Date(h.t);
+      const key = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+      const prev = byDay.get(key);
+      if (!prev || new Date(h.t) > new Date(prev.t)) byDay.set(key, h);
+    }
+    return [...byDay.values()]
+      .sort((a, b) => new Date(a.t) - new Date(b.t))
+      .map((h) => ({
+        t: h.t,
+        label: new Date(h.t).toLocaleDateString([], { month: "short", day: "2-digit", timeZone: "UTC" }),
+        supply: h.token_total_supply ?? null,
+        desks: h.desks_minted ?? null,
+      }));
+  }, [history]);
 
   const supplyNow = latest?.token_total_supply ?? null;
   const desksNow = latest?.desks_minted ?? null;
@@ -107,7 +117,7 @@ export default function SupplyChart({ history, latest }) {
         <div>
           <h3 className="text-base font-bold leading-tight text-green-400">&gt; EVERY_DESK_EATS_SUPPLY</h3>
           <p className="text-[10px] text-green-500/50">
-            HOURLY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
+            DAILY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
           </p>
         </div>
       </div>
@@ -170,8 +180,8 @@ export default function SupplyChart({ history, latest }) {
                   n,
                 ]}
               />
-              <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={false} connectNulls />
-              <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
+              <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
