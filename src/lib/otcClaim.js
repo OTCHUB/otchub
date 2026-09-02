@@ -413,6 +413,93 @@ export async function executeClaimTxsBatch(txs, signAllTransactionsRaw, onLog) {
   return results;
 }
 
+// Chunked execution for large claim runs (300+ claimable). Wallets reject /
+// let the blockhash expire on one giant signAll of 100+ txs, so we split the
+// instruction list into groups of ~chunkSize, and each group is ONE wallet
+// signAll prompt. Each group gets a fresh blockhash, is simulated first (a
+// failing sim is dropped — no fee), signed in a single approval, then sent
+// sequentially (preserving activate → distribute → claim order) and confirmed
+// before the next group. A stalled sign or broadcast times out instead of
+// hanging forever. So a 300-ticker claim = a handful of approvals, not one
+// giant batch and not 300 individual prompts.
+export async function executeClaimChunked(
+  ixs,
+  user,
+  signAllTransactionsRaw,
+  onLog,
+  chunkSize = 60
+) {
+  const results = [];
+  if (!ixs || !ixs.length) {
+    onLog({ type: "info", msg: "Nothing to do — no instructions." });
+    return results;
+  }
+  const totalGroups = Math.ceil(ixs.length / chunkSize);
+  onLog({
+    type: "info",
+    msg: `CHUNKED :: ${ixs.length} ix(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+  });
+  for (let c = 0, g = 0; c < ixs.length; c += chunkSize, g++) {
+    const groupNo = g + 1;
+    const groupIxs = ixs.slice(c, c + chunkSize);
+    const txs = await packTxs(groupIxs, user); // fresh blockhash per group
+    onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${txs.length} tx(s) :: simulating...` });
+    const sims = await mapLimit(txs, 8, (t) => simulate(t));
+    const passing = [];
+    for (let j = 0; j < txs.length; j++) {
+      const sim = sims[j];
+      if (!sim.ok) {
+        const errLine =
+          (sim.logs || []).find((l) => l.includes("Error Message")) ||
+          (sim.logs || []).find((l) => l.includes("Error Code"));
+        onLog({
+          type: "err",
+          msg: `G${groupNo} TX ${j + 1} SIM_FAIL: ${sim.err}${errLine ? ` :: ${errLine.replace("Program log: ", "")}` : ""}`,
+        });
+        results.push({ ok: false, reason: sim.err });
+      } else {
+        passing.push(txs[j]);
+      }
+    }
+    if (!passing.length) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} :: all sims failed — skipping.` });
+      continue;
+    }
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
+    let signed;
+    try {
+      signed = await signAllTransactionsRaw(passing);
+    } catch (e) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message}` });
+      for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "rejected" });
+      break; // user rejected — stop the whole run
+    }
+    if (!Array.isArray(signed) || signed.length !== passing.length) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} :: wallet returned wrong number of signed txs.` });
+      for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "bad-sign" });
+      continue;
+    }
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
+    for (let k = 0; k < signed.length; k++) {
+      try {
+        const r = await withTimeout(
+          relay("send", { tx: Buffer.from(signed[k]).toString("base64") }),
+          60000,
+          `G${groupNo} TX ${k + 1} broadcast`
+        );
+        onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
+        results.push({ ok: true, sig: r.sig });
+      } catch (e) {
+        onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
+        results.push({ ok: false, reason: e.message });
+      }
+    }
+    // brief pause so the next group's blockhash is fresh and prior state committed
+    if (c + chunkSize < ixs.length) await new Promise((r) => setTimeout(r, 2000));
+  }
+  return results;
+}
+
 // Build claim instructions for a set of desks' claimable tickers, in order.
 export async function buildClaimInstructions(deskPlans, user, tokenProgramMap) {
   const ixs = [];
