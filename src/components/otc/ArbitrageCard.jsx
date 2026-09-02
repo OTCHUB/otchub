@@ -122,9 +122,9 @@ export default function ArbitrageCard({ latest, holdings }) {
             href={`${ME_BASE}/${snipe.asset_id}`}
             target="_blank"
             rel="noreferrer"
-            className="border border-emerald-500/50 px-2 py-0.5 text-emerald-400 hover:bg-emerald-500/10"
+            className="border border-emerald-500/50 px-2 py-0.5 font-bold text-emerald-400 hover:bg-emerald-500/10"
           >
-            [BUY]
+            [BUY_ON_ME ↗]
           </a>
         </div>
       )}

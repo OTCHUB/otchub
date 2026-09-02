@@ -145,9 +145,9 @@ export default function Home() {
           />
           <StatCard
             label="NFT_FLOOR"
-            value={fmtSol(latest?.nft_floor_sol)}
-            sub={fmtUsd(latest?.nft_floor_usd)}
-            desc="Lowest Magic Eden listing"
+            value={fmtSol(latest?.secondary_cost_sol)}
+            sub={fmtUsd(latest?.secondary_cost_usd)}
+            desc="ME floor incl. 2% + 5% fees"
             accent="amber"
           />
           <StatCard

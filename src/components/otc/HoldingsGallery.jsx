@@ -3,6 +3,8 @@ import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 
+const ME_BASE = "https://magiceden.io/item-details";
+
 export default function HoldingsGallery({ holdings, byStock }) {
   const [mode, setMode] = useState("SNIPE");
   const [sel, setSel] = useState(null);
@@ -35,7 +37,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
           const spread = (h.accrued_value_sol || 0) - (h.listing_price_sol || 0);
           const snipe = h.is_listed && h.listing_price_sol != null && spread > 0.0001;
           return (
-            <button key={h.asset_id} onClick={() => setSel(h)} className={`border text-left hover:border-green-500/50 ${snipe ? "border-emerald-400 bg-emerald-500/10" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black" : "border-green-500/20 bg-black"}`}>
+            <div key={h.asset_id} onClick={() => setSel(h)} className={`border text-left hover:border-green-500/50 cursor-pointer ${snipe ? "border-emerald-400 bg-emerald-500/10" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black" : "border-green-500/20 bg-black"}`}>
               <div className="relative aspect-square">
                 {h.image_url ? <Image src={h.image_url} fittingType="fill" className="h-full w-full" /> : <div className="flex h-full items-center justify-center font-mono text-[10px] text-green-500/30">NO_IMG</div>}
                 {h.is_listed && h.listing_price_sol != null && <span className="absolute right-1 top-1 bg-black/80 px-1 font-mono text-[9px] text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}</span>}
@@ -48,12 +50,13 @@ export default function HoldingsGallery({ holdings, byStock }) {
                     <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
                     <div className="font-mono text-[9px] text-green-500/60">STK_HLD {fmtSol(h.accrued_value_sol, 3)} · {fmtUsd(h.accrued_value_usd, 2)}</div>
                     <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : "text-amber-400/70"}`}>NET(STK−LST) {fmtSol(spread, 3)}</div>
+                    <a href={`${ME_BASE}/${h.asset_id}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-1 inline-block border border-emerald-500/50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
                   </>
                 ) : (
                   <div className="font-mono text-[9px] text-green-500/60">STK_HLD {fmtSol(h.accrued_value_sol, 3)} · {fmtUsd(h.accrued_value_usd, 2)}</div>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
         {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">NO_DATA</div>}
