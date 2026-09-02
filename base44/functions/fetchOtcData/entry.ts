@@ -3,17 +3,21 @@ import {
   ADDRESSES,
   fetchDexScreenerToken,
   fetchSolPriceUsd,
-  fetchTokenAccountsByOwner,
   fetchAccountBalanceLamports,
   fetchCollectionAssets,
   fetchMagicEdenStats,
   fetchMagicEdenListings,
+  fetchProtocolStats,
 } from "../../shared/otcSources.ts";
+
+const LAMPORTS_PER_SOL = 1e9;
+const OTC_DECIMALS = 6;
+const OTC_DEPOSIT = 100000; // OTC burned per mint
+const SURCHARGE_SOL = 0.5; // SOL surcharge per mint (0.45 pot + 0.05 protocol)
 
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
-    // Allow workflow calls (no user) and admin users; reject non-admins.
     try {
       const user = await base44.auth.me();
       if (user && user.role !== "admin") {
@@ -23,102 +27,159 @@ export default async function (req) {
       // no authenticated user — workflow context, allowed
     }
 
-    const [pair, solPriceUsd, potAccounts, protocolAccounts, protocolSol, meStats, listings, assets] =
+    const [pair, solPriceUsd, potLamports, meStats, listings, assets, stats] =
       await Promise.all([
         fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT),
         fetchSolPriceUsd(),
-        fetchTokenAccountsByOwner(ADDRESSES.POT, ADDRESSES.OTC_TOKEN_MINT),
-        fetchTokenAccountsByOwner(ADDRESSES.PROTOCOL_WALLET, ADDRESSES.OTC_TOKEN_MINT),
-        fetchAccountBalanceLamports(ADDRESSES.PROTOCOL_WALLET),
+        fetchAccountBalanceLamports(ADDRESSES.POT),
         fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
         fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL, 50),
         fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
+        fetchProtocolStats(),
       ]);
 
     const tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
-    const tokenPriceSol = tokenPriceUsd && solPriceUsd ? tokenPriceUsd / solPriceUsd : null;
-    const potBalance = potAccounts.reduce((s, a) => s + a.amount, 0);
-    const protocolTokenBalance = protocolAccounts.reduce((s, a) => s + a.amount, 0);
-    const protocolSolBalance = protocolSol != null ? protocolSol / 1e9 : null;
+    const tokenPriceSol = pair
+      ? parseFloat(pair.priceNative)
+      : tokenPriceUsd && solPriceUsd
+      ? tokenPriceUsd / solPriceUsd
+      : null;
+    const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
     const totalSupply = assets.length;
+    const perDeskHistory = stats?.perDesk || [];
+    const desksMinted = perDeskHistory.length
+      ? perDeskHistory[perDeskHistory.length - 1].desks
+      : totalSupply;
     const listedCount = meStats?.listedCount ?? null;
     const floorSol =
       meStats?.floorPrice != null
-        ? meStats.floorPrice / 1e9
+        ? meStats.floorPrice / LAMPORTS_PER_SOL
         : listings.length
-        ? Math.min(...listings.map((l) => (l.price || 0) / 1e9))
+        ? Math.min(...listings.map((l) => (l.price || 0) / LAMPORTS_PER_SOL))
         : null;
     const floorUsd = floorSol != null && solPriceUsd ? floorSol * solPriceUsd : null;
 
-    // Per-NFT implied stock claim = total stock locked in pot / minted supply
-    const stockPerNft = totalSupply > 0 ? potBalance / totalSupply : null;
-    const stockPerNftUsd = stockPerNft != null && tokenPriceUsd ? stockPerNft * tokenPriceUsd : null;
-
-    // Opportunity: compare minting cost vs secondary floor.
-    // Mint cost ≈ implied stock value locked per NFT (what you get by minting).
-    const mintCostUsd = stockPerNftUsd;
+    // Mint cost: 100,000 OTC burned + 0.5 SOL surcharge
+    const mintCostSol =
+      tokenPriceSol != null ? OTC_DEPOSIT * tokenPriceSol + SURCHARGE_SOL : null;
+    const mintCostUsd =
+      tokenPriceUsd != null && solPriceUsd != null
+        ? OTC_DEPOSIT * tokenPriceUsd + SURCHARGE_SOL * solPriceUsd
+        : null;
+    const secondaryCostSol = floorSol;
     const secondaryCostUsd = floorUsd;
+
+    let spreadSol = null;
     let spreadUsd = null;
     let spreadPct = null;
     let recommendation = "neutral";
     if (mintCostUsd != null && secondaryCostUsd != null) {
-      spreadUsd = secondaryCostUsd - mintCostUsd;
+      spreadUsd = mintCostUsd - secondaryCostUsd;
+      spreadSol = mintCostSol - secondaryCostSol;
       spreadPct = mintCostUsd > 0 ? (spreadUsd / mintCostUsd) * 100 : null;
-      if (spreadUsd > 0) recommendation = "mint";
-      else if (spreadUsd < 0) recommendation = "buy_secondary";
+      recommendation =
+        spreadUsd > 0.0001 ? "buy_secondary" : spreadUsd < -0.0001 ? "mint" : "neutral";
     }
+
+    const byStock = (stats?.byStock || []).map((s) => ({
+      symbol: s.symbol,
+      mint: s.mint,
+      distributed_sol: s.distributed ? s.distributed / LAMPORTS_PER_SOL : 0,
+      coins: s.coins || 0,
+      per_desk_sol:
+        desksMinted > 0 && s.distributed ? s.distributed / LAMPORTS_PER_SOL / desksMinted : 0,
+    }));
+
+    const perDesk = perDeskHistory.map((d) => ({
+      day: d.day,
+      spent_sol: d.spent ? d.spent / LAMPORTS_PER_SOL : 0,
+      per_desk_sol: d.lamports ? d.lamports / LAMPORTS_PER_SOL : 0,
+      rounds: d.rounds || 0,
+      desks: d.desks || 0,
+    }));
+
+    const solOf = (v) => (v ? v / LAMPORTS_PER_SOL : null);
+    const protocolDistributedSol = solOf(stats?.distributed);
+    const roundsTotal = perDeskHistory.reduce((a, d) => a + (d.rounds || 0), 0);
+
+    const perDeskAccruedSol =
+      desksMinted > 0 && protocolDistributedSol != null
+        ? protocolDistributedSol / desksMinted
+        : null;
+    const perDeskAccruedUsd =
+      perDeskAccruedSol != null && solPriceUsd ? perDeskAccruedSol * solPriceUsd : null;
 
     const snapshot = {
       sol_price_usd: solPriceUsd,
       token_price_usd: tokenPriceUsd,
       token_price_sol: tokenPriceSol,
-      token_market_cap: pair?.marketCap ? parseFloat(pair.marketCap) : null,
-      token_volume_24h: pair?.volume?.h24 ? parseFloat(pair.volume.h24) : null,
+      token_market_cap: pair?.marketCap
+        ? parseFloat(pair.marketCap)
+        : stats?.marketCap ?? null,
+      token_volume_24h: pair?.volume?.h24
+        ? parseFloat(pair.volume.h24)
+        : stats?.volume24h ?? null,
       token_liquidity_usd: pair?.liquidity?.usd ? parseFloat(pair.liquidity.usd) : null,
       token_price_change_24h: pair?.priceChange?.h24 ? parseFloat(pair.priceChange.h24) : null,
       nft_floor_sol: floorSol,
       nft_floor_usd: floorUsd,
       nft_listed_count: listedCount,
       nft_total_supply: totalSupply,
-      nft_mint_price_sol: stockPerNft && solPriceUsd ? stockPerNft * tokenPriceSol : null,
-      nft_mint_price_usd: mintCostUsd,
-      pot_token_balance: potBalance,
-      pot_token_value_usd: potBalance && tokenPriceUsd ? potBalance * tokenPriceUsd : null,
-      protocol_wallet_balance: protocolTokenBalance,
+      desks_minted: desksMinted,
+      pot_sol_balance: potSol,
+      protocol_earned_sol: solOf(stats?.earned),
+      protocol_distributed_sol: protocolDistributedSol,
+      protocol_to_pot_sol: solOf(stats?.toPot),
+      protocol_to_protocol_sol: solOf(stats?.toProtocol),
+      protocol_buyback_sol: solOf(stats?.buybackBalance),
+      protocol_buyback_otc: stats?.buybackOtc
+        ? stats.buybackOtc / Math.pow(10, OTC_DECIMALS)
+        : null,
+      protocol_owed_sol: solOf(stats?.owed),
+      protocol_costs_sol: solOf(stats?.costs),
+      protocol_coins: stats?.coins ?? null,
+      protocol_earning_coins: stats?.earning ?? null,
+      rounds_total: roundsTotal,
+      mint_cost_sol: mintCostSol,
       mint_cost_usd: mintCostUsd,
+      secondary_cost_sol: secondaryCostSol,
       secondary_cost_usd: secondaryCostUsd,
+      spread_sol: spreadSol,
       spread_usd: spreadUsd,
       spread_pct: spreadPct,
       recommendation,
+      by_stock: byStock,
+      per_desk: perDesk,
     };
 
     const created = await base44.asServiceRole.entities.OtcSnapshot.create(snapshot);
 
-    // Refresh the NFT holdings cache.
-    const listedSet = new Set((listings || []).map((l) => l.tokenMint || l.token_mint));
+    const listedSet = new Set((listings || []).map((l) => l.tokenMint || l.token_mint || l.id));
     const holdings = assets.map((a) => ({
       asset_id: a.id || a.address || "",
-      name: a.content?.metadata?.name || a.name || "Untitled",
+      name: a.content?.metadata?.name || a.name || "OTC Desk",
       owner: a.ownership?.owner || null,
       image_url: a.content?.files?.[0]?.uri || a.content?.links?.image || null,
-      stock_token_balance: stockPerNft,
-      stock_token_value_usd: stockPerNftUsd,
+      accrued_value_sol: perDeskAccruedSol,
+      accrued_value_usd: perDeskAccruedUsd,
       is_listed: listedSet.has(a.id || a.address),
     }));
 
     await base44.asServiceRole.entities.NftHolding.deleteMany({});
-    if (holdings.length) {
-      await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
-    }
+    if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
 
     return Response.json({
       ok: true,
       snapshot_id: created?.id,
       assets_count: assets.length,
-      pot_balance: potBalance,
+      desks_minted: desksMinted,
+      pot_sol: potSol,
       floor_sol: floorSol,
-      me_stats: meStats ? "ok" : "unavailable",
+      mint_cost_sol: mintCostSol,
+      secondary_cost_sol: secondaryCostSol,
+      recommendation,
+      stats_ok: stats ? true : false,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

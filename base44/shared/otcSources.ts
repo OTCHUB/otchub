@@ -112,3 +112,13 @@ export async function fetchMagicEdenListings(symbol, limit = 20) {
     return [];
   }
 }
+
+export async function fetchProtocolStats() {
+  try {
+    const res = await fetch("https://otcdesks.cash/api/stats");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}

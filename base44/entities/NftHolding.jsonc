@@ -14,10 +14,10 @@
     "image_url": {
       "type": "string"
     },
-    "stock_token_balance": {
+    "accrued_value_sol": {
       "type": "number"
     },
-    "stock_token_value_usd": {
+    "accrued_value_usd": {
       "type": "number"
     },
     "is_listed": {
