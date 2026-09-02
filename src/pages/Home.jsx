@@ -187,7 +187,7 @@ export default function Home() {
 
         {/* Jupiter SOL → OTC swap */}
         <div className="mt-3">
-          <JupiterSwapPanel />
+          <JupiterSwapPanel wallet={wallet} />
         </div>
 
         {/* Charts */}

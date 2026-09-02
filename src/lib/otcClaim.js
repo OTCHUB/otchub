@@ -313,6 +313,7 @@ export function getConnectedProvider(address) {
     window.solana,
     window.solflare,
     window.backpack,
+    window.jupiter,
   ].filter(Boolean);
   for (const p of candidates) {
     try {
