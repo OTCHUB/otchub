@@ -17,6 +17,7 @@ import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 import RecentSwaps from "@/components/otc/RecentSwaps";
 import PriceCandles from "@/components/otc/PriceCandles";
+import WalletConnect from "@/components/otc/WalletConnect";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -40,7 +41,7 @@ function fmtLamports(raw) {
 // Two-way $OTC trading via Jupiter: BUY = SOL -> $OTC, SELL = $OTC -> SOL.
 // Same reliability model as before: every swap tx is simulated before the
 // wallet is asked to sign, so a failing sim aborts with no fee spent.
-export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect }) {
+export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected }) {
   const [mode, setMode] = useState("BUY"); // "BUY" | "SELL"
   const [amount, setAmount] = useState("0.1");
   const [slippageBps, setSlippageBps] = useState(100);
@@ -338,13 +339,22 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect 
       </div>
 
       {!wallet ? (
-        <button
-          onClick={() => onGoConnect?.()}
-          className="mt-3 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
-          title="Open the wallet connect panel"
-        >
-          [▲ CONNECT WALLET — GO TO WALLET PANEL]
-        </button>
+        <div className="mt-3">
+          <div className="mb-2 text-center font-mono text-[10px] text-green-500/50">
+            CONNECT A WALLET TO ENABLE SWAP :: ALSO UNLOCKS PORTFOLIO + BULK CLAIM
+          </div>
+          {/* Inline connect: no jump needed — connect right here and the swap
+              panel activates immediately (same wallet state as the app's
+              wallet view, so bulk claim unlocks too). */}
+          <WalletConnect onConnected={onConnected} />
+          <button
+            onClick={() => onGoConnect?.()}
+            className="mt-2 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
+            title="Open the wallet panel (portfolio + bulk claim)"
+          >
+            [▲ GO TO WALLET PANEL :: PORTFOLIO + BULK CLAIM]
+          </button>
+        </div>
       ) : (
         <>
           {/* Balance rows: native SOL + $OTC, both with live USD equivalents */}

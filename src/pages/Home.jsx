@@ -278,6 +278,7 @@ export default function Home() {
                 latest={latest}
                 history={data?.history}
                 onGoConnect={goWalletConnect}
+                onConnected={setWallet}
               />
             </CollapsibleCard>
           </div>
