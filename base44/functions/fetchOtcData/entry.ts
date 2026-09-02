@@ -37,6 +37,81 @@ export default async function (req) {
     // / market fetches while still showing fresh data. Pass { force: true }
     // to bypass (manual admin refresh).
     const reqArgs = await req.json().catch(() => ({}));
+
+    // Lightweight price-only refresh: fetch JUST DexScreener OTC price + SOL
+    // spot, then recompute the price-derived fields on the latest snapshot in
+    // place. Skips all heavy on-chain / Magic Eden / otcdesks calls so it can
+    // run every minute without rate-limiting. created_date is NOT touched
+    // (only updated_date bumps), so the 5-min full-snapshot cadence + history
+    // stay intact and the full-fetch freshness gate still works.
+    if (reqArgs.priceOnly === true) {
+      const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
+      let solPriceUsd = await fetchSolPriceUsd();
+      let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
+      let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
+
+      const prev = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
+      const p = prev?.[0];
+      if (p) {
+        // Fall back to last known prices if DexScreener rate-limited this run.
+        if (tokenPriceUsd == null) tokenPriceUsd = p.token_price_usd;
+        if (solPriceUsd == null) solPriceUsd = p.sol_price_usd;
+        if (tokenPriceSol == null) tokenPriceSol = p.token_price_sol;
+        if (tokenPriceSol == null && tokenPriceUsd != null && solPriceUsd != null) {
+          tokenPriceSol = tokenPriceUsd / solPriceUsd;
+        }
+
+        const floorSol = p.nft_floor_sol;
+        const floorUsd = floorSol != null && solPriceUsd != null ? floorSol * solPriceUsd : null;
+        const mintCostSol =
+          tokenPriceSol != null ? OTC_DEPOSIT * tokenPriceSol + SURCHARGE_SOL : null;
+        const mintCostUsd =
+          tokenPriceUsd != null && solPriceUsd != null
+            ? OTC_DEPOSIT * tokenPriceUsd + SURCHARGE_SOL * solPriceUsd
+            : null;
+        const secondaryCostSol = floorSol != null ? floorSol * ME_TOTAL_MARKUP : null;
+        const secondaryCostUsd = floorUsd != null ? floorUsd * ME_TOTAL_MARKUP : null;
+        let spreadSol = null;
+        let spreadUsd = null;
+        let spreadPct = null;
+        let recommendation = "neutral";
+        if (mintCostUsd != null && secondaryCostUsd != null) {
+          spreadUsd = mintCostUsd - secondaryCostUsd;
+          spreadSol = mintCostSol - secondaryCostSol;
+          spreadPct = mintCostUsd > 0 ? (spreadUsd / mintCostUsd) * 100 : null;
+          recommendation =
+            spreadUsd > 0.0001 ? "buy_secondary" : spreadUsd < -0.0001 ? "mint" : "neutral";
+        }
+        const buybackOtc = p.protocol_buyback_otc;
+        await base44.asServiceRole.entities.OtcSnapshot.update(p.id, {
+          sol_price_usd: solPriceUsd,
+          token_price_usd: tokenPriceUsd,
+          token_price_sol: tokenPriceSol,
+          nft_floor_usd: floorUsd,
+          mint_cost_sol: mintCostSol,
+          mint_cost_usd: mintCostUsd,
+          secondary_cost_usd: secondaryCostUsd,
+          spread_sol: spreadSol,
+          spread_usd: spreadUsd,
+          spread_pct: spreadPct,
+          recommendation,
+          protocol_buyback_otc_value_sol:
+            buybackOtc != null && tokenPriceSol != null ? buybackOtc * tokenPriceSol : null,
+          protocol_buyback_otc_value_usd:
+            buybackOtc != null && tokenPriceUsd != null ? buybackOtc * tokenPriceUsd : null,
+        });
+        return Response.json({
+          ok: true,
+          price_only: true,
+          updated: p.id,
+          token_price_usd: tokenPriceUsd,
+          sol_price_usd: solPriceUsd,
+          recommendation,
+        });
+      }
+      // No snapshot yet — fall through to a full fetch.
+    }
+
     if (reqArgs.force !== true) {
       const recent = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
       const last = recent?.[0];

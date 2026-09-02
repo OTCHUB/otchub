@@ -19,6 +19,7 @@ import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import BootScreen from "@/components/otc/BootScreen";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
+import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 
 export default function Home() {
   const [data, setData] = useState(null);
@@ -66,7 +67,12 @@ export default function Home() {
     }
   };
 
-  const latest = data?.latest;
+  const snapshot = data?.latest;
+  // Live DexScreener OTC + SOL price poll (every ~15s) merged over the stored
+  // snapshot so the displayed price, SOL conversion, and arbitrage stay fresh
+  // between the 5-minute backend ingests.
+  const live = useLiveOtcPrice(snapshot);
+  const latest = live && snapshot ? { ...snapshot, ...live } : snapshot;
 
   // Trailing 7-day average per-desk daily earning (SOL) — used to estimate a
   // connected wallet's daily earning from its owned (activated) desks.
@@ -95,7 +101,9 @@ export default function Home() {
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
-                LAST_UPDATE {timeAgo(latest?.created_date)} · {data?.snapshot_count || 0} SNAPSHOTS
+                LAST_UPDATE {timeAgo(latest?.updated_date || latest?.created_date)}
+                {live ? " · " : ""}{live && <span className="text-emerald-400">● LIVE</span>}
+                {" · "}{data?.snapshot_count || 0} SNAPSHOTS
               </p>
             </div>
             <div className="flex items-center gap-2">
