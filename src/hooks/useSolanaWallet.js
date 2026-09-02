@@ -16,6 +16,11 @@ export const WALLET_PROVIDERS = [
     name: "Backpack",
     get: () => (typeof window !== "undefined" ? window.backpack : null),
   },
+  {
+    id: "jupiter",
+    name: "Jupiter",
+    get: () => (typeof window !== "undefined" ? window.jupiter : null),
+  },
 ];
 
 export function useSolanaWallet() {

@@ -36,7 +36,7 @@ export default function WalletConnect({ onConnected }) {
         ))}
         {!available.length && (
           <span className="text-[11px] text-amber-400">
-            No Solana wallet detected — install Phantom/Solflare, or enter address below.
+            No Solana wallet detected — install Phantom/Solflare/Jupiter, or enter address below.
           </span>
         )}
       </div>
