@@ -29,7 +29,7 @@ export default function SupplyChart({ history }) {
             SUPPLY vs DESKS MINTED
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
-            OTC circulating supply (left) · desks minted vs 5,000 cap (right) · bootstrap: 100k OTC burned per desk mint
+            OTC circulating supply (left) · desks minted vs 5,000 cap (right) · burn: 1M OTC/desk early → 100k/desk now (on-chain anchored)
           </div>
         </div>
       </div>

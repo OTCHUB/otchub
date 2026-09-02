@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import { ADDRESSES } from "../../shared/otcSources.ts";
+import { ADDRESSES, fetchTokenSupply } from "../../shared/otcSources.ts";
 
 export default async function (req) {
   try {
@@ -20,17 +20,57 @@ export default async function (req) {
     // circulating supply = TGE(1B) − burn. This reconstructs the on-chain
     // mint↔burn relationship across the protocol's entire life (≈5 days),
     // before live snapshots existed.
+    // Accurate on-chain-grounded bootstrap of the full supply/burn history.
+    // Mint deposit started at 1,000,000 OTC/desk and was later cut to
+    // 100,000 OTC/desk, so a flat 100k/desk assumption understates early
+    // burns. We anchor to the real on-chain current supply (live RPC, falling
+    // back to the latest snapshot) to derive the migration point D_mig — the
+    // cumulative desk count at which the deposit changed — analytically:
+    //   currentBurnt = D_mig*1M + (D_total - D_mig)*100k
+    // Then each day's cumulative burn is reconstructed with the correct
+    // per-desk deposit before/after the migration.
     const OTC_TGE_SUPPLY = 1_000_000_000;
-    const OTC_BURN_PER_DESK = 100000;
+    const DEPOSIT_OLD = 1_000_000;
+    const DEPOSIT_NEW = 100_000;
+
+    let liveSupply = latest?.token_total_supply ?? null;
+    try {
+      const live = await fetchTokenSupply(ADDRESSES.OTC_TOKEN_MINT);
+      if (live != null) liveSupply = live;
+    } catch (e) {
+      /* keep snapshot/null anchor */
+    }
+    const currentBurnt = liveSupply != null ? OTC_TGE_SUPPLY - liveSupply : null;
     const perDeskItems = latest?.per_desk?.items || [];
+    const D_total =
+      latest?.desks_minted ?? perDeskItems[perDeskItems.length - 1]?.desks ?? null;
+
+    let D_mig = null;
+    if (currentBurnt != null && D_total != null) {
+      D_mig = (currentBurnt - D_total * DEPOSIT_NEW) / (DEPOSIT_OLD - DEPOSIT_NEW);
+      if (D_mig < 0) D_mig = 0;
+      if (D_mig > D_total) D_mig = D_total;
+    }
+
     const bootstrap = perDeskItems
       .filter((d) => d.day && d.desks != null)
-      .map((d) => ({
-        t: d.day,
-        desks_minted: d.desks,
-        token_burnt: d.desks * OTC_BURN_PER_DESK,
-        token_total_supply: OTC_TGE_SUPPLY - d.desks * OTC_BURN_PER_DESK,
-      }));
+      .map((d) => {
+        const D_d = d.desks;
+        let burnt;
+        if (D_mig == null) {
+          burnt = D_d * DEPOSIT_NEW;
+        } else if (D_d <= D_mig) {
+          burnt = D_d * DEPOSIT_OLD;
+        } else {
+          burnt = D_mig * DEPOSIT_OLD + (D_d - D_mig) * DEPOSIT_NEW;
+        }
+        return {
+          t: d.day,
+          desks_minted: D_d,
+          token_burnt: burnt,
+          token_total_supply: OTC_TGE_SUPPLY - burnt,
+        };
+      });
 
     const snapshotHistory = list
       .slice()
