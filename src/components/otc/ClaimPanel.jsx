@@ -22,9 +22,9 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
 
-  const loadLifetime = async (w) => {
+  const loadLifetime = async (w, force = false) => {
     try {
-      const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w });
+      const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w, force });
       const payload = res?.data || {};
       if (payload.error) return;
       const map = {};
@@ -207,39 +207,17 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
 
       if (ok > 0 && claimable.length) {
         if (onClaimed) onClaimed();
-        // Lifetime log: claimable tickers valued at their pre-run vault balances.
-        // Conservative lower bound (actual claim moves the full post-distribute
-        // balance when PULL_OWED ran first).
-        const claimed = [];
-        for (const d of claimable) {
-          for (const t of d.claimable) {
-            const amountHuman = t.amount / 10 ** t.decimals;
-            const valueUsd = amountHuman * (prices?.[t.mint] || 0);
-            const valueSol = solPriceUsd ? valueUsd / solPriceUsd : 0;
-            claimed.push({
-              asset_id: d.asset_id,
-              symbol: t.symbol,
-              mint: t.mint,
-              amount: amountHuman,
-              value_usd: valueUsd,
-              value_sol: valueSol,
-            });
-          }
-        }
-        if (claimed.length) {
-          setCleared((prev) => {
-            const n = new Set(prev);
-            for (const c of claimed) n.add(c.asset_id);
-            return n;
-          });
-          try {
-            await base44.functions.invoke("logClaims", { wallet: address, claims: claimed });
-            log({ type: "ok", msg: `Logged ${claimed.length} claim(s) to lifetime history.` });
-            loadLifetime(address);
-          } catch (e) {
-            log({ type: "err", msg: `LOG_FAIL: ${e.message}` });
-          }
-        }
+        setCleared((prev) => {
+          const n = new Set(prev);
+          for (const d of claimable) n.add(d.asset_id);
+          return n;
+        });
+        // Lifetime totals are authoritative on-chain now: re-scan the wallet's
+        // OTC claim history (force bypasses the 5-min cache) so the totals
+        // reflect exactly what landed in this run — no client estimate.
+        log({ type: "info", msg: "Refreshing lifetime totals from on-chain history..." });
+        await loadLifetime(address, true);
+        log({ type: "ok", msg: "Lifetime totals refreshed from on-chain claim history." });
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
@@ -307,7 +285,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         const tUsd = Object.values(lifetime).reduce((a, d) => a + (d.value_usd || 0), 0);
         return (
           <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[9px] text-amber-400/80">
-            LIFETIME_CLAIMED_BY_THIS_WALLET :: {fmtSol(tSol, 3)} · {fmtUsd(tUsd)} · {Object.keys(lifetime).length} desk(s)
+            LIFETIME_CLAIMED (ON-CHAIN) :: {fmtSol(tSol, 3)} · {fmtUsd(tUsd)} · {Object.keys(lifetime).length} desk(s)
           </div>
         );
       })()}
