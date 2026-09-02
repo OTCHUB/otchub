@@ -3,7 +3,7 @@ import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 
-export default function HoldingsGallery({ holdings }) {
+export default function HoldingsGallery({ holdings, byStock }) {
   const [mode, setMode] = useState("ALL");
   const [sel, setSel] = useState(null);
   const all = holdings || [];
@@ -46,7 +46,7 @@ export default function HoldingsGallery({ holdings }) {
         })}
         {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">NO_DATA</div>}
       </div>
-      <HoldingsDetail h={sel} onClose={() => setSel(null)} />
+      <HoldingsDetail h={sel} byStock={byStock} onClose={() => setSel(null)} />
     </div>
   );
 }

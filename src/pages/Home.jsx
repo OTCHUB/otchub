@@ -192,7 +192,7 @@ export default function Home() {
 
         {/* Holdings */}
         <div className="mt-3">
-          <HoldingsGallery holdings={data?.holdings} />
+          <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} />
         </div>
 
         <footer className="mt-4 text-center text-[10px] text-green-500/30">
