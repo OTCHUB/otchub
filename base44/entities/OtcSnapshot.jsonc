@@ -103,6 +103,9 @@
     },
     "per_desk": {
       "type": "object"
+    },
+    "buybacks": {
+      "type": "object"
     }
   },
   "required": []

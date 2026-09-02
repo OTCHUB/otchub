@@ -102,13 +102,18 @@ export default async function (req) {
         desksMinted > 0 && s.distributed ? s.distributed / LAMPORTS_PER_SOL / desksMinted : 0,
     }));
 
-    const perDesk = perDeskHistory.map((d) => ({
-      day: d.day,
-      spent_sol: d.spent ? d.spent / LAMPORTS_PER_SOL : 0,
-      per_desk_sol: d.lamports ? d.lamports / LAMPORTS_PER_SOL : 0,
-      rounds: d.rounds || 0,
-      desks: d.desks || 0,
-    }));
+    const perDesk = perDeskHistory.map((d) => {
+      const perDesksol = d.lamports ? d.lamports / LAMPORTS_PER_SOL : 0;
+      const desks = d.desks || 0;
+      return {
+        day: d.day,
+        spent_sol: d.spent ? d.spent / LAMPORTS_PER_SOL : 0,
+        per_desk_sol: perDesksol,
+        total_earned_sol: perDesksol * desks,
+        rounds: d.rounds || 0,
+        desks,
+      };
+    });
 
     const solOf = (v) => (v ? v / LAMPORTS_PER_SOL : null);
     const protocolDistributedSol = solOf(stats?.distributed);
@@ -162,20 +167,39 @@ export default async function (req) {
       recommendation,
       by_stock: { items: byStock },
       per_desk: { items: perDesk },
+      buybacks: {
+        items: (stats?.buybacks || []).map((b) => ({
+          date: b.at ? new Date(b.at * 1000).toISOString().slice(0, 10) : null,
+          sol: b.sol ? b.sol / LAMPORTS_PER_SOL : 0,
+          otc: b.otc ? b.otc / Math.pow(10, OTC_DECIMALS) : 0,
+          signature: b.signature || null,
+        })),
+      },
     };
 
     const created = await base44.asServiceRole.entities.OtcSnapshot.create(snapshot);
 
     const listedSet = new Set((listings || []).map((l) => l.tokenMint || l.token_mint || l.id));
-    const holdings = assets.map((a) => ({
-      asset_id: a.id || a.address || "",
-      name: a.content?.metadata?.name || a.name || "OTC Desk",
-      owner: a.ownership?.owner || null,
-      image_url: a.content?.files?.[0]?.uri || a.content?.links?.image || null,
-      accrued_value_sol: perDeskAccruedSol,
-      accrued_value_usd: perDeskAccruedUsd,
-      is_listed: listedSet.has(a.id || a.address),
-    }));
+    const priceMap = new Map();
+    for (const l of listings || []) {
+      const m = l.tokenMint || l.token_mint || l.id;
+      if (m && l.price) priceMap.set(m, l.price);
+    }
+    const holdings = assets.map((a) => {
+      const id = a.id || a.address || "";
+      const lp = priceMap.get(id);
+      return {
+        asset_id: id,
+        name: a.content?.metadata?.name || a.name || "OTC Desk",
+        owner: a.ownership?.owner || null,
+        image_url: a.content?.files?.[0]?.uri || a.content?.links?.image || null,
+        accrued_value_sol: perDeskAccruedSol,
+        accrued_value_usd: perDeskAccruedUsd,
+        is_listed: listedSet.has(id),
+        listing_price_sol: lp != null ? lp / LAMPORTS_PER_SOL : null,
+        listing_price_usd: lp != null && solPriceUsd ? (lp / LAMPORTS_PER_SOL) * solPriceUsd : null,
+      };
+    });
 
     await base44.asServiceRole.entities.NftHolding.deleteMany({});
     if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);

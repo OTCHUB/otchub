@@ -5,7 +5,10 @@ import StatCard from "@/components/otc/StatCard";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
 import TrendChart from "@/components/otc/TrendChart";
-import PerDeskChart from "@/components/otc/PerDeskChart";
+import EarningsChart from "@/components/otc/EarningsChart";
+import RoundsChart from "@/components/otc/RoundsChart";
+import ByStockChart from "@/components/otc/ByStockChart";
+import BuybacksPanel from "@/components/otc/BuybacksPanel";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
 import WalletConnect from "@/components/otc/WalletConnect";
@@ -170,7 +173,16 @@ export default function Home() {
         {/* Charts */}
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <TrendChart history={data?.history} />
-          <PerDeskChart latest={latest} />
+          <EarningsChart latest={latest} />
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <RoundsChart latest={latest} />
+          <BuybacksPanel latest={latest} />
+        </div>
+
+        <div className="mt-3">
+          <ByStockChart latest={latest} />
         </div>
 
         {/* Tables */}

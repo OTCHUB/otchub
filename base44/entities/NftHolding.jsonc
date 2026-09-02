@@ -22,6 +22,12 @@
     },
     "is_listed": {
       "type": "boolean"
+    },
+    "listing_price_sol": {
+      "type": "number"
+    },
+    "listing_price_usd": {
+      "type": "number"
     }
   },
   "required": [
