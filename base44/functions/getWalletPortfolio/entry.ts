@@ -45,6 +45,7 @@ export default async function (req) {
       listed_count: listedCount,
       total_earning_sol: totalEarningSol,
       total_earning_usd: totalEarningUsd,
+      by_stock: latest?.by_stock || null,
       holdings: holdings || [],
     });
   } catch (error) {

@@ -61,7 +61,7 @@ export default function HoldingsDetail({ h, byStock, onClose }) {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-          <a href={`https://magiceden.io/itemdetails/${h.asset_id}`} target="_blank" rel="noreferrer" className="border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10">[MAGIC_EDEN]</a>
+          <a href={`https://magiceden.io/item-details/${h.asset_id}`} target="_blank" rel="noreferrer" className="border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10">[MAGIC_EDEN]</a>
           <a href={`https://solscan.io/token/${h.asset_id}`} target="_blank" rel="noreferrer" className="border border-green-500/30 px-2 py-1 text-green-400 hover:bg-green-500/10">[SOLSCAN]</a>
         </div>
       </DialogContent>

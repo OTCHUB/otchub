@@ -90,8 +90,34 @@ export default function WalletPortfolio({ address, onClear }) {
               accent="text-emerald-400"
             />
           </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Metric
+              label="EARN_TO_CLAIM"
+              value={fmtSol(data.total_earning_sol, 4)}
+              sub={`≈ ${fmtUsd(data.total_earning_usd)}`}
+              accent="text-emerald-400"
+            />
+            <Metric
+              label="CLAIMED_EARN"
+              value="—"
+              sub="no claim data"
+              accent="text-green-500/50"
+            />
+            <Metric
+              label="STOCK_HOLDING"
+              value={fmtSol(data.total_earning_sol, 4)}
+              sub={`${(data.by_stock?.items || []).length} symbols`}
+              accent="text-emerald-400"
+            />
+            <Metric
+              label="LISTED_DESKS"
+              value={fmtNum(data.listed_count)}
+              sub={`of ${fmtNum(data.desks_owned)}`}
+              accent="text-amber-400"
+            />
+          </div>
           <div className="mt-3">
-            <HoldingsGallery holdings={data.holdings} />
+            <HoldingsGallery holdings={data.holdings} byStock={data.by_stock?.items} />
           </div>
         </>
       )}
