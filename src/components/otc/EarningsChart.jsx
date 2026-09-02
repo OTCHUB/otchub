@@ -32,11 +32,15 @@ export default function EarningsChart({ latest }) {
       };
     });
 
-  const latestDailySol = raw.length
-    ? [...raw].sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")))[0]?.per_desk_sol
+  const sortedRaw = [...raw].sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")));
+  const todayPerDeskSol = sortedRaw[0]?.per_desk_sol;
+  const window = 7;
+  const trailing = sortedRaw.slice(0, window).filter((d) => (d.per_desk_sol || 0) > 0);
+  const trailingAvgSol = trailing.length
+    ? trailing.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailing.length
     : null;
   const floorSol = latest?.nft_floor_sol || 0;
-  const breakevenDays = latestDailySol && latestDailySol > 0 ? floorSol / latestDailySol : null;
+  const breakevenDays = trailingAvgSol && trailingAvgSol > 0 ? floorSol / trailingAvgSol : null;
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -49,7 +53,10 @@ export default function EarningsChart({ latest }) {
             bars = total into desks · line = avg / desk · bootstrap excluded from avg
           </div>
           <div className="mt-1 text-[10px] text-emerald-400/80">
-            BREAKEVEN: {breakevenDays != null ? `${breakevenDays.toFixed(1)} days` : "—"} @ floor {fmtSol(floorSol, 2)}
+            BREAKEVEN (7d avg): {breakevenDays != null ? `${breakevenDays.toFixed(1)} days` : "—"} @ floor {fmtSol(floorSol, 2)}
+            {todayPerDeskSol != null && trailingAvgSol != null && (
+              <span className="ml-1 text-green-500/40">· today {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}</span>
+            )}
           </div>
         </div>
         <div className="flex gap-1">
