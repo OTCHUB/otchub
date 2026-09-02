@@ -22,7 +22,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          NFT_HOLDINGS :: {all.length} · LISTED {listed.length} · PRICES INCL. 2% ME FEE
+          NFT_HOLDINGS :: {all.length} · LISTED {listed.length} · PRICES INCL. 2% FEE + 5% ROYALTY
         </span>
         <div className="flex gap-1">
           {["LISTED", "STOCK", "SNIPE"].map((m) => (

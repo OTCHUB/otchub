@@ -14,7 +14,9 @@ const LAMPORTS_PER_SOL = 1e9;
 const OTC_DECIMALS = 6;
 const OTC_DEPOSIT = 100000; // OTC burned per mint
 const SURCHARGE_SOL = 0.5; // SOL surcharge per mint (0.45 pot + 0.05 protocol)
-const ME_BUYER_FEE_PCT = 0.02; // Magic Eden 2% platform fee paid by the BUYER on top of listing price
+const ME_BUYER_FEE_PCT = 0.02; // Magic Eden 2% platform/taker fee paid by the BUYER on top of listing price
+const ME_ROYALTY_PCT = 0.05; // Creator royalty (5% for OTC desks) paid by the BUYER on top of listing price
+const ME_TOTAL_MARKUP = 1 + ME_BUYER_FEE_PCT + ME_ROYALTY_PCT; // 1.07 — true buyer cost multiplier
 
 export default async function (req) {
   try {
@@ -103,9 +105,9 @@ export default async function (req) {
       tokenPriceUsd != null && solPriceUsd != null
         ? OTC_DEPOSIT * tokenPriceUsd + SURCHARGE_SOL * solPriceUsd
         : null;
-    // True buyer cost on secondary = list price + 2% Magic Eden buyer fee
-    const secondaryCostSol = floorSol != null ? floorSol * (1 + ME_BUYER_FEE_PCT) : null;
-    const secondaryCostUsd = floorUsd != null ? floorUsd * (1 + ME_BUYER_FEE_PCT) : null;
+    // True buyer cost on secondary = list price + 2% taker fee + 5% creator royalty
+    const secondaryCostSol = floorSol != null ? floorSol * ME_TOTAL_MARKUP : null;
+    const secondaryCostUsd = floorUsd != null ? floorUsd * ME_TOTAL_MARKUP : null;
 
     let spreadSol = null;
     let spreadUsd = null;
@@ -245,9 +247,9 @@ export default async function (req) {
         accrued_value_usd: accrued != null && solPriceUsd ? accrued * solPriceUsd : null,
         mint_day: mintDay,
         is_listed: listedSet.has(id),
-        // True buyer cost = raw ME list price + 2% platform buyer fee
-        listing_price_sol: lp != null ? lp * (1 + ME_BUYER_FEE_PCT) : null,
-        listing_price_usd: lp != null && solPriceUsd ? lp * (1 + ME_BUYER_FEE_PCT) * solPriceUsd : null,
+        // True buyer cost = raw ME list price + 2% taker fee + 5% creator royalty
+        listing_price_sol: lp != null ? lp * ME_TOTAL_MARKUP : null,
+        listing_price_usd: lp != null && solPriceUsd ? lp * ME_TOTAL_MARKUP * solPriceUsd : null,
       };
     });
 

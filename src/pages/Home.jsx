@@ -39,6 +39,16 @@ export default function Home() {
     load();
   }, [load]);
 
+  // Auto-refresh the dashboard view every 60s so listings/trends reflect
+  // quick secondary-market buy-ups captured by the 5-min snapshot workflow,
+  // without requiring a manual force-refresh.
+  useEffect(() => {
+    const id = setInterval(() => {
+      load();
+    }, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
   const refresh = async () => {
     setRefreshing(true);
     try {

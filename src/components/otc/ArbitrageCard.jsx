@@ -77,7 +77,7 @@ export default function ArbitrageCard({ latest, holdings }) {
         <Field
           label="SECONDARY_FLOOR"
           value={fmtSol(bestFloor)}
-          sub={`incl. 2% ME fee · stock ${fmtSol(bestAccrued, 3)}`}
+          sub={`incl. 2% fee + 5% royalty · stock ${fmtSol(bestAccrued, 3)}`}
           valueClass="text-cyan-400"
         />
         <Field
@@ -94,11 +94,11 @@ export default function ArbitrageCard({ latest, holdings }) {
           <span className="text-amber-400">{fmtUsd(latest?.mint_cost_usd)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-green-500/50">&gt; SECONDARY = floor + 2% ME buyer fee + bundled accrued stock</span>
+          <span className="text-green-500/50">&gt; SECONDARY = floor + 2% taker fee + 5% royalty + bundled accrued stock</span>
           <span className="text-cyan-400">{fmtUsd(latest?.secondary_cost_usd)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-green-500/50">&gt; EFFECTIVE_SEC = floor (+2% fee) − stock (net cost to acquire desk + claim)</span>
+          <span className="text-green-500/50">&gt; EFFECTIVE_SEC = floor (+2% fee +5% royalty) − stock (net cost to acquire desk + claim)</span>
           <span className={secCheaper ? "text-emerald-400" : "text-red-400"}>
             {fmtSol(effectiveSecSol, 4)}
           </span>
