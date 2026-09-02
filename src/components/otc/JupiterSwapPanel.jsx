@@ -10,6 +10,8 @@ import {
   fetchOtcBalance,
 } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
+import { fetchTokenPricesUsd } from "@/lib/stockPrices";
+import { fmtUsd } from "@/lib/format";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -44,8 +46,21 @@ export default function JupiterSwapPanel({ wallet }) {
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState(null);
   const [otcBal, setOtcBal] = useState(null);
+  const [prices, setPrices] = useState({}); // mint -> USD spot (SOL + $OTC)
 
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
+
+  // USD spot prices for SOL and $OTC so users can estimate trade size in USD.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const p = await fetchTokenPricesUsd([SOL_MINT, OTC_MINT]);
+      if (!cancelled) setPrices(p);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [OTC_MINT]);
 
   const loadBalance = async (w) => {
     const bal = await fetchOtcBalance(w);
@@ -59,6 +74,25 @@ export default function JupiterSwapPanel({ wallet }) {
   }, [wallet]);
 
   const isBuy = mode === "BUY";
+  const solUsd = prices?.[SOL_MINT] ?? null;
+  const otcUsd = prices?.[OTC_MINT] ?? null;
+  // USD value of the entered amount, the quoted output, and the balance
+  // (null = spot price not loaded yet).
+  const amountUsd = (() => {
+    const v = parseFloat(amount);
+    if (!v || v <= 0) return null;
+    const px = isBuy ? solUsd : otcUsd;
+    return px != null ? v * px : null;
+  })();
+  const outUsd = (() => {
+    if (!quote) return null;
+    const px = isBuy ? otcUsd : solUsd;
+    if (px == null) return null;
+    return isBuy
+      ? (Number(quote.outAmount) / 10 ** OTC_DECIMALS) * px
+      : (Number(quote.outAmount) / LAMPORTS_PER_SOL) * px;
+  })();
+  const balUsd = otcBal != null && otcUsd != null ? otcBal * otcUsd : null;
 
   // Raw integer amount for the quote (lamports for BUY, base units for SELL).
   const rawAmount = () => {
@@ -213,6 +247,7 @@ export default function JupiterSwapPanel({ wallet }) {
             <span className="text-green-500/50">YOUR_$OTC_BALANCE</span>
             <span className="text-emerald-300">
               {otcBal == null ? "READING…" : otcBal.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS })}
+              {balUsd != null && <span className="ml-1 text-green-500/50">≈ {fmtUsd(balUsd)}</span>}
             </span>
           </div>
 
@@ -252,6 +287,9 @@ export default function JupiterSwapPanel({ wallet }) {
               <span className="font-mono text-[10px] text-green-500/60">
                 {isBuy ? "SOL" : "$OTC"}
               </span>
+            </div>
+            <div className="mt-1 text-right font-mono text-[10px] text-cyan-400/80">
+              ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
             </div>
 
             <div className="mt-2 flex items-center justify-between">
@@ -304,6 +342,11 @@ export default function JupiterSwapPanel({ wallet }) {
                 {isBuy ? "$OTC" : "SOL"}
               </span>
             </div>
+            {quote && (
+              <div className="mt-0.5 font-mono text-[10px] text-cyan-400/80">
+                ≈ {outUsd != null ? fmtUsd(outUsd) : "—"}
+              </div>
+            )}
             {quote && (
               <div className="mt-1 space-y-0.5 font-mono text-[9px] text-green-500/60">
                 <div>
