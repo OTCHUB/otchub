@@ -17,7 +17,7 @@ export default function About() {
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
-                SOLANA OTC DESK ANALYTICS · EST. 2026
+                OTC_DESK SOLANA TOOL · EST. 2026
               </p>
             </div>
             <Link
@@ -101,7 +101,7 @@ export default function About() {
                 <li>
                   <span className="text-emerald-400">[DISTRIBUTE_CRANK]</span> A permissionless
                   crank anyone can run to push the protocol&apos;s owed backlog into desk vaults,
-                  submitting transactions in batched approval waves and atomic bundles for
+                  submitting transactions in batched approval waves with confirmation tracking for
                   reliable landing.
                 </li>
               </ul>
@@ -147,10 +147,15 @@ export default function About() {
                 always verify important transactions in your own wallet before signing.
               </p>
               <p>
-                Questions, feedback, or bug reports? Reach us from the{" "}
-                <Link to="/contact" className="text-emerald-400 underline hover:text-emerald-300">
-                  contact page
-                </Link>
+                Questions, feedback, or bug reports? Reach out on{" "}
+                <a
+                  href="https://x.com/themoonether"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 underline hover:text-emerald-300"
+                >
+                  X
+                </a>
                 .
               </p>
             </div>

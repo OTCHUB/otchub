@@ -101,7 +101,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; OTC_HUB :: SOLANA
+                &gt; OTC_HUB :: OTC_DESK SOLANA TOOL
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
@@ -123,16 +123,9 @@ export default function Home() {
               <Link
                 to="/about"
                 className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="What OTC Pulse is and who builds it"
+                title="What OTC Hub is and who builds it"
               >
                 [ABOUT]
-              </Link>
-              <Link
-                to="/contact"
-                className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="Contact the OTC Pulse team"
-              >
-                [CONTACT]
               </Link>
               <button
                 onClick={refresh}
