@@ -42,11 +42,24 @@ export default async function (req) {
     if (mode === "send") {
       const tx = body.tx;
       if (!tx) return Response.json({ error: "tx required" }, { status: 400 });
-      const sig = await heliusRpc("sendTransaction", [
-        tx,
-        { encoding: "base64", skipPreflight: true, maxRetries: 3, commitment: "confirmed" },
-      ]);
-      return Response.json({ ok: true, sig });
+      // Helius sendTransaction intermittently 500s under load (and 429s on
+      // rate limits). Retry the broadcast a few times — a duplicate submit of
+      // an already-accepted tx is harmless (Helius returns "already
+      // processed"), so this only helps transient failures.
+      let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const sig = await heliusRpc("sendTransaction", [
+            tx,
+            { encoding: "base64", skipPreflight: true, maxRetries: 3, commitment: "confirmed" },
+          ]);
+          return Response.json({ ok: true, sig });
+        } catch (e) {
+          lastErr = e;
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+      return Response.json({ error: lastErr?.message || "send failed" }, { status: 500 });
     }
 
     if (mode === "accounts") {

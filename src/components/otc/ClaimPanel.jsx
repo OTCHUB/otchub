@@ -199,7 +199,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         // This is the smooth default for claiming already-owed stock.
         const pairs = await buildClaimPairs(claimable, address, tpMap);
         log({ type: "info", msg: `PAIRS :: ${pairs.length} atomic distribute+claim pair(s).` });
-        results = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 20, setProgress);
+        results = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
       }
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
@@ -238,7 +238,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const distIxEst = pullOwed ? 13 * targetCount : totalClaimable;
   const estApprovals = pullOwed
     ? Math.ceil((totalClaimable + distIxEst) / 60) || 0
-    : Math.ceil(totalClaimable / 40) || 0;
+    : Math.ceil(totalClaimable / 60) || 0;
   const phaseLabel = busy
     ? progress
       ? `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()}…`

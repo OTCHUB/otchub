@@ -663,10 +663,12 @@ export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
 }
 
 // Pack WHOLE pairs into transactions (a pair is never split across txs). Each
-// tx = compute-budget ixs + N whole distribute/claim pairs.
-async function packPairedTxs(pairs, user) {
-  const bh = await relay("blockhash");
-  const blockhash = bh.blockhash;
+// tx = compute-budget ixs + N whole distribute/claim pairs. The blockhash is
+// passed in so each group can be packed with a FRESH blockhash right before
+// signing — packing ALL groups with one blockhash lets later groups sign/send
+// against an expired blockhash (Solana blockhashes are valid ~60-90s), so every
+// tx in those groups 500s on broadcast.
+function packPairedTxs(pairs, user, blockhash) {
   const userPk = new PublicKey(user);
   const newTx = () => {
     const tx = new Transaction();
@@ -698,15 +700,20 @@ async function packPairedTxs(pairs, user) {
   return txs;
 }
 
-// Execute atomic distribute+claim pairs: pack into txs, chunk txs into signAll
-// groups, simulate each group, one signAll prompt per group, send all txs in
-// parallel (safe — txs are independent). No pause between groups.
+// Execute atomic distribute+claim pairs. Pairs are split into groups; each
+// group gets a FRESH blockhash (so later groups don't broadcast against an
+// expired one), is simulated in parallel, signed with ONE signAll prompt,
+// then sent SEQUENTIALLY. Sequential send matters because pairs are
+// desk-ordered, so several txs in a group usually write the SAME desk vault
+// PDA — Solana can only land one write to an account per block, so sending
+// them in parallel silently drops the conflicts (accepted but never
+// confirms). Sequential submit lets them land in order, one per block.
 export async function executePairedClaim(
   pairs,
   user,
   signAllTransactionsRaw,
   onLog,
-  txsPerGroup = 20,
+  pairsPerGroup = 60,
   onProgress
 ) {
   const results = [];
@@ -714,16 +721,19 @@ export async function executePairedClaim(
     onLog({ type: "info", msg: "Nothing to do — no claimable pairs." });
     return results;
   }
-  const txs = await packPairedTxs(pairs, user);
-  const totalGroups = Math.ceil(txs.length / txsPerGroup);
+  const totalGroups = Math.ceil(pairs.length / pairsPerGroup);
   onLog({
     type: "info",
-    msg: `PAIRED :: ${pairs.length} pair(s) → ${txs.length} tx(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+    msg: `PAIRED :: ${pairs.length} pair(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
   });
   onProgress?.({ group: 0, totalGroups, phase: "start" });
   for (let g = 0; g < totalGroups; g++) {
     const groupNo = g + 1;
-    const groupTxs = txs.slice(g * txsPerGroup, (g + 1) * txsPerGroup);
+    const groupPairs = pairs.slice(g * pairsPerGroup, (g + 1) * pairsPerGroup);
+    // Fresh blockhash per group — one blockhash for all groups expires before
+    // later groups are signed/sent, causing every tx in them to 500 on send.
+    const bh = await relay("blockhash");
+    const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash);
     onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: simulating...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "sim" });
     const sims = await mapLimit(groupTxs, 8, (t) => simulate(t));
@@ -762,25 +772,24 @@ export async function executePairedClaim(
       for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "bad-sign" });
       continue;
     }
-    onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) in parallel...` });
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "send" });
-    const sends = await mapLimit(signed, 8, (bytes, k) =>
-      withTimeout(
-        relay("send", { tx: Buffer.from(bytes).toString("base64") }),
-        60000,
-        `G${groupNo} TX ${k + 1} broadcast`
-      )
-        .then((r) => {
-          onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
-          return { ok: true, sig: r.sig };
-        })
-        .catch((e) => {
-          onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
-          return { ok: false, reason: e.message };
-        })
-    );
-    for (const s of sends) results.push(s);
-    // txs are independent (whole atomic pairs) — no pause needed between groups.
+    for (let k = 0; k < signed.length; k++) {
+      try {
+        const r = await withTimeout(
+          relay("send", { tx: Buffer.from(signed[k]).toString("base64") }),
+          60000,
+          `G${groupNo} TX ${k + 1} broadcast`
+        );
+        onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
+        results.push({ ok: true, sig: r.sig });
+      } catch (e) {
+        onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
+        results.push({ ok: false, reason: e.message });
+      }
+    }
+    // brief pause so prior sends commit and the next group's blockhash is fresh
+    if (g + 1 < totalGroups) await new Promise((r) => setTimeout(r, 1500));
   }
   return results;
 }
