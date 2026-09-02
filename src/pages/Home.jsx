@@ -218,7 +218,7 @@ export default function Home() {
         {/* Supply vs desks minted */}
         <div className="mt-3">
           <CollapsibleCard title="SUPPLY vs DESKS">
-            <SupplyChart history={data?.history} />
+            <SupplyChart history={data?.history} latest={latest} />
           </CollapsibleCard>
         </div>
 
