@@ -27,6 +27,8 @@ export default async function (req) {
         protocol_distributed_sol: s.protocol_distributed_sol,
         protocol_buyback_sol: s.protocol_buyback_sol,
         desks_minted: s.desks_minted,
+        token_total_supply: s.token_total_supply,
+        token_burnt: s.token_burnt,
         rounds_total: s.rounds_total,
         mint_cost_usd: s.mint_cost_usd,
         secondary_cost_usd: s.secondary_cost_usd,

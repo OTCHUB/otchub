@@ -9,6 +9,7 @@ import EarningsChart from "@/components/otc/EarningsChart";
 import RoundsChart from "@/components/otc/RoundsChart";
 import ByStockChart from "@/components/otc/ByStockChart";
 import PerDeskTrendChart from "@/components/otc/PerDeskTrendChart";
+import SupplyChart from "@/components/otc/SupplyChart";
 import BuybacksPanel from "@/components/otc/BuybacksPanel";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
@@ -211,6 +212,13 @@ export default function Home() {
           </div>
           <CollapsibleCard title="PROTOCOL">
             <ProtocolPanel latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Supply vs desks minted */}
+        <div className="mt-3">
+          <CollapsibleCard title="SUPPLY vs DESKS">
+            <SupplyChart history={data?.history} />
           </CollapsibleCard>
         </div>
 
