@@ -18,6 +18,7 @@ import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
+import DistributeCrank from "@/components/otc/DistributeCrank";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
@@ -259,6 +260,13 @@ export default function Home() {
           </CollapsibleCard>
           <CollapsibleCard title="BUYBACKS" defaultOpen={false}>
             <BuybacksPanel latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Permissionless global distribute crank */}
+        <div className="mt-3">
+          <CollapsibleCard title="☢ DISTRIBUTE :: GLOBAL CRANK" defaultOpen={false}>
+            <DistributeCrank wallet={wallet} allDesks={data?.holdings} latest={latest} />
           </CollapsibleCard>
         </div>
 

@@ -686,8 +686,19 @@ function buildDistributeIx(assetId, slot, mint, tokenProgramMap) {
 // Permissionless delivery: triggers the desk's owed stock backlog into its
 // vault so it becomes claimable. No-op (succeeds, delivers 0) for slots the
 // desk is already current on.
-export async function buildDistributeInstructions(deskPlans, _user, tokenProgramMap) {
+export async function buildDistributeInstructions(deskPlans, _user, tokenProgramMap, groupBySlot = false) {
   const ixs = [];
+  if (groupBySlot) {
+    // Slot-major ordering for pure-crank runs: consecutive ixs share the same
+    // mint + pool ATA, so packTxs fits more ixs per tx (~2x) → fewer txs, fewer
+    // fees, fewer wallet prompts for a global distribute sweep.
+    for (const s of LINEUP_STOCKS) {
+      for (const d of deskPlans) {
+        ixs.push(buildDistributeIx(d.asset_id, s.slot, s.mint, tokenProgramMap));
+      }
+    }
+    return ixs;
+  }
   for (const d of deskPlans) {
     for (const s of LINEUP_STOCKS) {
       ixs.push(buildDistributeIx(d.asset_id, s.slot, s.mint, tokenProgramMap));
