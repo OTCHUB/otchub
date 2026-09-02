@@ -16,6 +16,7 @@ import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 import RecentSwaps from "@/components/otc/RecentSwaps";
+import PriceCandles from "@/components/otc/PriceCandles";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -298,6 +299,9 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
           </div>
         </div>
       </div>
+
+      {/* Mini price candles (bootstrap from snapshot history) */}
+      <PriceCandles latest={latest} history={history} />
 
       {/* Direction toggle */}
       <div className="mt-2 flex gap-1">
