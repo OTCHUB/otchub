@@ -8,6 +8,7 @@
 
 import { Buffer } from "buffer";
 import "@/lib/bufferPolyfill";
+import { base44 } from "@/api/base44Client";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import {
   getAssociatedTokenAddressSync,
@@ -19,22 +20,24 @@ import { relay, ensureConfirmed } from "@/lib/otcClaim";
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 export const OTC_DECIMALS = 6;
-const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
-const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
+
 
 // Fetch a Jupiter quote for any input->output pair (raw integer amount).
 // BUY: getQuote(SOL_MINT, OTC_MINT, lamports, ...) · SELL: getQuote(OTC_MINT,
 // SOL_MINT, rawOtc, ...).
 export async function getQuote(inputMint, outputMint, amountRaw, slippageBps = 100) {
-  const url =
-    `${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}` +
-    `&amount=${amountRaw}&slippageBps=${slippageBps}&swapMode=ExactIn`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`QUOTE_FAIL (${res.status}) ${t}`);
-  }
-  return await res.json();
+  // Routed through the jupiterSwapRelay backend function — the browser never
+  // calls Jupiter directly (CORS / rate limits broke browser-side swaps).
+  const res = await base44.functions.invoke("jupiterSwapRelay", {
+    mode: "quote",
+    inputMint,
+    outputMint,
+    amount: amountRaw,
+    slippageBps,
+  });
+  const data = res?.data || {};
+  if (data.error) throw new Error(data.error);
+  return data.quote;
 }
 
 // On-chain $OTC balance of a wallet (its standard ATA — where both bought and
@@ -73,16 +76,16 @@ export async function fetchSolBalance(wallet) {
 
 // Ask Jupiter to build the serialized swap transaction for this user.
 export async function getSwapTx(quoteResponse, userPublicKey) {
-  const res = await fetch(SWAP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quoteResponse, userPublicKey }),
+  // Swap tx built server-side by the jupiterSwapRelay function (Jupiter
+  // aggregator); only the serialized tx bytes come back for local signing.
+  const res = await base44.functions.invoke("jupiterSwapRelay", {
+    mode: "swap",
+    quoteResponse,
+    userPublicKey,
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`SWAP_BUILD_FAIL (${res.status}) ${t}`);
-  }
-  return await res.json(); // { swapTransaction, lastValidBlockHeight, ... }
+  const data = res?.data || {};
+  if (data.error) throw new Error(data.error);
+  return data.swap; // { swapTransaction, lastValidBlockHeight, ... }
 }
 
 // Simulate the (unsigned) versioned swap tx before asking the wallet to sign.

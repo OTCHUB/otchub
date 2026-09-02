@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Zap } from "lucide-react";
 import {
   SOL_MINT,
   OTC_MINT,
@@ -216,6 +216,16 @@ export default function JupiterSwapPanel({ wallet }) {
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
           SWAP :: {isBuy ? "SOL → $OTC" : "$OTC → SOL"}
         </span>
+        <a
+          href="https://jup.ag"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[10px] text-amber-300 hover:border-amber-300/60"
+          title="Routing & liquidity by the Jupiter aggregator"
+        >
+          <Zap className="h-3 w-3" />
+          POWERED BY JUPITER
+        </a>
         <button
           onClick={copyCa}
           className="inline-flex items-center gap-1 border border-green-500/40 px-2 py-1 font-mono text-[10px] text-green-300 hover:bg-green-500/10"
