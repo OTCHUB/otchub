@@ -7,7 +7,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default async function (req) {
   try {
-    await createClientFromRequest(req);
+    const client = createClientFromRequest(req);
     const body = await req.json().catch(() => ({}));
     const name = String(body.name || "").trim().slice(0, 120);
     const email = String(body.email || "").trim().slice(0, 254);
@@ -18,7 +18,6 @@ export default async function (req) {
     if (email && !EMAIL_RE.test(email)) {
       return Response.json({ error: "Invalid email address" }, { status: 400 });
     }
-    const client = createClientFromRequest(req);
     await client.asServiceRole.entities.ContactMessage.create({ name, email, message });
     return Response.json({ ok: true });
   } catch (e) {
