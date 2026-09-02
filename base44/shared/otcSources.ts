@@ -76,9 +76,11 @@ export async function fetchCollectionAssets(collectionAddress) {
   const allAssets = [];
   let page = 1;
   while (page <= 20) {
-    const result = await heliusRpc("searchAssets", [
-      { grouping: ["collection", collectionAddress], page, limit: 1000 },
-    ]);
+    const result = await heliusRpc("searchAssets", {
+      grouping: [["collection", collectionAddress]],
+      page,
+      limit: 1000,
+    });
     const items = result?.items || [];
     allAssets.push(...items);
     if (items.length < 1000) break;
