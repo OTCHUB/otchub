@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { buildClaimInstructions, packTxs, executeClaimTxs } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
+import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
+import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
@@ -11,9 +13,35 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [prices, setPrices] = useState({});
 
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
+
+  // USD spot price per mint, plus SOL spot (keyed by SOL_MINT). Re-fetched
+  // whenever the scan plan changes so claim values stay current.
+  useEffect(() => {
+    if (!plan) return;
+    const mints = new Set([SOL_MINT]);
+    for (const d of plan) for (const t of d.claimable || []) mints.add(t.mint);
+    let cancelled = false;
+    (async () => {
+      const p = await fetchTokenPricesUsd([...mints]);
+      if (!cancelled) setPrices(p);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plan]);
+
+  const solPriceUsd = prices?.[SOL_MINT] ?? null;
+  const deskUsdValue = (dp) =>
+    (dp?.claimable || []).reduce((s, t) => {
+      const px = prices?.[t.mint] || 0;
+      return s + (t.amount / 10 ** t.decimals) * px;
+    }, 0);
+  const deskSolValue = (dp) =>
+    solPriceUsd ? deskUsdValue(dp) / solPriceUsd : null;
 
   const toggle = (id) =>
     setSelected((prev) => {
@@ -131,6 +159,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     ? plan.reduce((a, d) => a + d.claimable.length, 0)
     : 0;
 
+  const selectedDesks = plan ? plan.filter((d) => selected.has(d.asset_id)) : [];
+  const selectedUsd = selectedDesks.reduce((s, d) => s + deskUsdValue(d), 0);
+  const selectedSol = solPriceUsd ? selectedUsd / solPriceUsd : null;
+  const allUsd = plan ? plan.reduce((s, d) => s + deskUsdValue(d), 0) : 0;
+  const allSol = solPriceUsd ? allUsd / solPriceUsd : null;
+
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
@@ -202,19 +236,31 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                   {d.asset_id.slice(0, 8)}...
                 </div>
               </div>
-              {deskPlan && (
-                <span
-                  className={`font-mono text-[9px] ${
-                    deskPlan.claimable.length
-                      ? "text-emerald-400"
-                      : "text-green-500/40"
-                  }`}
-                >
-                  {deskPlan.claimable.length
-                    ? `${deskPlan.claimable.length} CLAIM`
-                    : "—"}
-                </span>
-              )}
+              <div className="text-right">
+                {deskPlan && (
+                  <div
+                    className={`font-mono text-[9px] ${
+                      deskPlan.claimable.length
+                        ? "text-emerald-400"
+                        : "text-green-500/40"
+                    }`}
+                  >
+                    {deskPlan.claimable.length
+                      ? `${deskPlan.claimable.length} CLAIM`
+                      : "—"}
+                  </div>
+                )}
+                {deskPlan && deskPlan.claimable.length > 0 && (
+                  <div className="font-mono text-[8px] leading-tight text-green-500/60">
+                    {fmtSol(deskSolValue(deskPlan), 4)}
+                  </div>
+                )}
+                {deskPlan && deskPlan.claimable.length > 0 && (
+                  <div className="font-mono text-[8px] leading-tight text-cyan-400/70">
+                    {fmtUsd(deskUsdValue(deskPlan), 2)}
+                  </div>
+                )}
+              </div>
             </label>
           );
         })}
@@ -245,8 +291,18 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         </button>
       </div>
       {plan && (
-        <div className="mt-1 text-[9px] text-green-500/60">
-          {totalClaimable} claimable ticker(s) found
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-green-500/60">
+          <span>{totalClaimable} claimable ticker(s)</span>
+          {selectedDesks.length > 0 && (
+            <span className="text-emerald-400">
+              SELECTED {selectedDesks.length} :: {fmtSol(selectedSol, 4)} · {fmtUsd(selectedUsd)}
+            </span>
+          )}
+          {totalClaimable > 0 && (
+            <span>
+              ALL_DESKS :: {fmtSol(allSol, 4)} · {fmtUsd(allUsd)}
+            </span>
+          )}
         </div>
       )}
 
