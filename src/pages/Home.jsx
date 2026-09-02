@@ -8,6 +8,8 @@ import TrendChart from "@/components/otc/TrendChart";
 import PerDeskChart from "@/components/otc/PerDeskChart";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
+import WalletConnect from "@/components/otc/WalletConnect";
+import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 
 export default function Home() {
@@ -15,6 +17,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [wallet, setWallet] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +89,15 @@ export default function Home() {
             </div>
           )}
         </header>
+
+        {/* Wallet */}
+        <div className="mt-3">
+          {wallet ? (
+            <WalletPortfolio address={wallet} onClear={() => setWallet(null)} />
+          ) : (
+            <WalletConnect onConnected={setWallet} />
+          )}
+        </div>
 
         {/* Top metrics */}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">

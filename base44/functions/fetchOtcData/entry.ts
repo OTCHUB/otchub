@@ -29,7 +29,23 @@ export default async function (req) {
 
     // DexScreener calls run sequentially to avoid concurrent rate-limiting
     const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
-    const solPriceUsd = await fetchSolPriceUsd();
+    let solPriceUsd = await fetchSolPriceUsd();
+
+    // Fall back to last known prices if DexScreener is rate-limited this run
+    let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
+    let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
+    if (tokenPriceUsd == null || solPriceUsd == null || tokenPriceSol == null) {
+      const prev = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
+      const p = prev?.[0];
+      if (p) {
+        if (tokenPriceUsd == null) tokenPriceUsd = p.token_price_usd;
+        if (solPriceUsd == null) solPriceUsd = p.sol_price_usd;
+        if (tokenPriceSol == null) tokenPriceSol = p.token_price_sol;
+      }
+    }
+    if (tokenPriceSol == null && tokenPriceUsd != null && solPriceUsd != null) {
+      tokenPriceSol = tokenPriceUsd / solPriceUsd;
+    }
 
     const [potLamports, meStats, listings, assets, stats] = await Promise.all([
       fetchAccountBalanceLamports(ADDRESSES.POT),
@@ -39,12 +55,6 @@ export default async function (req) {
       fetchProtocolStats(),
     ]);
 
-    const tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
-    const tokenPriceSol = pair
-      ? parseFloat(pair.priceNative)
-      : tokenPriceUsd && solPriceUsd
-      ? tokenPriceUsd / solPriceUsd
-      : null;
     const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
     const totalSupply = assets.length;
