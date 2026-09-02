@@ -224,6 +224,15 @@ export default function JupiterSwapPanel({ wallet }) {
           SWAP :: {isBuy ? "SOL → $OTC" : "$OTC → SOL"}
         </span>
         <a
+          href="https://dexscreener.com/solana/da4pm4xsdy4m9v4cgakkbvh1pw1ysctqqa5nekghukpt"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 border border-cyan-400/40 bg-cyan-400/5 px-2 py-1 font-mono text-[10px] text-cyan-300 hover:border-cyan-300/60"
+          title="Live $OTC price chart & pair data on DexScreener"
+        >
+          [DEXSCREENER ↗]
+        </a>
+        <a
           href="https://jup.ag"
           target="_blank"
           rel="noreferrer"

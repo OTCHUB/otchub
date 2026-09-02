@@ -37,7 +37,6 @@ export default function ArbitrageCard({ latest, holdings }) {
   const ranked = [...listed]
     .map((h) => ({ ...h, net: h.listing_price_sol - holdSol(h) }))
     .sort((a, b) => a.net - b.net);
-  const topSnipes = ranked.slice(0, 3);
   const snipe = ranked[0] || null;
 
   const bestAccrued = snipe ? holdSol(snipe) : null;
@@ -132,7 +131,7 @@ export default function ArbitrageCard({ latest, holdings }) {
       <div className="mt-3 flex min-h-0 flex-1 flex-col border border-green-500/20">
         <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
           <span className="text-[9px] uppercase tracking-widest text-green-500/50">
-            NEAR_FLOOR :: TOP_3_NET_CHEAPEST
+            NEAR_FLOOR :: ALL_LISTED ({ranked.length}) · NET_ASC
           </span>
           {excludedEmpty > 0 && (
             <span className="text-[9px] text-red-400/60">
@@ -140,8 +139,10 @@ export default function ArbitrageCard({ latest, holdings }) {
             </span>
           )}
         </div>
-        {topSnipes.length ? (
-          topSnipes.map((h, i) => (
+        {/* Full near-floor list scrolls inside the panel's allocated space */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        {ranked.length ? (
+          ranked.map((h, i) => (
             <a
               key={h.asset_id}
               href={`${ME_BASE}/${h.asset_id}`}
@@ -177,8 +178,9 @@ export default function ArbitrageCard({ latest, holdings }) {
             NO_LIVE_LISTINGS — no stocked desks for sale right now
           </div>
         )}
+        </div>
       </div>
-      {topSnipes.some((h) => !holdIsLive(h)) && (
+      {ranked.some((h) => !holdIsLive(h)) && (
         <div className="mt-1 text-right text-[8px] text-green-500/40">
           * stock estimated — live vault scan in progress
         </div>
