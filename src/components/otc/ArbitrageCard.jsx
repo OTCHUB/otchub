@@ -24,13 +24,14 @@ export default function ArbitrageCard({ latest, holdings }) {
     (h) => h.is_listed && h.listing_price_sol != null
   );
   const { realHold, scanning: liveScanning } = useLiveVaultHoldings(listedAll);
-  const holdSol = (h) =>
-    realHold[h.asset_id]?.loaded
-      ? realHold[h.asset_id].holdingSol || 0
-      : h.accrued_value_sol || 0;
-  const holdIsLive = (h) => !!realHold[h.asset_id]?.loaded;
+  // Live on-chain vault balances ONLY — never the snapshot's accrued estimate.
+  // The estimate is theoretical: a desk whose owner already claimed still
+  // carries it but holds ZERO real stock, and netting a stale estimate against
+  // the listing price recommended buying empty desks. A desk appears here only
+  // once the live scan has verified its actual vault balance.
+  const holdSol = (h) => realHold[h.asset_id]?.holdingSol || 0;
   const vaultHasStock = (h) =>
-    realHold[h.asset_id]?.loaded ? !!realHold[h.asset_id].hasStock : true;
+    realHold[h.asset_id]?.loaded ? !!realHold[h.asset_id].hasStock : false;
   const listed = listedAll.filter((h) => vaultHasStock(h));
 
   // Every viable snipe ranked by net cost; the top 3 feed NEAR_FLOOR below.
@@ -47,7 +48,9 @@ export default function ArbitrageCard({ latest, holdings }) {
   const effectiveSecSol =
     bestFloor != null && bestAccrued != null ? bestFloor - bestAccrued : null;
   // Listed desks skipped because their vaults were already claimed out.
-  const excludedEmpty = listedAll.filter((h) => !vaultHasStock(h)).length;
+  const excludedEmpty = listedAll.filter(
+    (h) => realHold[h.asset_id]?.loaded && !realHold[h.asset_id].hasStock
+  ).length;
 
   // Recommendation: lower net cost wins. A fresh mint ships with 0 stock, so
   // its effective cost is the raw mint cost. Secondary net is floor - stock.
@@ -165,10 +168,7 @@ export default function ArbitrageCard({ latest, holdings }) {
                 </span>
                 <span>
                   STOCK{" "}
-                  <span className="text-emerald-400">
-                    {fmtSol(holdSol(h), 2)}
-                    {holdIsLive(h) ? "" : "*"}
-                  </span>
+                  <span className="text-emerald-400">{fmtSol(holdSol(h), 2)}</span>
                 </span>
                 <span>
                   NET{" "}
@@ -180,16 +180,13 @@ export default function ArbitrageCard({ latest, holdings }) {
           ))
         ) : (
           <div className="px-2 py-2 text-center text-[10px] text-green-500/50">
-            NO_LIVE_LISTINGS — no stocked desks for sale right now
+            {liveScanning
+              ? "SCANNING :: READING VAULT BALANCES…"
+              : "NO_LIVE_LISTINGS — no stocked desks for sale right now"}
           </div>
         )}
         </div>
       </div>
-      {ranked.some((h) => !holdIsLive(h)) && (
-        <div className="mt-1 text-right text-[8px] text-green-500/40">
-          * stock estimated — live vault scan in progress
-        </div>
-      )}
 
       {/* CTAs pinned to the bottom of the panel */}
       <div className="mt-auto flex flex-wrap gap-2 pt-3">
