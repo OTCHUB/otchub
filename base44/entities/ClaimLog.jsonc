@@ -1,0 +1,34 @@
+{
+  "name": "ClaimLog",
+  "type": "object",
+  "properties": {
+    "wallet": {
+      "type": "string"
+    },
+    "asset_id": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "mint": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "value_usd": {
+      "type": "number"
+    },
+    "value_sol": {
+      "type": "number"
+    },
+    "tx_sig": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "wallet",
+    "asset_id"
+  ]
+}
