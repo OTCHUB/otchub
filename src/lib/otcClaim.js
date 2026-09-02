@@ -427,7 +427,8 @@ export async function executeClaimChunked(
   user,
   signAllTransactionsRaw,
   onLog,
-  chunkSize = 60
+  chunkSize = 60,
+  onProgress
 ) {
   const results = [];
   if (!ixs || !ixs.length) {
@@ -439,11 +440,13 @@ export async function executeClaimChunked(
     type: "info",
     msg: `CHUNKED :: ${ixs.length} ix(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
   });
+  onProgress?.({ group: 0, totalGroups, phase: "start" });
   for (let c = 0, g = 0; c < ixs.length; c += chunkSize, g++) {
     const groupNo = g + 1;
     const groupIxs = ixs.slice(c, c + chunkSize);
     const txs = await packTxs(groupIxs, user); // fresh blockhash per group
     onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${txs.length} tx(s) :: simulating...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sim" });
     const sims = await mapLimit(txs, 8, (t) => simulate(t));
     const passing = [];
     for (let j = 0; j < txs.length; j++) {
@@ -466,6 +469,7 @@ export async function executeClaimChunked(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sign" });
     let signed;
     try {
       signed = await signAllTransactionsRaw(passing);
@@ -480,6 +484,7 @@ export async function executeClaimChunked(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "send" });
     for (let k = 0; k < signed.length; k++) {
       try {
         const r = await withTimeout(
@@ -634,6 +639,150 @@ export async function buildDistributeForClaimable(deskPlans, tokenProgramMap) {
     }
   }
   return ixs;
+}
+
+// Build one atomic [distribute(slot), claim(ticker)] pair per claimable
+// ticker. Each pair is packed into a tx together (never split), so the tx is
+// self-contained: its claim depends only on its own distribute landing in the
+// SAME tx. That makes every tx independent of every other — no cross-tx
+// ordering, no pause between groups, safe parallel send, and far fewer wallet
+// approvals (large signAll batches). This is the fast path for claiming
+// already-owed stock.
+export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
+  const pairs = [];
+  for (const d of deskPlans) {
+    for (const t of d.claimable || []) {
+      const slot = SLOT_BY_SYMBOL[t.symbol];
+      if (!slot) continue;
+      const distIx = buildDistributeIx(d.asset_id, slot.slot, slot.mint, tokenProgramMap);
+      const claimIx = buildClaimIx(user, d.asset_id, t, tokenProgramMap);
+      pairs.push([distIx, claimIx]);
+    }
+  }
+  return pairs;
+}
+
+// Pack WHOLE pairs into transactions (a pair is never split across txs). Each
+// tx = compute-budget ixs + N whole distribute/claim pairs.
+async function packPairedTxs(pairs, user) {
+  const bh = await relay("blockhash");
+  const blockhash = bh.blockhash;
+  const userPk = new PublicKey(user);
+  const newTx = () => {
+    const tx = new Transaction();
+    tx.feePayer = userPk;
+    tx.recentBlockhash = blockhash;
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
+    );
+    return tx;
+  };
+  const txs = [];
+  let cur = null;
+  for (const [distIx, claimIx] of pairs) {
+    if (!cur) {
+      cur = newTx();
+      txs.push(cur);
+    }
+    cur.add(distIx, claimIx);
+    if (cur.serializeMessage().length > MAX_MSG_BYTES) {
+      // this pair didn't fit; move it to its own fresh tx
+      cur.instructions.pop();
+      cur.instructions.pop();
+      cur = newTx();
+      txs.push(cur);
+      cur.add(distIx, claimIx);
+    }
+  }
+  return txs;
+}
+
+// Execute atomic distribute+claim pairs: pack into txs, chunk txs into signAll
+// groups, simulate each group, one signAll prompt per group, send all txs in
+// parallel (safe — txs are independent). No pause between groups.
+export async function executePairedClaim(
+  pairs,
+  user,
+  signAllTransactionsRaw,
+  onLog,
+  txsPerGroup = 20,
+  onProgress
+) {
+  const results = [];
+  if (!pairs || !pairs.length) {
+    onLog({ type: "info", msg: "Nothing to do — no claimable pairs." });
+    return results;
+  }
+  const txs = await packPairedTxs(pairs, user);
+  const totalGroups = Math.ceil(txs.length / txsPerGroup);
+  onLog({
+    type: "info",
+    msg: `PAIRED :: ${pairs.length} pair(s) → ${txs.length} tx(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+  });
+  onProgress?.({ group: 0, totalGroups, phase: "start" });
+  for (let g = 0; g < totalGroups; g++) {
+    const groupNo = g + 1;
+    const groupTxs = txs.slice(g * txsPerGroup, (g + 1) * txsPerGroup);
+    onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: simulating...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sim" });
+    const sims = await mapLimit(groupTxs, 8, (t) => simulate(t));
+    const passing = [];
+    for (let j = 0; j < groupTxs.length; j++) {
+      const sim = sims[j];
+      if (!sim.ok) {
+        const errLine =
+          (sim.logs || []).find((l) => l.includes("Error Message")) ||
+          (sim.logs || []).find((l) => l.includes("Error Code"));
+        onLog({
+          type: "err",
+          msg: `G${groupNo} TX ${j + 1} SIM_FAIL: ${sim.err}${errLine ? ` :: ${errLine.replace("Program log: ", "")}` : ""}`,
+        });
+        results.push({ ok: false, reason: sim.err });
+      } else {
+        passing.push(groupTxs[j]);
+      }
+    }
+    if (!passing.length) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} :: all sims failed — skipping.` });
+      continue;
+    }
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sign" });
+    let signed;
+    try {
+      signed = await signAllTransactionsRaw(passing);
+    } catch (e) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message || "user rejected the prompt"}` });
+      for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "rejected" });
+      break;
+    }
+    if (!Array.isArray(signed) || signed.length !== passing.length) {
+      onLog({ type: "err", msg: `GROUP ${groupNo} :: wallet returned wrong number of signed txs.` });
+      for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "bad-sign" });
+      continue;
+    }
+    onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) in parallel...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "send" });
+    const sends = await mapLimit(signed, 8, (bytes, k) =>
+      withTimeout(
+        relay("send", { tx: Buffer.from(bytes).toString("base64") }),
+        60000,
+        `G${groupNo} TX ${k + 1} broadcast`
+      )
+        .then((r) => {
+          onLog({ type: "ok", msg: `G${groupNo} TX ${k + 1} SENT ${r.sig}`, sig: r.sig });
+          return { ok: true, sig: r.sig };
+        })
+        .catch((e) => {
+          onLog({ type: "err", msg: `G${groupNo} TX ${k + 1} SEND_FAIL: ${e.message}` });
+          return { ok: false, reason: e.message };
+        })
+    );
+    for (const s of sends) results.push(s);
+    // txs are independent (whole atomic pairs) — no pause needed between groups.
+  }
+  return results;
 }
 
 export { packTxs };

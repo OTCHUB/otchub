@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildDistributeForClaimable, executeClaimChunked } from "@/lib/otcClaim";
+import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -16,7 +16,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [prices, setPrices] = useState({});
   const [lifetime, setLifetime] = useState({}); // asset_id -> {value_sol, value_usd, count, tickers}
   const [cleared, setCleared] = useState(() => new Set()); // desks claimed & emptied this session
-  const [pullOwed, setPullOwed] = useState(false); // OFF = claim-only (smooth); ON = also activate + distribute owed backlog first
+  const [pullOwed, setPullOwed] = useState(false); // OFF = atomic distribute+claim pairs (fast); ON = also activate + distribute ALL owed backlog first
+  const [progress, setProgress] = useState(null); // { group, totalGroups, phase } live chunk progress
 
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
@@ -160,21 +161,20 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
     setBusy(true);
     try {
-      const orderedIxs = [];
       const claimable = targets.filter((d) => d.claimable.length);
+      if (!claimable.length) {
+        log({ type: "err", msg: "Nothing to claim — no claimable tickers. Toggle [PULL_OWED] to pull owed backlog first." });
+        return;
+      }
+      setProgress(null);
 
-      // DISTRIBUTE is mandatory before CLAIM — the program rejects claim with
-      // UndistributedBalance if a ticker's owed share hasn't been pushed from
-      // the protocol pot into the desk vault yet. distribute(slot) is
-      // permissionless and a no-op for slots already current, so always safe.
-      //   PULL_OWED OFF: distribute only the claimable tickers' slots (minimum
-      //   to unblock their claims).
-      //   PULL_OWED ON: additionally activate missing accounts and distribute
-      //   ALL 13 slots per desk — pulling the full owed backlog into
-      //   currently-empty vaults so they become claimable on the next run.
+      let results;
       if (pullOwed) {
-        // 1. ACTIVATE — open missing ticker vault accounts so distribute can
-        // deliver into them. Must run before distribute.
+        // Full backlog pull: activate missing accounts, distribute ALL 13
+        // slots per desk (pulls owed into empty vaults too), then claim. Uses
+        // the chunked executor (cross-tx distribute→claim ordering, pauses
+        // between groups). Run occasionally to refresh empty vaults.
+        const orderedIxs = [];
         const toActivate = [];
         for (const d of targets) for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
         if (toActivate.length) {
@@ -184,30 +184,23 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         } else {
           log({ type: "info", msg: `ACTIVATE :: all ticker accounts already open.` });
         }
-        // 2. DISTRIBUTE all 13 slots per desk — pulls full owed backlog.
         const distIxs = await buildDistributeInstructions(targets, address, tpMap);
         orderedIxs.push(...distIxs);
         log({ type: "info", msg: `DISTRIBUTE_ALL :: ${distIxs.length} ixs (${targets.length} desks × 13 slots) — pulling owed backlog.` });
-      } else if (claimable.length) {
-        // DISTRIBUTE only the claimable tickers' slots — minimum to unblock claims.
-        const distIxs = await buildDistributeForClaimable(claimable, tpMap);
-        orderedIxs.push(...distIxs);
-        log({ type: "info", msg: `DISTRIBUTE :: ${distIxs.length} slot(s) to clear owed before claim.` });
-      }
-
-      // 3. CLAIM — withdraw every claimable ticker from the vault to the wallet.
-      if (claimable.length) {
         const claimIxs = await buildClaimInstructions(claimable, address, tpMap);
         orderedIxs.push(...claimIxs);
         log({ type: "info", msg: `CLAIM :: ${claimable.length} desk(s), ${claimIxs.length} claimable ticker(s).` });
+        results = await executeClaimChunked(orderedIxs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+      } else {
+        // Fast path: one atomic [distribute(slot), claim(ticker)] tx per
+        // claimable ticker. Each tx is self-contained (its claim depends only
+        // on its own distribute in the same tx), so txs are independent —
+        // signed in a few large batches and sent in parallel with no pauses.
+        // This is the smooth default for claiming already-owed stock.
+        const pairs = await buildClaimPairs(claimable, address, tpMap);
+        log({ type: "info", msg: `PAIRS :: ${pairs.length} atomic distribute+claim pair(s).` });
+        results = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 20, setProgress);
       }
-
-      if (!orderedIxs.length) {
-        log({ type: "err", msg: "Nothing to do — no claimable stock and PULL_OWED is off." });
-        return;
-      }
-
-      const results = await executeClaimChunked(orderedIxs, address, signer.signAllTransactionsRaw, log);
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
       log({ type: fail ? "err" : "ok", msg: `DONE :: ${ok} confirmed, ${fail} failed (of ${results.length} tx).` });
@@ -252,6 +245,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -264,8 +258,16 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
 
   const targetCount = selected.size || (plan ? plan.length : 0);
   const distIxEst = pullOwed ? 13 * targetCount : totalClaimable;
-  const estApprovals = Math.ceil((totalClaimable + distIxEst) / 60) || 0;
-  const phaseLabel = busy ? "PROCESSING..." : pullOwed ? "PULL_OWED + CLAIM" : "CLAIM";
+  const estApprovals = pullOwed
+    ? Math.ceil((totalClaimable + distIxEst) / 60) || 0
+    : Math.ceil(totalClaimable / 40) || 0;
+  const phaseLabel = busy
+    ? progress
+      ? `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()}…`
+      : "PROCESSING…"
+    : pullOwed
+    ? "PULL_OWED + CLAIM"
+    : "CLAIM";
 
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
@@ -292,13 +294,12 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       </div>
 
       <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        CLAIM always distributes each claimable ticker's owed share from the protocol pot into the
-        desk vault first (required by the program; permissionless, no-op if already current), then
-        withdraws it to your wallet. PULL_OWED ON additionally opens missing ticker accounts and
-        distributes ALL slots — pulling the full owed backlog into currently-empty vaults so they
-        become claimable next run (more approvals; run occasionally). Large runs are split into
-        groups, each group = one wallet approval. Every tx is simulated first; a failing sim is
-        skipped (no fee spent). The program enforces you own the NFT.
+        Default builds one atomic distribute+claim tx per claimable ticker (its claim depends only on
+        its own distribute in the same tx), so txs are independent — signed in a few large batches
+        and sent in parallel. PULL_OWED ON instead opens missing accounts and distributes ALL slots
+        per desk first to pull the full owed backlog into empty vaults (more approvals; run
+        occasionally). Every tx is simulated first; a failing sim is skipped (no fee spent). The
+        program enforces you own the NFT.
       </p>
 
       {Object.keys(lifetime).length > 0 && (() => {
