@@ -138,6 +138,20 @@ export default function ArbitrageCard({ latest, holdings }) {
             ? `> MINT_NOW — mint ${fmtSol(mintSol, 3)} < secondary net ${fmtSol(effectiveSecSol, 3)} (fresh desk cheaper than listed desks after stock)`
             : "> NEUTRAL — costs within tolerance"}
         </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            onClick={() => document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className={`border px-2 py-1 font-mono text-[10px] ${recKey === "buy_secondary" ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400" : "border-green-500/30 text-green-500/60"}`}
+          >
+            [→ BUY_SECONDARY · LISTINGS]
+          </button>
+          <button
+            onClick={() => document.getElementById("otc-swap")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className={`border px-2 py-1 font-mono text-[10px] ${recKey === "mint" ? "border-amber-500/60 bg-amber-500/10 text-amber-400" : "border-green-500/30 text-green-500/60"}`}
+          >
+            [→ MINT · SWAP OTC]
+          </button>
+        </div>
       </div>
     </div>
   );

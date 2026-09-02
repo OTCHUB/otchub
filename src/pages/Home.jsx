@@ -16,6 +16,7 @@ import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import BootScreen from "@/components/otc/BootScreen";
+import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 
 export default function Home() {
@@ -128,15 +129,17 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          {wallet ? (
-            <WalletPortfolio
-              address={wallet}
-              onClear={() => setWallet(null)}
-              perDeskPerDaySol={perDeskPerDaySol}
-            />
-          ) : (
-            <WalletConnect onConnected={setWallet} />
-          )}
+          <CollapsibleCard title="WALLET">
+            {wallet ? (
+              <WalletPortfolio
+                address={wallet}
+                onClear={() => setWallet(null)}
+                perDeskPerDaySol={perDeskPerDaySol}
+              />
+            ) : (
+              <WalletConnect onConnected={setWallet} />
+            )}
+          </CollapsibleCard>
         </div>
 
         {/* Top metrics */}
@@ -202,40 +205,62 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <ArbitrageCard latest={latest} holdings={data?.holdings} />
+            <CollapsibleCard title="ARBITRAGE">
+              <ArbitrageCard latest={latest} holdings={data?.holdings} />
+            </CollapsibleCard>
           </div>
-          <ProtocolPanel latest={latest} />
+          <CollapsibleCard title="PROTOCOL">
+            <ProtocolPanel latest={latest} />
+          </CollapsibleCard>
         </div>
 
         {/* Jupiter SOL → OTC swap */}
         <div className="mt-3">
-          <JupiterSwapPanel wallet={wallet} />
+          <CollapsibleCard title="SWAP :: SOL → OTC" id="otc-swap">
+            <JupiterSwapPanel wallet={wallet} />
+          </CollapsibleCard>
         </div>
 
         {/* Charts */}
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <ArbitrageChart history={data?.history} />
-          <EarningsChart latest={latest} />
+          <CollapsibleCard title="ARBITRAGE TREND" defaultOpen={false}>
+            <ArbitrageChart history={data?.history} />
+          </CollapsibleCard>
+          <CollapsibleCard title="EARNINGS">
+            <EarningsChart latest={latest} />
+          </CollapsibleCard>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <RoundsChart latest={latest} />
-          <BuybacksPanel latest={latest} />
+          <CollapsibleCard title="ROUNDS" defaultOpen={false}>
+            <RoundsChart latest={latest} />
+          </CollapsibleCard>
+          <CollapsibleCard title="BUYBACKS" defaultOpen={false}>
+            <BuybacksPanel latest={latest} />
+          </CollapsibleCard>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <PerDeskTrendChart latest={latest} />
-          <ByStockChart latest={latest} />
+          <CollapsibleCard title="PER_DESK_EARN">
+            <PerDeskTrendChart latest={latest} />
+          </CollapsibleCard>
+          <CollapsibleCard title="BY_STOCK" defaultOpen={false}>
+            <ByStockChart latest={latest} />
+          </CollapsibleCard>
         </div>
 
         {/* Tables */}
         <div className="mt-3">
-          <DesksTables latest={latest} />
+          <CollapsibleCard title="DESKS :: DISTRIBUTION" defaultOpen={false}>
+            <DesksTables latest={latest} />
+          </CollapsibleCard>
         </div>
 
         {/* Holdings */}
         <div className="mt-3">
-          <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} />
+          <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
+            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} />
+          </CollapsibleCard>
         </div>
 
         <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
