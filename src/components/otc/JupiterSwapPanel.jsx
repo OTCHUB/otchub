@@ -106,26 +106,13 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
   })();
   const balUsd = otcBal != null && otcUsd != null ? otcBal * otcUsd : null;
 
-  // Market stats strip: live market cap, 1h change (DexScreener), and 2h
-  // change computed from the stored snapshot history (5-min granularity).
+  // Market stats strip — all from DexScreener's live pair data: market cap,
+  // 1h / 24h price change, liquidity, and 24h volume.
   const mcap = latest?.token_market_cap ?? null;
   const ch1h = latest?.token_price_change_1h ?? null;
-  const ch2h = (() => {
-    const nowPx = parseFloat(latest?.token_price_usd);
-    if (!nowPx || !Array.isArray(history) || !history.length) return null;
-    const cutoff = Date.now() - 2 * 3600 * 1000;
-    let base = null;
-    for (const h of history) {
-      // history is sorted oldest → newest; stop at "now", keep the last
-      // priced point at/before the 2h cutoff
-      const t = new Date(h.t).getTime();
-      if (!Number.isFinite(t) || t > Date.now()) break;
-      if (t <= cutoff && h.token_price_usd != null) base = h;
-    }
-    if (!base) return null;
-    const then = base.token_price_usd;
-    return then > 0 ? ((nowPx - then) / then) * 100 : null;
-  })();
+  const ch24h = latest?.token_price_change_24h ?? null;
+  const liq = latest?.token_liquidity_usd ?? null;
+  const vol = latest?.token_volume_24h ?? null;
 
   // Raw integer amount for the quote (lamports for BUY, base units for SELL).
   const rawAmount = () => {
@@ -278,8 +265,8 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
         $OTC :: <span className="text-green-300">{OTC_MINT}</span>
       </div>
 
-      {/* Market stats: mcap + 1h/2h price change */}
-      <div className="mt-2 grid grid-cols-3 gap-1">
+      {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
+      <div className="mt-2 grid grid-cols-3 gap-1 sm:grid-cols-5">
         <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
@@ -293,9 +280,21 @@ export default function JupiterSwapPanel({ wallet, latest, history }) {
           </div>
         </div>
         <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">2H</div>
-          <div className={ch2h == null ? "text-green-500/40" : ch2h >= 0 ? "text-emerald-400" : "text-red-400"}>
-            {ch2h != null ? `${ch2h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch2h))}` : "—"}
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">24H</div>
+          <div className={ch24h == null ? "text-green-500/40" : ch24h >= 0 ? "text-emerald-400" : "text-red-400"}>
+            {ch24h != null ? `${ch24h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch24h))}` : "—"}
+          </div>
+        </div>
+        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">LIQ</div>
+          <div className="text-cyan-300">
+            {liq != null ? `$${fmtCompact(liq)}` : "—"}
+          </div>
+        </div>
+        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+          <div className="text-[8px] uppercase tracking-widest text-green-500/50">VOL_24H</div>
+          <div className="text-cyan-300">
+            {vol != null ? `$${fmtCompact(vol)}` : "—"}
           </div>
         </div>
       </div>
