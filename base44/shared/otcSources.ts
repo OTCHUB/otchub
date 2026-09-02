@@ -83,11 +83,51 @@ export async function fetchAccountBalanceLamports(address) {
   return result?.value ?? null;
 }
 
+async function solanaRpc(rpcUrl, method, params) {
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: "otc", method, params }),
+  });
+  if (!res.ok) throw new Error(`RPC ${method} HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(`RPC ${method} error: ${json.error.message}`);
+  return json.result;
+}
+
+function supplyFromResult(result) {
+  const v = result?.value;
+  if (v?.uiAmountString != null) return parseFloat(v.uiAmountString);
+  if (v?.uiAmount != null) return v.uiAmount;
+  return null;
+}
+
+// Circulating OTC supply. Primary source is DexScreener, whose marketCap
+// equals priceUsd × circulating supply (verified to match on-chain supply),
+// and which is far more reliable than getTokenSupply — Helius intermittently
+// 500s on that method (see https://www.helius.dev/docs/api-reference/rpc/http/gettokensupply,
+// result.value.uiAmountString). We still fall back to exact on-chain RPCs.
 export async function fetchTokenSupply(tokenMint) {
-  const result = await heliusRpc("getTokenSupply", [tokenMint]);
-  return result?.value?.uiAmountString != null
-    ? parseFloat(result.value.uiAmountString)
-    : result?.value?.uiAmount ?? null;
+  try {
+    const pair = await fetchDexScreenerToken(tokenMint);
+    const mc = pair?.marketCap;
+    const px = pair?.priceUsd;
+    if (mc && px) return mc / px;
+  } catch (e) {
+    /* fall through to on-chain RPC */
+  }
+  for (const call of [
+    () => heliusRpc("getTokenSupply", [tokenMint]),
+    () => solanaRpc("https://api.mainnet-beta.solana.com", "getTokenSupply", [tokenMint]),
+  ]) {
+    try {
+      const v = supplyFromResult(await call());
+      if (v != null) return v;
+    } catch (e) {
+      /* try next */
+    }
+  }
+  return null;
 }
 
 export async function fetchCollectionAssets(collectionAddress) {
