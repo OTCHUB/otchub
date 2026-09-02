@@ -13,7 +13,26 @@ export default async function (req) {
 
     const list = snapshots || [];
     const latest = list.length ? list[0] : null;
-    const history = list
+
+    // Bootstrap the full historical supply/burn series from the protocol's
+    // daily per-desk history (stored on every snapshot). Each desk mint burns
+    // exactly 100,000 OTC, so cumulative burn = cumulative desks × 100k and
+    // circulating supply = TGE(1B) − burn. This reconstructs the on-chain
+    // mint↔burn relationship across the protocol's entire life (≈5 days),
+    // before live snapshots existed.
+    const OTC_TGE_SUPPLY = 1_000_000_000;
+    const OTC_BURN_PER_DESK = 100000;
+    const perDeskItems = latest?.per_desk?.items || [];
+    const bootstrap = perDeskItems
+      .filter((d) => d.day && d.desks != null)
+      .map((d) => ({
+        t: d.day,
+        desks_minted: d.desks,
+        token_burnt: d.desks * OTC_BURN_PER_DESK,
+        token_total_supply: OTC_TGE_SUPPLY - d.desks * OTC_BURN_PER_DESK,
+      }));
+
+    const snapshotHistory = list
       .slice()
       .reverse()
       .map((s) => ({
@@ -36,6 +55,13 @@ export default async function (req) {
         spread_pct: s.spread_pct,
         nft_total_supply: s.nft_total_supply,
       }));
+
+    // Merge the daily bootstrap (full history) with live snapshot points
+    // (recent granularity), sorted chronologically. The supply/desks chart
+    // connects nulls so partial series render cleanly.
+    const history = [...bootstrap, ...snapshotHistory].sort((a, b) =>
+      String(a.t || "").localeCompare(String(b.t || ""))
+    );
 
     return Response.json({
       addresses: ADDRESSES,
