@@ -94,7 +94,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black font-mono text-green-400">
+    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black font-mono text-green-400">
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
         <header className="border border-green-500/30 bg-black p-3">

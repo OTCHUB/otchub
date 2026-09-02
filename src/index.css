@@ -90,3 +90,22 @@
     @apply bg-background text-foreground font-body;
   }
 }
+
+/* Keep the app inside the viewport: no horizontal scroll on any panel. */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Mobile browsers auto-zoom the whole page when an input with font-size under
+   16px is focused (all dashboard inputs use 9–14px mono text), which blows
+   the layout out of the viewport. Force 16px on form controls below the sm
+   breakpoint — desktop is untouched. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
