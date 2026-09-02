@@ -440,13 +440,13 @@ export async function executeClaimChunked(
     type: "info",
     msg: `CHUNKED :: ${ixs.length} ix(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
   });
-  onProgress?.({ group: 0, totalGroups, phase: "start" });
+  onProgress?.({ group: 0, totalGroups, phase: "start", desks: [], signaturesLeft: totalGroups });
   for (let c = 0, g = 0; c < ixs.length; c += chunkSize, g++) {
     const groupNo = g + 1;
     const groupIxs = ixs.slice(c, c + chunkSize);
     const txs = await packTxs(groupIxs, user); // fresh blockhash per group
     onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${txs.length} tx(s) :: simulating...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sim" });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sim", desks: [], signaturesLeft: totalGroups - groupNo + 1 });
     const sims = await mapLimit(txs, 8, (t) => simulate(t));
     const passing = [];
     for (let j = 0; j < txs.length; j++) {
@@ -469,7 +469,7 @@ export async function executeClaimChunked(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sign" });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sign", desks: [], signaturesLeft: totalGroups - groupNo + 1 });
     let signed;
     try {
       signed = await signAllTransactionsRaw(passing);
@@ -484,7 +484,7 @@ export async function executeClaimChunked(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "send" });
+    onProgress?.({ group: groupNo, totalGroups, phase: "send", desks: [], signaturesLeft: totalGroups - groupNo });
     for (let k = 0; k < signed.length; k++) {
       try {
         const r = await withTimeout(
@@ -647,7 +647,8 @@ export async function buildDistributeForClaimable(deskPlans, tokenProgramMap) {
 // SAME tx. That makes every tx independent of every other — no cross-tx
 // ordering, no pause between groups, safe parallel send, and far fewer wallet
 // approvals (large signAll batches). This is the fast path for claiming
-// already-owed stock.
+// already-owed stock. Each pair carries its desk name/symbol so the progress
+// UI can show exactly which desks the current signing group covers.
 export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
   const pairs = [];
   for (const d of deskPlans) {
@@ -656,7 +657,13 @@ export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
       if (!slot) continue;
       const distIx = buildDistributeIx(d.asset_id, slot.slot, slot.mint, tokenProgramMap);
       const claimIx = buildClaimIx(user, d.asset_id, t, tokenProgramMap);
-      pairs.push([distIx, claimIx]);
+      pairs.push({
+        distIx,
+        claimIx,
+        deskName: d.name || d.asset_id.slice(0, 8),
+        assetId: d.asset_id,
+        symbol: t.symbol,
+      });
     }
   }
   return pairs;
@@ -682,7 +689,9 @@ function packPairedTxs(pairs, user, blockhash) {
   };
   const txs = [];
   let cur = null;
-  for (const [distIx, claimIx] of pairs) {
+  for (const p of pairs) {
+    const distIx = p.distIx;
+    const claimIx = p.claimIx;
     if (!cur) {
       cur = newTx();
       txs.push(cur);
@@ -726,16 +735,19 @@ export async function executePairedClaim(
     type: "info",
     msg: `PAIRED :: ${pairs.length} pair(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
   });
-  onProgress?.({ group: 0, totalGroups, phase: "start" });
+  onProgress?.({ group: 0, totalGroups, phase: "start", desks: [], signaturesLeft: totalGroups });
   for (let g = 0; g < totalGroups; g++) {
     const groupNo = g + 1;
     const groupPairs = pairs.slice(g * pairsPerGroup, (g + 1) * pairsPerGroup);
+    // Distinct desk names covered by this signing group, in first-seen order —
+    // shown in the progress UI so the user knows which desks are signing now.
+    const desks = [...new Set(groupPairs.map((p) => p.deskName))];
     // Fresh blockhash per group — one blockhash for all groups expires before
     // later groups are signed/sent, causing every tx in them to 500 on send.
     const bh = await relay("blockhash");
     const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash);
-    onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: simulating...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sim" });
+    onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: ${desks.length} desk(s) :: simulating...` });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sim", desks, signaturesLeft: totalGroups - groupNo + 1 });
     const sims = await mapLimit(groupTxs, 8, (t) => simulate(t));
     const passing = [];
     for (let j = 0; j < groupTxs.length; j++) {
@@ -758,7 +770,7 @@ export async function executePairedClaim(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sign" });
+    onProgress?.({ group: groupNo, totalGroups, phase: "sign", desks, signaturesLeft: totalGroups - groupNo + 1 });
     let signed;
     try {
       signed = await signAllTransactionsRaw(passing);
@@ -773,7 +785,7 @@ export async function executePairedClaim(
       continue;
     }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "send" });
+    onProgress?.({ group: groupNo, totalGroups, phase: "send", desks, signaturesLeft: totalGroups - groupNo });
     for (let k = 0; k < signed.length; k++) {
       try {
         const r = await withTimeout(

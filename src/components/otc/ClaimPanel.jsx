@@ -241,7 +241,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     : Math.ceil(totalClaimable / 60) || 0;
   const phaseLabel = busy
     ? progress
-      ? `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()}…`
+      ? `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()} · ${progress.signaturesLeft ?? ""}SIG`
       : "PROCESSING…"
     : pullOwed
     ? "PULL_OWED + CLAIM"
@@ -438,6 +438,37 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
             <span className="text-cyan-400">
               ~{estApprovals} approval(s) · {totalClaimable + distIxEst} ix
             </span>
+          )}
+        </div>
+      )}
+
+      {/* Live claim progress: which desks are in the current signing group and
+          how many wallet signatures remain. */}
+      {busy && progress && (
+        <div className="mt-2 border border-emerald-500/40 bg-emerald-500/5 p-2">
+          <div className="flex items-center justify-between font-mono text-[10px]">
+            <span className="text-emerald-300">
+              {progress.phase === "start"
+                ? `INIT · ${progress.totalGroups} GROUP(S)`
+                : `GROUP ${progress.group}/${progress.totalGroups} · ${progress.phase.toUpperCase()}`}
+            </span>
+            <span className="text-cyan-300">
+              {progress.signaturesLeft} SIG LEFT
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 w-full bg-green-500/10">
+            <div
+              className="h-full bg-emerald-400 transition-all duration-300"
+              style={{
+                width: `${progress.totalGroups ? Math.min(100, (progress.group / progress.totalGroups) * 100) : 0}%`,
+              }}
+            />
+          </div>
+          {progress.desks && progress.desks.length > 0 && (
+            <div className="mt-1 font-mono text-[9px] leading-snug text-green-500/70">
+              <span className="text-emerald-400/90">PROCESSING:</span>{" "}
+              {progress.desks.join(" · ")}
+            </div>
           )}
         </div>
       )}
