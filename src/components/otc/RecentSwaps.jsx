@@ -18,11 +18,10 @@ function ago(tsSec) {
   return `${hrs}h ${mins % 60}m`;
 }
 
-const fmtAmt = (v) =>
-  v == null
+const fmtUsd2 = (v) =>
+  v == null || !Number.isFinite(v)
     ? "—"
-    : Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
-const fmtSolAmt = (v) => (v == null ? "—" : Number(v).toFixed(3));
+    : `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function RecentSwaps({ latest }) {
   const [swaps, setSwaps] = useState(null);
@@ -52,6 +51,8 @@ export default function RecentSwaps({ latest }) {
 
   const list = swaps || [];
   const livePriceSol = latest?.token_price_sol ?? null;
+  const solPriceUsd = latest?.sol_price_usd ?? null;
+  const otcPriceUsd = latest?.token_price_usd ?? null;
 
   return (
     <div className="mt-3 border border-green-500/20">
@@ -65,14 +66,12 @@ export default function RecentSwaps({ latest }) {
         </span>
       </div>
 
-      {/* Header row */}
-      <div className="grid grid-cols-[42px_1fr_1fr_1fr_1.2fr_auto] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
+      {/* Header row — DexScreener-style columns */}
+      <div className="grid grid-cols-[46px_1fr_1fr_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
         <span>SIDE</span>
-        <span className="text-right">PRICE SOL</span>
-        <span className="text-right">AMOUNT $OTC</span>
-        <span className="text-right">SIZE SOL</span>
+        <span className="text-right">USD</span>
+        <span className="text-right">PRICE (SOL)</span>
         <span className="text-right">WALLET</span>
-        <span className="text-right">AGE</span>
       </div>
 
       <div className="max-h-56 overflow-y-auto">
@@ -80,13 +79,22 @@ export default function RecentSwaps({ latest }) {
           list.map((s) => {
             const price = s.price_sol ?? livePriceSol;
             const buy = s.side === "BUY";
+            // Trade value in USD: prefer the decoded SOL leg × SOL spot,
+            // fall back to the $OTC leg × $OTC spot.
+            const usd =
+              s.sol_amount != null && solPriceUsd != null
+                ? s.sol_amount * solPriceUsd
+                : s.otc_amount != null && otcPriceUsd != null
+                ? s.otc_amount * otcPriceUsd
+                : null;
             return (
               <a
                 key={s.sig}
                 href={`https://solscan.io/tx/${s.sig}`}
                 target="_blank"
                 rel="noreferrer"
-                className="grid grid-cols-[42px_1fr_1fr_1fr_1.2fr_auto] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[9px] last:border-0 hover:bg-green-500/5"
+                title={ago(s.time) !== "—" ? `${ago(s.time)} ago · ${s.sig}` : s.sig}
+                className="grid grid-cols-[46px_1fr_1fr_1.4fr] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[9px] last:border-0 hover:bg-green-500/5"
               >
                 <span
                   className={`border px-1 text-center font-bold ${
@@ -97,16 +105,12 @@ export default function RecentSwaps({ latest }) {
                 >
                   {s.side}
                 </span>
+                <span className="truncate text-right text-amber-300">{fmtUsd2(usd)}</span>
                 <span className="text-right text-cyan-300">
                   {price != null ? Number(price).toFixed(7) : "—"}
                 </span>
-                <span className="truncate text-right text-green-300">{fmtAmt(s.otc_amount)}</span>
-                <span className="truncate text-right text-amber-300">{fmtSolAmt(s.sol_amount)}</span>
                 <span className="truncate text-right text-green-500/50" title={s.wallet}>
                   {short(s.wallet)}
-                </span>
-                <span className="whitespace-nowrap text-right text-green-500/40">
-                  {ago(s.time)} ↗
                 </span>
               </a>
             );
