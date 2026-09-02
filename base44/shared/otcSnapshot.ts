@@ -14,6 +14,7 @@ import {
   fetchProtocolStats,
   fetchTokenSupply,
 } from "./otcSources.ts";
+import { acquireLock, releaseLock } from "./dataLock.ts";
 
 const LAMPORTS_PER_SOL = 1e9;
 const OTC_DECIMALS = 6;
@@ -128,6 +129,30 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
           snapshot_id: last.id,
           age_ms: ageMs,
         };
+      }
+    }
+  }
+
+  // Ingest lock: the 5-min scheduler, the Helius webhook, and the admin force
+  // refresh can all fire a full ingest at the same moment. Two overlapping
+  // runs would create duplicate snapshots AND interleave the holdings rewrite
+  // (deleteMany + bulkCreate), duplicating every NFT row. The lock serializes
+  // full ingests; a crashed holder auto-expires via the TTL.
+  const lock = await acquireLock(base44, "otc_ingest", 3 * 60 * 1000);
+  if (!lock.acquired) {
+    const last = await latestSnapshot(base44);
+    return { ok: true, locked: true, skipped: true, snapshot_id: last?.id ?? null };
+  }
+  // Double-checked freshness: the lock winner may have started right after
+  // another ingest finished — re-check so we don't stack a second snapshot
+  // seconds after the last one.
+  if (!force) {
+    const last = await latestSnapshot(base44);
+    if (last?.created_date) {
+      const ageMs = Date.now() - new Date(last.created_date).getTime();
+      if (ageMs < FRESH_MS) {
+        await releaseLock(base44, lock);
+        return { ok: true, cached: true, skipped: true, snapshot_id: last.id, age_ms: ageMs };
       }
     }
   }
@@ -374,6 +399,8 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     await base44.asServiceRole.entities.NftHolding.deleteMany({});
     if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
   }
+
+  await releaseLock(base44, lock);
 
   return {
     ok: true,

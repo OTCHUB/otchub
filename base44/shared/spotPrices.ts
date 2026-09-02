@@ -58,10 +58,19 @@ function pairSummary(p) {
 // Returns { prices: { mint -> usd }, otc_pair, sol_price_usd, cached }.
 // `cached: true` means the row was fresh and NO upstream call was made.
 export async function getSpotPrices(base44) {
-  const existing = await base44.asServiceRole.entities.PriceCache.filter({
+  // Race-proof row pick: two concurrent cold callers can both create a row
+  // for the same key — keep the most recently updated and prune the rest so
+  // every read/write targets a single row.
+  const existing = (await base44.asServiceRole.entities.PriceCache.filter({
     key: CACHE_KEY,
-  });
-  const row = existing?.[0] || null;
+  })) || [];
+  existing.sort((a, b) => new Date(b.updated_date || 0) - new Date(a.updated_date || 0));
+  if (existing.length > 1) {
+    await Promise.all(
+      existing.slice(1).map((r) => base44.asServiceRole.entities.PriceCache.delete(r.id))
+    );
+  }
+  const row = existing[0] || null;
   const rowFresh =
     row?.updated_date &&
     Date.now() - new Date(row.updated_date).getTime() < TTL_MS &&

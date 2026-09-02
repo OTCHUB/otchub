@@ -37,8 +37,34 @@ export default async function (req) {
       .filter((r) => r.asset_id && r.tx_sig);
     if (!records.length) return Response.json({ ok: true, logged: 0 });
 
-    await base44.asServiceRole.entities.ClaimLog.bulkCreate(records);
-    return Response.json({ ok: true, logged: records.length });
+    // Server-side dedupe: never insert a claim that is already logged for
+    // this wallet (same tx signature + ticker + desk). Client retries and
+    // racing panels must not be able to double-count lifetime earnings.
+    const existing = await base44.asServiceRole.entities.ClaimLog.filter(
+      { wallet },
+      "-created_date",
+      1000
+    );
+    const seen = new Set();
+    for (const r of existing || []) {
+      if (r.tx_sig) seen.add(`${r.tx_sig}|${r.symbol}|${r.asset_id}`);
+    }
+    const unique = [];
+    for (const r of records) {
+      const key = `${r.tx_sig}|${r.symbol}|${r.asset_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(r);
+    }
+    if (!unique.length) {
+      return Response.json({ ok: true, logged: 0, duplicates: records.length });
+    }
+    await base44.asServiceRole.entities.ClaimLog.bulkCreate(unique);
+    return Response.json({
+      ok: true,
+      logged: unique.length,
+      duplicates: records.length - unique.length,
+    });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

@@ -21,6 +21,7 @@ import { secrets } from "base44:runtime";
 import { Buffer } from "node:buffer";
 import { PROGRAM_ID, STOCKS, INSTRUCTIONS } from "../../shared/otcIdl.ts";
 import { getSpotPrices } from "../../shared/spotPrices.ts";
+import { acquireLock, releaseLock } from "../../shared/dataLock.ts";
 
 // web3.js expects a global Buffer; set it before the module is imported.
 if (!globalThis.Buffer) globalThis.Buffer = Buffer;
@@ -182,8 +183,17 @@ export default async function (req) {
     const cacheKey = `${wallet}__lifetime`;
     let cache = null;
     try {
-      const existing = await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey });
-      cache = (existing && existing[0]) || null;
+      const existing = (await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey })) || [];
+      // Race-proof cache row pick: concurrent creators can leave duplicate
+      // rows for the same key — keep the most recently updated and prune the
+      // rest so every read/write targets a single row.
+      existing.sort((a, b) => new Date(b.updated_date || 0) - new Date(a.updated_date || 0));
+      if (existing.length > 1) {
+        await Promise.all(
+          existing.slice(1).map((r) => base44.asServiceRole.entities.ClaimCache.delete(r.id))
+        );
+      }
+      cache = existing[0] || null;
     } catch {
       /* ignore */
     }
@@ -240,6 +250,15 @@ export default async function (req) {
     let parsedCount = 0;
     const newClaims = [];
     if (!fresh || force) {
+      // Scan lock: two concurrent scans for the same wallet (double connect,
+      // multiple tabs, racing panels) would parse the same new signatures and
+      // BOTH insert them into ClaimLog — doubling lifetime earnings. Only one
+      // scan runs; the loser serves the persisted DB totals, which the winner
+      // keeps current.
+      const lock = await acquireLock(base44, `lifetime_${wallet}`, 90 * 1000);
+      if (!lock.acquired) {
+        parsedCount = 0;
+      } else {
       const tpMap = await resolveTokenPrograms();
       // Collect un-parsed signatures across all 13 user_stock accounts.
       const toParse = new Set();
@@ -313,6 +332,8 @@ export default async function (req) {
         }
       } catch {
         /* cache write is best-effort */
+      }
+      await releaseLock(base44, lock);
       }
     }
 

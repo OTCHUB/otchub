@@ -19,6 +19,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { Buffer } from "node:buffer";
 import { heliusRpc } from "../../shared/otcSources.ts";
+import { acquireLock, releaseLock } from "../../shared/dataLock.ts";
 
 // web3.js expects a global Buffer; set it before the module is imported.
 if (!globalThis.Buffer) globalThis.Buffer = Buffer;
@@ -141,9 +142,17 @@ export default async function (req) {
       }));
     }
 
-    // Cache lookup
-    const cachedRows = await base44.asServiceRole.entities.ClaimCache.filter({ wallet });
-    const cache = cachedRows?.[0] || null;
+    // Cache lookup — race-proof: concurrent creators can leave duplicate rows
+    // for the same wallet; keep the most recently updated and prune the rest
+    // so every read/write targets a single row.
+    const cachedRows = (await base44.asServiceRole.entities.ClaimCache.filter({ wallet })) || [];
+    cachedRows.sort((a, b) => new Date(b.updated_date || 0) - new Date(a.updated_date || 0));
+    if (cachedRows.length > 1) {
+      await Promise.all(
+        cachedRows.slice(1).map((r) => base44.asServiceRole.entities.ClaimCache.delete(r.id))
+      );
+    }
+    const cache = cachedRows[0] || null;
     const fresh =
       cache?.updated_date &&
       Date.now() - new Date(cache.updated_date).getTime() < CACHE_TTL_MS &&
@@ -169,6 +178,21 @@ export default async function (req) {
       });
     }
 
+    // Scan lock: two concurrent scans for the same wallet (double connect,
+    // claim + portfolio panels racing) would burn duplicate RPC reads and
+    // interleave cache writes. First scan wins; the loser serves the existing
+    // cache instead of double-scanning.
+    const lock = await acquireLock(base44, `wscan_${wallet}`, 90 * 1000);
+    if (!lock.acquired) {
+      return Response.json({
+        ok: true,
+        locked: true,
+        desks: cache?.desks?._v === CACHE_VERSION ? cache.desks.items || [] : [],
+        wallet,
+        desks_count: desks.length,
+      });
+    }
+    try {
     if (!desks.length) {
       await saveCache(base44, cache, wallet, []);
       return Response.json({ ok: true, fresh: true, desks: [], wallet, desks_count: 0 });
@@ -247,6 +271,9 @@ export default async function (req) {
 
     await saveCache(base44, cache, wallet, out);
     return Response.json({ ok: true, fresh: true, desks: out, wallet, desks_count: desks.length });
+    } finally {
+      await releaseLock(base44, lock);
+    }
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

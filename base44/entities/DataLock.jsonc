@@ -1,0 +1,15 @@
+{
+  "name": "DataLock",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "key"
+  ]
+}
