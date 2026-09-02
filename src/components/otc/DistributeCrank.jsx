@@ -22,10 +22,10 @@ const MAX_DEPTH = 10;
 export default function DistributeCrank({ wallet, allDesks, latest }) {
   const [armed, setArmed] = useState(false);
   const [depth, setDepth] = useState(1);
-  // Atomic 5-tx Jito bundles via Helius — requires a Helius API key on a plan
-  // with bundle access; on other plans submits fail fast and fall back to
-  // normal sends, so it stays OFF by default until that's confirmed.
-  const [useBundles, setUseBundles] = useState(false);
+  // Atomic 5-tx Jito bundles via Helius (Developer plan supports bundles). If
+  // a submit is ever rejected, the crank falls back to normal sends of the
+  // same signed bytes automatically.
+  const [useBundles, setUseBundles] = useState(true);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState([]);
   const [progress, setProgress] = useState(null);

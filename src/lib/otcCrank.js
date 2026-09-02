@@ -27,7 +27,8 @@ import {
   ensureConfirmed,
   mapLimit,
   writableKeys,
-  simulate,
+  simulateMany,
+  sendMany,
 } from "@/lib/otcClaim";
 
 // Helius tip accounts (docs.helius.dev → send-bundle → Tip Accounts). At
@@ -111,18 +112,19 @@ function packCrankTxs(ixs, user, blockhash, microLamports) {
 // Normal broadcast of already-signed txs (also the fallback path for bundles
 // that don't land in time — the same bytes, idempotent).
 async function sendWaveDirect(b64s, waveNo, onLog, results) {
+  const sends = await sendMany(b64s);
   const sentEntries = [];
-  await mapLimit(b64s, 6, async (b64, i) => {
-    try {
-      const r = await relay("send", { tx: b64 });
-      onLog({ type: "ok", msg: `W${waveNo} TX ${i + 1} SENT ${r.sig}`, sig: r.sig });
-      sentEntries.push({ sig: r.sig, b64 });
-      results.push({ ok: true, sig: r.sig });
-    } catch (e) {
-      onLog({ type: "err", msg: `W${waveNo} TX ${i + 1} SEND_FAIL: ${e.message}` });
-      results.push({ ok: false, reason: e.message });
+  for (let i = 0; i < sends.length; i++) {
+    const s = sends[i];
+    if (s.ok) {
+      onLog({ type: "ok", msg: `W${waveNo} TX ${i + 1} SENT ${s.sig}`, sig: s.sig });
+      sentEntries.push({ sig: s.sig, b64: b64s[i] });
+      results.push({ ok: true, sig: s.sig });
+    } else {
+      onLog({ type: "err", msg: `W${waveNo} TX ${i + 1} SEND_FAIL: ${s.reason}` });
+      results.push({ ok: false, reason: s.reason });
     }
-  });
+  }
   await ensureConfirmed(sentEntries, onLog);
 }
 
@@ -134,20 +136,32 @@ async function sendWaveBundled(b64s, waveNo, onLog, results) {
     type: "info",
     msg: `WAVE ${waveNo} :: ${groups.length} atomic bundle(s) of ≤${BUNDLE_SIZE} tx :: JITO...`,
   });
-  // sendBundle is rate-limited to 5 RPS per project — concurrency 4.
-  const submitted = await mapLimit(groups, 4, async (g) => {
+  // Up to 6 bundles per relay invocation (server-side sends respect
+  // sendBundle's 5 RPS rate limit).
+  const submitted = [];
+  for (const batch of chunk(groups, 6)) {
+    let r;
     try {
-      const r = await relay("bundle", { txs: g });
-      return { txs: g, id: r.bundleId };
+      r = await relay("bundleBatch", { bundles: batch });
     } catch (e) {
-      const plan =
-        e.message && e.message.toLowerCase().includes("plan")
-          ? " — bundles need a Helius API key on a plan with bundle access"
-          : "";
-      onLog({ type: "err", msg: `W${waveNo} BUNDLE_SUBMIT_FAIL: ${e.message}${plan}` });
-      return { txs: g, id: null };
+      onLog({ type: "err", msg: `W${waveNo} BUNDLE_SUBMIT_FAIL: ${e.message}` });
+      r = { results: [] };
     }
-  });
+    const br = r.results || [];
+    for (let i = 0; i < batch.length; i++) {
+      const res = br[i];
+      if (res?.bundleId) {
+        submitted.push({ txs: batch[i], id: res.bundleId });
+      } else {
+        const plan =
+          res?.error && res.error.toLowerCase().includes("plan")
+            ? " — bundles need a Helius API key on a plan with bundle access"
+            : "";
+        onLog({ type: "err", msg: `W${waveNo} BUNDLE_SUBMIT_FAIL: ${res?.error || "unknown"}${plan}` });
+        submitted.push({ txs: batch[i], id: null });
+      }
+    }
+  }
 
   // Poll landing. getBundleStatuses returns null until the bundle lands; a
   // landed bundle is all-or-nothing success (a failing tx means the whole
@@ -232,7 +246,7 @@ export async function executeCrank(
       type: "info",
       msg: `WAVE ${waveNo}/${totalWaves} :: ${txs.length} tx(s) :: simulating...`,
     });
-    const sims = await mapLimit(txs, 8, (t) => simulate(t));
+    const sims = await simulateMany(txs);
     const passing = [];
     for (let j = 0; j < txs.length; j++) {
       const sim = sims[j];

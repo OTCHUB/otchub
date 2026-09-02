@@ -300,6 +300,42 @@ async function simulate(tx) {
   }
 }
 
+// Batched simulation: one relay invocation per ~25 txs instead of one per tx
+// — far fewer round trips (latency + invocation overhead) on big runs. Each
+// item has the same result shape as simulate().
+export async function simulateMany(txs) {
+  const out = [];
+  for (let i = 0; i < txs.length; i += 25) {
+    const b64s = txs
+      .slice(i, i + 25)
+      .map((t) =>
+        t.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64")
+      );
+    const r = await relay("simulateBatch", { txs: b64s });
+    for (const s of r.results || []) {
+      out.push(
+        s && s.err
+          ? { ok: false, err: s.err, logs: s.logs || [] }
+          : { ok: true, units: s?.units, logs: s?.logs || [] }
+      );
+    }
+  }
+  return out;
+}
+
+// Batched broadcast of already-signed base64 txs — one relay invocation per
+// ~20 txs. Each item is { ok: true, sig } or { ok: false, reason }.
+export async function sendMany(b64s) {
+  const out = [];
+  for (let i = 0; i < b64s.length; i += 20) {
+    const r = await relay("sendBatch", { txs: b64s.slice(i, i + 20) });
+    for (const s of r.results || []) {
+      out.push(s?.sig ? { ok: true, sig: s.sig } : { ok: false, reason: s?.error || "send failed" });
+    }
+  }
+  return out;
+}
+
 // Execute a list of (already-built) transactions: simulate -> sign -> send.
 // `signTransactionRaw(tx)` returns signed serialized bytes (Uint8Array); it
 // delegates to the connected wallet (injected or Wallet Standard) and never
@@ -425,7 +461,7 @@ export async function executeClaimTxsBatch(txs, signAllTransactionsRaw, onLog) {
   if (!txs || !txs.length) return results;
 
   onLog({ type: "info", msg: `SIM :: ${txs.length} tx(s)...` });
-  const sims = await mapLimit(txs, 8, (t) => simulate(t));
+  const sims = await simulateMany(txs);
   const passing = [];
   for (let i = 0; i < txs.length; i++) {
     const sim = sims[i];
@@ -463,17 +499,11 @@ export async function executeClaimTxsBatch(txs, signAllTransactionsRaw, onLog) {
   onLog({ type: "info", msg: `WALLET_SIGNED :: ${signed.length} tx(s). Broadcasting...` });
 
   onLog({ type: "info", msg: `SEND :: ${passing.length} tx(s)...` });
-  const sends = await mapLimit(signed, 8, (bytes, i) =>
-    withTimeout(relay("send", { tx: Buffer.from(bytes).toString("base64") }), 60000, `TX ${passing[i].idx + 1} broadcast`)
-      .then((r) => {
-        onLog({ type: "ok", msg: `TX ${passing[i].idx + 1} SENT ${r.sig}`, sig: r.sig });
-        return { ok: true, sig: r.sig };
-      })
-      .catch((e) => {
-        onLog({ type: "err", msg: `TX ${passing[i].idx + 1} SEND_FAIL: ${e.message}` });
-        return { ok: false, reason: e.message };
-      })
-  );
+  const sends = await sendMany(signed.map((bytes) => Buffer.from(bytes).toString("base64")));
+  sends.forEach((s, i) => {
+    if (s.ok) onLog({ type: "ok", msg: `TX ${passing[i].idx + 1} SENT ${s.sig}`, sig: s.sig });
+    else onLog({ type: "err", msg: `TX ${passing[i].idx + 1} SEND_FAIL: ${s.reason}` });
+  });
   for (let i = 0; i < passing.length; i++) {
     const s = sends[i];
     if (s.ok) results.push({ ok: true, sig: s.sig });
@@ -521,7 +551,7 @@ export async function executeClaimChunked(
     const txs = await packTxs(groupIxs, user, fee); // fresh blockhash per group
     onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${txs.length} tx(s) :: simulating...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "sim", desks: [], signaturesLeft: totalGroups - groupNo + 1 });
-    const sims = await mapLimit(txs, 8, (t) => simulate(t));
+    const sims = await simulateMany(txs);
     const passing = [];
     for (let j = 0; j < txs.length; j++) {
       const sim = sims[j];
@@ -792,7 +822,7 @@ async function resolveDistCounts(pairs, user, onLog) {
     user,
     blockhash
   );
-  const packedSims = await mapLimit(packed.txs, 8, (t) => simulate(t));
+  const packedSims = await simulateMany(packed.txs);
   const drillIdx = [];
   let fastOk = 0;
   for (let ti = 0; ti < packed.txs.length; ti++) {
@@ -817,7 +847,7 @@ async function resolveDistCounts(pairs, user, onLog) {
   // Phase B: iterative N=1..MAX for drill candidates (dedup, first-seen order).
   let active = [...new Set(drillIdx)];
   for (let n = 1; n <= MAX_RESOLVE_N && active.length; n++) {
-    const sims = await mapLimit(active, 10, (idx) => {
+    const probeTxs = active.map((idx) => {
       const p = pairs[idx];
       const tx = new Transaction();
       tx.feePayer = userPk;
@@ -825,8 +855,9 @@ async function resolveDistCounts(pairs, user, onLog) {
       tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }));
       for (let i = 0; i < n; i++) tx.add(p.distIx);
       tx.add(p.claimIx);
-      return simulate(tx);
+      return tx;
     });
+    const sims = await simulateMany(probeTxs);
     const stillActive = [];
     let okCount = 0;
     let nothingCount = 0;
@@ -1022,7 +1053,7 @@ export async function executePairedClaim(
       desks,
       signaturesLeft: totalGroups - groupNo + 1,
     });
-    const sims = await mapLimit(groupTxs, 8, (t) => simulate(t));
+    const sims = await simulateMany(groupTxs);
     const passing = [];
     for (let j = 0; j < groupTxs.length; j++) {
       const sim = sims[j];
