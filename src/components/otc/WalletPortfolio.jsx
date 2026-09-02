@@ -49,22 +49,28 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
 
   useEffect(() => load(), [load]);
 
-  // LIFETIME_EARN: authoritative — decoded from the wallet's real on-chain
-  // OTC claim transactions (server-cached, incremental scan).
-  useEffect(() => {
-    let active = true;
-    base44.functions
-      .invoke("getLifetimeClaims", { wallet: address })
-      .then((r) => {
-        if (active && r?.data && !r.data.error) setLifetime(r.data);
-      })
-      .catch(() => {
-        /* lifetime stays hidden on failure */
-      });
-    return () => {
-      active = false;
-    };
-  }, [address]);
+  // LIFETIME_EARN: authoritative — seeded instantly from the persisted ClaimLog
+  // DB, then kept current by an incremental on-chain claim scan. Re-fetch with
+  // force after a claim so the new claim is picked up right away.
+  const loadLifetime = React.useCallback(
+    (force) => {
+      let active = true;
+      base44.functions
+        .invoke("getLifetimeClaims", { wallet: address, force: force === true })
+        .then((r) => {
+          if (active && r?.data && !r.data.error) setLifetime(r.data);
+        })
+        .catch(() => {
+          /* lifetime stays hidden on failure */
+        });
+      return () => {
+        active = false;
+      };
+    },
+    [address]
+  );
+
+  useEffect(() => loadLifetime(false), [loadLifetime]);
 
   // Called by ClaimPanel with its live desk-vault scan: the exact on-chain
   // stock amounts a claim would deliver right now, priced at spot.
@@ -163,6 +169,30 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
               accent="text-emerald-400"
             />
           </div>
+          {/* Lifetime earnings per stock (ticker) — amount + live SOL/USD */}
+          {lifetime?.by_stock?.length > 0 && (
+            <div className="mt-2 border border-amber-500/20 p-2">
+              <div className="text-[9px] uppercase tracking-widest text-amber-500/50">
+                LIFETIME :: BY STOCK (AMOUNT · SOL · USD)
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3">
+                {lifetime.by_stock.map((s) => (
+                  <div
+                    key={s.symbol}
+                    className="flex items-center justify-between gap-1 border border-green-500/15 px-1.5 py-1 font-mono text-[9px]"
+                  >
+                    <span className="text-amber-300">{s.symbol}</span>
+                    <span className="truncate text-right">
+                      <span className="text-green-300">{fmtNum(s.amount)}</span>{" "}
+                      <span className="text-green-500/50">
+                        {fmtSol(s.value_sol, 3)} ◎ / {fmtUsd(s.value_usd)}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-3">
             <HoldingsGallery holdings={data.holdings} byStock={data.by_stock?.items} />
           </div>
@@ -170,7 +200,10 @@ export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0
             <ClaimPanel
               address={address}
               holdings={data.holdings}
-              onClaimed={load}
+              onClaimed={() => {
+                load();
+                loadLifetime(true);
+              }}
               onScan={handleScan}
             />
           </div>

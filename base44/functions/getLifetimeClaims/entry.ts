@@ -32,10 +32,11 @@ const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqC
 const STOCKS_BY_MINT = Object.fromEntries(STOCKS.map((s) => [s.mint, s]));
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-// Bump to invalidate caches written by an older parser (e.g. the pre-ATA-scan
-// version, whose by_desk came from a partial 1000-signature window — merging
-// a full rescan into it would double-count).
-const CACHE_VERSION = 2;
+// Bump to invalidate caches written by an older parser. v3 moves the
+// authoritative totals into the ClaimLog DB — markers reset so every wallet
+// gets one full rescan that repopulates ClaimLog, after which reads are
+// instant and scans are incremental again.
+const CACHE_VERSION = 3;
 
 function heliusRpcUrl() {
   return `https://mainnet.helius-rpc.com/?api-key=${secrets.get("HELIUS_API_KEY")}`;
@@ -196,15 +197,35 @@ export default async function (req) {
     const cached = cache?.desks || null;
     const usable = cached?._v === CACHE_VERSION;
 
-    let amountsByDesk = (!force && usable && cached.by_desk)
-      ? structuredClone(cached.by_desk)
-      : {};
+    // Persisted per-claim records (ClaimLog) are the primary store: totals
+    // seed instantly from the DB the moment a wallet connects, and the
+    // on-chain scan below only needs to pick up claims newer than the last
+    // scan markers. New parsed claims are written back so the DB stays the
+    // durable, always-current source.
+    const seenKeys = new Set();
+    const amountsByDesk = {};
+    try {
+      const logs = await base44.asServiceRole.entities.ClaimLog.filter(
+        { wallet },
+        "-created_date",
+        1000
+      );
+      for (const r of logs || []) {
+        if (!r.asset_id || !r.symbol) continue;
+        const d = (amountsByDesk[r.asset_id] ||= {});
+        d[r.symbol] = (d[r.symbol] || 0) + (Number(r.amount) || 0);
+        seenKeys.add(`${r.tx_sig}|${r.symbol}|${r.asset_id}`);
+      }
+    } catch {
+      /* DB read failure -> the on-chain scan below still recovers */
+    }
     let markers = (!force && usable && cached.markers) ? { ...cached.markers } : {};
 
     // Incremental on-chain scan unless the cache is fresh (and not forced).
     const SCAN_TTL_MS = 5 * 60 * 1000;
     const fresh = usable && cached.scanned_at && Date.now() - cached.scanned_at < SCAN_TTL_MS;
     let parsedCount = 0;
+    const newClaims = [];
     if (!fresh || force) {
       const tpMap = await resolveTokenPrograms();
       // Collect un-parsed signatures across all 13 user_stock accounts.
@@ -238,9 +259,30 @@ export default async function (req) {
           if (tx.transactionError) continue;
           const claims = extractClaimsFromTx(tx, wallet);
           for (const c of claims) {
+            const key = `${c.tx_sig}|${c.symbol}|${c.asset_id}`;
+            if (seenKeys.has(key)) continue; // already persisted in ClaimLog
+            seenKeys.add(key);
             const d = (amountsByDesk[c.asset_id] ||= {});
             d[c.symbol] = (d[c.symbol] || 0) + c.amount;
+            newClaims.push({
+              wallet,
+              asset_id: c.asset_id,
+              symbol: c.symbol,
+              mint: c.mint,
+              amount: c.amount,
+              value_usd: 0, // display values are recomputed live from spot
+              value_sol: 0,
+              tx_sig: c.tx_sig,
+            });
           }
+        }
+      }
+      // Persist the newly decoded claims so the next connect reads instantly.
+      if (newClaims.length) {
+        try {
+          await base44.asServiceRole.entities.ClaimLog.bulkCreate(newClaims);
+        } catch {
+          /* best-effort persistence */
         }
       }
       const updated = {
@@ -299,10 +341,30 @@ export default async function (req) {
     }
     byDesk.sort((a, b) => b.value_usd - a.value_usd);
 
+    // Per-stock (ticker) totals: lifetime amount + live SOL/USD value.
+    const perStock = {};
+    for (const amt of Object.values(amountsByDesk)) {
+      for (const [sym, amount] of Object.entries(amt)) {
+        const s = (perStock[sym] ||= { amount: 0, usd: 0 });
+        s.amount += amount;
+        const stock = STOCKS.find((x) => x.symbol === sym);
+        s.usd += amount * (stock ? prices[stock.mint] ?? 0 : 0);
+      }
+    }
+    const byStock = Object.entries(perStock)
+      .map(([symbol, v]) => ({
+        symbol,
+        amount: v.amount,
+        value_usd: v.usd,
+        value_sol: solUsd ? v.usd / solUsd : 0,
+      }))
+      .sort((a, b) => b.value_usd - a.value_usd);
+
     return Response.json({
       ok: true,
       wallet,
       by_desk: byDesk,
+      by_stock: byStock,
       total_usd: totalUsd,
       total_sol: totalSol,
       count: claimCount,
