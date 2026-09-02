@@ -47,8 +47,17 @@ const sendOne = async (tx) => {
 
 export default async function (req) {
   try {
-    // touch client so the request context is initialized (auth/billing)
-    await createClientFromRequest(req);
+    // Auth gate: every relayed call runs against the app's server-side Helius
+    // API key. Without an authenticated-caller check, anonymous traffic could
+    // drain the Helius quota/rate limits (quota abuse) via any mode.
+    const base44 = createClientFromRequest(req);
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch {
+      /* fall through to 401 */
+    }
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const mode = body.mode;
 

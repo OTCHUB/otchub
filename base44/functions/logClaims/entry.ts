@@ -5,13 +5,21 @@
 // The client computes each claim's human amount and claim-time USD/SOL value
 // from a post-claim re-scan delta (authoritative on-chain state) plus live
 // DexScreener prices, then submits the records here. Service-role bulkCreate
-// so it works regardless of whether the viewer is authenticated.
+// requires an authenticated caller: without the auth gate below, anyone could
+// bulk-insert fabricated claim records into ClaimLog.
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch {
+      /* fall through to 401 */
+    }
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json().catch(() => ({}));
     const wallet = (body.wallet || "").trim();
     const claims = Array.isArray(body.claims) ? body.claims : [];
