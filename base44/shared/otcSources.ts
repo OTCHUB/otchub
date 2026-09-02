@@ -71,11 +71,16 @@ export async function fetchSolPriceUsd() {
 // for the DexScreener-derived prices. https://www.helius.dev/docs/das/get-tokens
 export async function fetchDasTokenInfo(tokenMint) {
   try {
-    const result = await heliusRpc("getAsset", [
-      { id: tokenMint, options: { showFungible: true } },
-    ]);
+    // Params as a JSON-RPC object per the DAS docs (array form is rejected).
+    const result = await heliusRpc("getAsset", {
+      id: tokenMint,
+      options: { showFungible: true },
+    });
     const info = result?.token_info;
-    if (!info) return null;
+    if (!info) {
+      console.warn("DAS getAsset returned no token_info for", tokenMint);
+      return null;
+    }
     const decimals = info.decimals ?? 0;
     return {
       symbol: info.symbol || null,

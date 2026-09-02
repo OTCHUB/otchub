@@ -38,17 +38,31 @@ export default async function (req) {
     if (action === "list") {
       const hooks = (await call("", { method: "GET" })) || [];
       const list = Array.isArray(hooks) ? hooks : [];
+      // The LIST endpoint omits accountAddresses, so fetch each webhook's
+      // full config individually to report the addresses it actually fires on.
+      const detailed = await Promise.all(
+        list.map(async (h) => {
+          let addresses = [];
+          try {
+            const full = await call(`/${h.webhookID}`, { method: "GET" });
+            addresses = full?.accountAddresses || [];
+          } catch (e) {
+            /* report what list gave us */
+          }
+          return {
+            id: h.webhookID,
+            url: h.webhookURL,
+            type: h.webhookType,
+            txTypes: h.transactionTypes,
+            addresses,
+          };
+        })
+      );
       return Response.json({
         ok: true,
         total: list.length,
         ours: list.filter((h) => h.webhookURL === WEBHOOK_URL).length,
-        webhooks: list.map((h) => ({
-          id: h.webhookID,
-          url: h.webhookURL,
-          type: h.webhookType,
-          txTypes: h.transactionTypes,
-          addresses: h.accountAddresses || [],
-        })),
+        webhooks: detailed,
       });
     }
 
@@ -64,6 +78,34 @@ export default async function (req) {
         txTypes: h?.transactionTypes,
         addresses: h?.accountAddresses ?? null,
       });
+    }
+
+    if (action === "update") {
+      const id = reqArgs.id;
+      if (!id) return Response.json({ error: "id required" }, { status: 400 });
+      const updated = await call(`/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          webhookURL: WEBHOOK_URL,
+          transactionTypes: ["ANY"],
+          accountAddresses: WATCH_ADDRESSES,
+          webhookType: "enhanced",
+          authHeader: apiKey,
+        }),
+      });
+      return Response.json({
+        ok: true,
+        id: updated?.webhookID || null,
+        addresses: updated?.accountAddresses || [],
+      });
+    }
+
+    if (action === "delete") {
+      const id = reqArgs.id;
+      if (!id) return Response.json({ error: "id required" }, { status: 400 });
+      await call(`/${id}`, { method: "DELETE" });
+      return Response.json({ ok: true, deleted: id });
     }
 
     if (action === "create") {
