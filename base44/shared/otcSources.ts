@@ -91,6 +91,7 @@ export async function fetchDasTokenInfo(tokenMint) {
         : null,
     };
   } catch (e) {
+    console.warn("DAS getAsset failed:", e?.message || e);
     return null;
   }
 }
