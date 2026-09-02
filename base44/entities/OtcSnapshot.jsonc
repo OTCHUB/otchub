@@ -99,10 +99,10 @@
       "type": "string"
     },
     "by_stock": {
-      "type": "array"
+      "type": "object"
     },
     "per_desk": {
-      "type": "array"
+      "type": "object"
     }
   },
   "required": []
