@@ -669,54 +669,188 @@ export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
   return pairs;
 }
 
-// Pack WHOLE pairs into transactions (a pair is never split across txs). Each
-// tx = compute-budget ixs + N whole distribute/claim pairs. The blockhash is
-// passed in so each group can be packed with a FRESH blockhash right before
-// signing — packing ALL groups with one blockhash lets later groups sign/send
-// against an expired blockhash (Solana blockhashes are valid ~60-90s), so every
-// tx in those groups 500s on broadcast.
-function packPairedTxs(pairs, user, blockhash) {
-  const userPk = new PublicKey(user);
-  const newTx = () => {
-    const tx = new Transaction();
-    tx.feePayer = userPk;
-    tx.recentBlockhash = blockhash;
-    tx.add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
-    );
-    return tx;
-  };
-  const txs = [];
-  let cur = null;
-  for (const p of pairs) {
-    const distIx = p.distIx;
-    const claimIx = p.claimIx;
-    if (!cur) {
-      cur = newTx();
-      txs.push(cur);
-    }
-    cur.add(distIx, claimIx);
-    if (cur.serializeMessage().length > MAX_MSG_BYTES) {
-      // this pair didn't fit; move it to its own fresh tx
-      cur.instructions.pop();
-      cur.instructions.pop();
-      cur = newTx();
-      txs.push(cur);
-      cur.add(distIx, claimIx);
-    }
-  }
-  return txs;
+// distribute(slot) advances a desk ONE coin/round at a time for that slot
+// (verified against the live program: a desk behind R rounds needs R distribute
+// calls before its claim clears UndistributedBalance 6022). So the "atomic
+// [distribute, claim] per ticker" fast path only works for desks already
+// current (1 round). For desks behind multiple rounds we must emit N
+// distributes before the claim. N is found by simulating [dist×N, claim] at
+// increasing N — UNSIGNED, so it costs no fee and needs no wallet prompt:
+//   OK              → claimable with N distributes
+//   6025 NothingToWithdraw → vault has nothing accrued to withdraw (skip)
+//   6022 at cap     → still >MAX rounds behind (skip; retry after more buybacks)
+//   other error    → skip
+const MAX_RESOLVE_N = 8;
+
+function errCode(sim) {
+  if (typeof sim.err !== "string") return null;
+  const m = sim.err.match(/Custom":(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
-// Execute atomic distribute+claim pairs. Pairs are split into groups; each
-// group gets a FRESH blockhash (so later groups don't broadcast against an
-// expired one), is simulated in parallel, signed with ONE signAll prompt,
-// then sent SEQUENTIALLY. Sequential send matters because pairs are
-// desk-ordered, so several txs in a group usually write the SAME desk vault
-// PDA — Solana can only land one write to an account per block, so sending
-// them in parallel silently drops the conflicts (accepted but never
-// confirms). Sequential submit lets them land in order, one per block.
+// Probe each ticker for the minimum distribute count that makes its claim
+// simulate OK. Returns per-pair distCount (0 = not claimable) and an
+// unclaimable flag. Phase A packs all pairs at distCount=1 and sims the packed
+// txs (a handful of sims, fast) — passing txs resolve all their tickers at 1.
+// Only the tickers in failing txs are then drilled individually at N=2..MAX.
+async function resolveDistCounts(pairs, user, onLog) {
+  const userPk = new PublicKey(user);
+  const bh = await relay("blockhash");
+  const blockhash = bh.blockhash;
+  const distCounts = new Array(pairs.length).fill(0);
+  const unclaimable = new Array(pairs.length).fill(false);
+
+  // Phase A: pack at distCount=1, sim packed txs.
+  const packed = packPairedTxs(
+    pairs.map((p) => ({ ...p, distCount: 1 })),
+    user,
+    blockhash
+  );
+  const packedSims = await mapLimit(packed.txs, 8, (t) => simulate(t));
+  const drillIdx = [];
+  let fastOk = 0;
+  for (let ti = 0; ti < packed.txs.length; ti++) {
+    const sim = packedSims[ti];
+    const members = packed.members[ti];
+    if (sim.ok) {
+      for (const idx of members) {
+        distCounts[idx] = 1;
+        fastOk++;
+      }
+    } else {
+      // a failing packed tx usually means at least one member is behind >1 round
+      // (or unclaimable) — drill each member individually.
+      drillIdx.push(...members);
+    }
+  }
+  onLog({
+    type: "info",
+    msg: `RESOLVE :: ${fastOk} ticker(s) current (1 distribute); probing ${drillIdx.length} behind (cap ${MAX_RESOLVE_N})...`,
+  });
+
+  // Phase B: iterative N=1..MAX for drill candidates (dedup, first-seen order).
+  let active = [...new Set(drillIdx)];
+  for (let n = 1; n <= MAX_RESOLVE_N && active.length; n++) {
+    const sims = await mapLimit(active, 10, (idx) => {
+      const p = pairs[idx];
+      const tx = new Transaction();
+      tx.feePayer = userPk;
+      tx.recentBlockhash = blockhash;
+      tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }));
+      for (let i = 0; i < n; i++) tx.add(p.distIx);
+      tx.add(p.claimIx);
+      return simulate(tx);
+    });
+    const stillActive = [];
+    let okCount = 0;
+    let nothingCount = 0;
+    let otherCount = 0;
+    active.forEach((idx, i) => {
+      const s = sims[i];
+      const code = errCode(s);
+      if (s.ok) {
+        distCounts[idx] = n;
+        okCount++;
+      } else if (code === 6022) {
+        stillActive.push(idx);
+      } else if (code === 6025) {
+        unclaimable[idx] = true;
+        nothingCount++;
+      } else {
+        unclaimable[idx] = true;
+        otherCount++;
+      }
+    });
+    onLog({
+      type: "info",
+      msg: `RESOLVE n=${n} :: +${okCount} claimable, ${nothingCount} nothing-to-withdraw, ${otherCount} other, ${stillActive.length} still behind.`,
+    });
+    active = stillActive;
+  }
+  // anything still 6022 at the cap is too far behind to claim now
+  active.forEach((idx) => {
+    unclaimable[idx] = true;
+  });
+  if (active.length) {
+    onLog({
+      type: "info",
+      msg: `RESOLVE :: ${active.length} ticker(s) >${MAX_RESOLVE_N} rounds behind — skipped (retry later).`,
+    });
+  }
+  return { distCounts, unclaimable };
+}
+
+// Pack whole pairs into transactions (a pair is never split across txs). Each
+// pair carries distCount = how many distribute(slot) calls must precede its
+// claim (1 for a current desk, more for a desk behind multiple rounds). Packed
+// by serialized message size AND compute budget — extended pairs (many dists)
+// are bigger and cost more CU, so fewer fit per tx. Returns {txs, members}
+// where members[ti] is the list of pair indices packed into tx ti (used by the
+// resolve probe to attribute packed-sim results to individual tickers).
+function packPairedTxs(pairs, user, blockhash) {
+  const userPk = new PublicKey(user);
+  const CU_PER_DIST = 40_000;
+  const CU_PER_CLAIM = 120_000;
+  const CU_BASE = 30_000;
+  const MAX_CU = 1_000_000;
+  const txs = [];
+  const members = [];
+  let cur = null;
+  let curCu = 0;
+  let curMembers = null;
+  const start = () => {
+    cur = new Transaction();
+    cur.feePayer = userPk;
+    cur.recentBlockhash = blockhash;
+    cur.add(ComputeBudgetProgram.setComputeUnitLimit({ units: MAX_CU }));
+    cur.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }));
+    curCu = CU_BASE;
+    curMembers = [];
+  };
+  const flush = () => {
+    if (cur) {
+      cur.instructions[0] = ComputeBudgetProgram.setComputeUnitLimit({
+        units: Math.min(MAX_CU, curCu),
+      });
+      txs.push(cur);
+      members.push(curMembers);
+    }
+    cur = null;
+  };
+  for (let pi = 0; pi < pairs.length; pi++) {
+    const p = pairs[pi];
+    const n = p.distCount || 1;
+    if (!cur) start();
+    const beforeCount = cur.instructions.length;
+    for (let i = 0; i < n; i++) cur.add(p.distIx);
+    cur.add(p.claimIx);
+    const pairCu = n * CU_PER_DIST + CU_PER_CLAIM;
+    const overflow =
+      cur.serializeMessage().length > MAX_MSG_BYTES || curCu + pairCu > MAX_CU;
+    if (overflow) {
+      // didn't fit — undo this pair and start a fresh tx for it
+      cur.instructions.length = beforeCount;
+      flush();
+      start();
+      for (let i = 0; i < n; i++) cur.add(p.distIx);
+      cur.add(p.claimIx);
+    }
+    curCu += pairCu;
+    curMembers.push(pi);
+  }
+  flush();
+  return { txs, members };
+}
+
+// Execute atomic distribute+claim pairs. First probe each ticker for how many
+// distributes it needs (no wallet prompt), drop the unclaimable ones, then
+// pack the rest into txs split into signAll groups; each group gets a FRESH
+// blockhash, is simulated, signed with ONE prompt, then sent SEQUENTIALLY.
+// Sequential send matters because pairs are desk-ordered, so several txs in a
+// group usually write the SAME desk vault PDA — Solana can only land one write
+// to an account per block, so sending them in parallel silently drops the
+// conflicts (accepted but never confirms). Sequential submit lets them land in
+// order, one per block.
 export async function executePairedClaim(
   pairs,
   user,
@@ -730,24 +864,72 @@ export async function executePairedClaim(
     onLog({ type: "info", msg: "Nothing to do — no claimable pairs." });
     return results;
   }
-  const totalGroups = Math.ceil(pairs.length / pairsPerGroup);
+
   onLog({
     type: "info",
-    msg: `PAIRED :: ${pairs.length} pair(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+    msg: `RESOLVE :: probing distribute count per ticker (cap ${MAX_RESOLVE_N})...`,
   });
-  onProgress?.({ group: 0, totalGroups, phase: "start", desks: [], signaturesLeft: totalGroups });
+  onProgress?.({
+    group: 0,
+    totalGroups: 0,
+    phase: "resolve",
+    desks: [],
+    signaturesLeft: 0,
+  });
+  const { distCounts, unclaimable } = await resolveDistCounts(pairs, user, onLog);
+  const goodPairs = [];
+  let skippedCount = 0;
+  for (let i = 0; i < pairs.length; i++) {
+    if (unclaimable[i] || !distCounts[i]) {
+      skippedCount++;
+      results.push({ ok: false, reason: "unclaimable" });
+      continue;
+    }
+    goodPairs.push({ ...pairs[i], distCount: distCounts[i] });
+  }
+  const totalDists = goodPairs.reduce((a, p) => a + p.distCount, 0);
+  onLog({
+    type: "info",
+    msg: `PAIRS :: ${goodPairs.length} claimable ticker(s), ${totalDists} distribute(s) total :: ${skippedCount} skipped.`,
+  });
+  if (!goodPairs.length) {
+    onLog({ type: "err", msg: "Nothing claimable after resolve." });
+    return results;
+  }
+
+  const totalGroups = Math.ceil(goodPairs.length / pairsPerGroup);
+  onLog({
+    type: "info",
+    msg: `PAIRED :: ${goodPairs.length} ticker(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+  });
+  onProgress?.({
+    group: 0,
+    totalGroups,
+    phase: "start",
+    desks: [],
+    signaturesLeft: totalGroups,
+  });
   for (let g = 0; g < totalGroups; g++) {
     const groupNo = g + 1;
-    const groupPairs = pairs.slice(g * pairsPerGroup, (g + 1) * pairsPerGroup);
+    const groupPairs = goodPairs.slice(g * pairsPerGroup, (g + 1) * pairsPerGroup);
     // Distinct desk names covered by this signing group, in first-seen order —
     // shown in the progress UI so the user knows which desks are signing now.
     const desks = [...new Set(groupPairs.map((p) => p.deskName))];
     // Fresh blockhash per group — one blockhash for all groups expires before
     // later groups are signed/sent, causing every tx in them to 500 on send.
     const bh = await relay("blockhash");
-    const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash);
-    onLog({ type: "info", msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: ${desks.length} desk(s) :: simulating...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sim", desks, signaturesLeft: totalGroups - groupNo + 1 });
+    const groupTxs = packPairedTxs(groupPairs, user, bh.blockhash).txs;
+    onLog({
+      type: "info",
+      msg: `GROUP ${groupNo}/${totalGroups} :: ${groupTxs.length} tx(s) :: ${desks.length} desk(s) :: simulating...`,
+    });
+    onProgress?.({
+      group: groupNo,
+      totalGroups,
+      phase: "sim",
+      desks,
+      signaturesLeft: totalGroups - groupNo + 1,
+    });
     const sims = await mapLimit(groupTxs, 8, (t) => simulate(t));
     const passing = [];
     for (let j = 0; j < groupTxs.length; j++) {
@@ -769,13 +951,25 @@ export async function executePairedClaim(
       onLog({ type: "err", msg: `GROUP ${groupNo} :: all sims failed — skipping.` });
       continue;
     }
-    onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "sign", desks, signaturesLeft: totalGroups - groupNo + 1 });
+    onLog({
+      type: "info",
+      msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...`,
+    });
+    onProgress?.({
+      group: groupNo,
+      totalGroups,
+      phase: "sign",
+      desks,
+      signaturesLeft: totalGroups - groupNo + 1,
+    });
     let signed;
     try {
       signed = await signAllTransactionsRaw(passing);
     } catch (e) {
-      onLog({ type: "err", msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message || "user rejected the prompt"}` });
+      onLog({
+        type: "err",
+        msg: `GROUP ${groupNo} SIGN_REJECTED: ${e.message || "user rejected the prompt"}`,
+      });
       for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "rejected" });
       break;
     }
@@ -784,8 +978,17 @@ export async function executePairedClaim(
       for (let k = 0; k < passing.length; k++) results.push({ ok: false, reason: "bad-sign" });
       continue;
     }
-    onLog({ type: "info", msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...` });
-    onProgress?.({ group: groupNo, totalGroups, phase: "send", desks, signaturesLeft: totalGroups - groupNo });
+    onLog({
+      type: "info",
+      msg: `GROUP ${groupNo} :: WALLET_SIGNED :: sending ${signed.length} tx(s) sequentially...`,
+    });
+    onProgress?.({
+      group: groupNo,
+      totalGroups,
+      phase: "send",
+      desks,
+      signaturesLeft: totalGroups - groupNo,
+    });
     for (let k = 0; k < signed.length; k++) {
       try {
         const r = await withTimeout(

@@ -241,7 +241,9 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     : Math.ceil(totalClaimable / 60) || 0;
   const phaseLabel = busy
     ? progress
-      ? `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()} · ${progress.signaturesLeft ?? ""}SIG`
+      ? progress.phase === "resolve"
+        ? "RESOLVING…"
+        : `G${progress.group}/${progress.totalGroups} ${progress.phase.toUpperCase()} · ${progress.signaturesLeft ?? ""}SIG`
       : "PROCESSING…"
     : pullOwed
     ? "PULL_OWED + CLAIM"
@@ -272,12 +274,13 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       </div>
 
       <p className="mt-2 text-[9px] leading-snug text-green-500/40">
-        Default builds one atomic distribute+claim tx per claimable ticker (its claim depends only on
-        its own distribute in the same tx), so txs are independent — signed in a few large batches
-        and sent in parallel. PULL_OWED ON instead opens missing accounts and distributes ALL slots
-        per desk first to pull the full owed backlog into empty vaults (more approvals; run
-        occasionally). Every tx is simulated first; a failing sim is skipped (no fee spent). The
-        program enforces you own the NFT.
+        Default first probes each ticker (unsigned, no fee) to find how many distribute calls it
+        needs — a desk behind R rounds needs R distributes before its claim clears, so the right
+        count is packed with each claim. Tickers with nothing to withdraw, or too far behind, are
+        skipped automatically. Each tx is then simulated, signed in a few large batches, and sent.
+        PULL_OWED ON instead opens missing accounts and distributes ALL slots per desk first (more
+        approvals; run occasionally). Every tx is simulated first; a failing sim is skipped (no fee
+        spent). The program enforces you own the NFT.
       </p>
 
       {Object.keys(lifetime).length > 0 && (() => {
@@ -448,19 +451,21 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         <div className="mt-2 border border-emerald-500/40 bg-emerald-500/5 p-2">
           <div className="flex items-center justify-between font-mono text-[10px]">
             <span className="text-emerald-300">
-              {progress.phase === "start"
+              {progress.phase === "resolve"
+                ? "RESOLVING TICKERS…"
+                : progress.phase === "start"
                 ? `INIT · ${progress.totalGroups} GROUP(S)`
                 : `GROUP ${progress.group}/${progress.totalGroups} · ${progress.phase.toUpperCase()}`}
             </span>
             <span className="text-cyan-300">
-              {progress.signaturesLeft} SIG LEFT
+              {progress.phase === "resolve" ? "PROBING" : `${progress.signaturesLeft} SIG LEFT`}
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full bg-green-500/10">
             <div
-              className="h-full bg-emerald-400 transition-all duration-300"
+              className={`h-full bg-emerald-400 ${progress.phase === "resolve" ? "animate-pulse" : "transition-all duration-300"}`}
               style={{
-                width: `${progress.totalGroups ? Math.min(100, (progress.group / progress.totalGroups) * 100) : 0}%`,
+                width: `${progress.phase === "resolve" ? 100 : progress.totalGroups ? Math.min(100, (progress.group / progress.totalGroups) * 100) : 0}%`,
               }}
             />
           </div>
