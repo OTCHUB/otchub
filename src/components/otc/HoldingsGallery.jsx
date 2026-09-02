@@ -4,12 +4,15 @@ import { fmtSol, fmtUsd } from "@/lib/format";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
 import HelpNote from "@/components/otc/HelpNote";
+import Pager from "@/components/otc/Pager";
 
 const ME_BASE = "https://magiceden.io/item-details";
+const PAGE_SIZE = 12;
 
 export default function HoldingsGallery({ holdings, byStock }) {
   const [mode, setMode] = useState("SNIPE");
   const [sel, setSel] = useState(null);
+  const [pageNo, setPageNo] = useState(0);
 
   const all = holdings || [];
   const listed = all.filter((h) => h.is_listed && h.listing_price_sol != null);
@@ -45,7 +48,12 @@ export default function HoldingsGallery({ holdings, byStock }) {
   const snipes = withSpread(listed.filter((h) => hasRealStock(h))).sort(
     (a, b) => b.spread_sol - a.spread_sol
   );
-  const list = (mode === "LISTED" ? byPriceAsc : mode === "STOCK" ? byStockDesc : snipes).slice(0, 60);
+  // Full sorted dataset for the active mode; the gallery shows ONE page at a
+  // time so the panel keeps its allocated space no matter how big holdings get.
+  const full = mode === "LISTED" ? byPriceAsc : mode === "STOCK" ? byStockDesc : snipes;
+  const pages = Math.max(1, Math.ceil(full.length / PAGE_SIZE));
+  const page = Math.min(pageNo, pages - 1);
+  const list = full.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -62,7 +70,10 @@ export default function HoldingsGallery({ holdings, byStock }) {
           {["LISTED", "STOCK", "SNIPE"].map((m, i) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => {
+                setMode(m);
+                setPageNo(0);
+              }}
               className={`min-h-[36px] px-3 font-mono text-[10px] ${i > 0 ? "border-l border-green-500/30" : ""} ${mode === m ? "bg-emerald-500/15 text-emerald-400" : "text-green-500/60 hover:text-green-400"}`}
             >
               {m}
@@ -137,6 +148,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
         })}
         {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">NO_DATA</div>}
       </div>
+      <Pager page={page} pages={pages} onPage={setPageNo} total={full.length} label="DESKS" />
       <HoldingsDetail h={sel} byStock={byStock} onClose={() => setSel(null)} />
     </div>
   );
