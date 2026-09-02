@@ -44,7 +44,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
               <div className="border-t border-green-500/20 p-1.5">
                 <div className="truncate font-mono text-[10px] text-green-300">{h.name}</div>
                 <div className="font-mono text-[9px] text-green-500/60">STOCK {fmtSol(h.accrued_value_sol, 3)} · {fmtUsd(h.accrued_value_usd, 2)}</div>
-                {h.is_listed && h.listing_price_sol != null && <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : "text-amber-400/70"}`}>DELTA(B+STK) {fmtSol(spread, 3)}</div>}
+                {h.is_listed && h.listing_price_sol != null && <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : "text-amber-400/70"}`}>NET(STK−LST) {fmtSol(spread, 3)}</div>}
               </div>
             </button>
           );

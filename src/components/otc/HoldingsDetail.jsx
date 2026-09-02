@@ -39,8 +39,13 @@ export default function HoldingsDetail({ h, byStock, onClose }) {
             {h.is_listed && h.listing_price_sol != null && (
               <>
                 <div className="text-green-500/50">LISTING: <span className="text-amber-400">{fmtSol(h.listing_price_sol, 3)}</span> · {fmtUsd(h.listing_price_usd, 2)}</div>
+                <div className="text-green-500/50">
+                  EFF_BUY_COST: <span className={snipe ? "text-emerald-400" : "text-amber-400"}>
+                    {fmtSol(h.listing_price_sol - h.accrued_value_sol, 4)}
+                  </span> · {fmtUsd((h.listing_price_usd || 0) - (h.accrued_value_usd || 0), 2)} <span className="text-green-500/40">(listing − stock)</span>
+                </div>
                 <div className={snipe ? "text-emerald-400" : "text-amber-400/70"}>
-                  DELTA (BUY+STK): {fmtSol(spread, 4)} · {fmtUsd((h.accrued_value_usd || 0) - (h.listing_price_usd || 0), 2)} {snipe ? "[SNIPE]" : ""}
+                  NET (STK − LST): {fmtSol(spread, 4)} · {fmtUsd((h.accrued_value_usd || 0) - (h.listing_price_usd || 0), 2)} {snipe ? "[SNIPE]" : ""}
                 </div>
               </>
             )}

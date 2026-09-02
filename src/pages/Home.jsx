@@ -165,7 +165,7 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <ArbitrageCard latest={latest} />
+            <ArbitrageCard latest={latest} holdings={data?.holdings} />
           </div>
           <ProtocolPanel latest={latest} />
         </div>
