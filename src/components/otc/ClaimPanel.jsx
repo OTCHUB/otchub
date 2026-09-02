@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import { buildClaimInstructions, packTxs, executeClaimTxs } from "@/lib/otcClaim";
+import { buildClaimInstructions, buildActivateInstructions, packTxs, executeClaimTxs } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -206,8 +206,52 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     }
   };
 
+  const runActivate = async (allDesks) => {
+    const signer = getSignerForAddress(address);
+    if (!signer) {
+      log({ type: "err", msg: "No signing wallet connected for this address." });
+      return;
+    }
+    const targets = allDesks ? plan : plan.filter((d) => selected.has(d.asset_id));
+    if (!targets || !targets.length) {
+      log({ type: "err", msg: "Nothing selected — scan first." });
+      return;
+    }
+    const toActivate = [];
+    for (const d of targets) {
+      for (const t of d.tickers || []) if (!t.exists) toActivate.push(t);
+    }
+    if (!toActivate.length) {
+      log({ type: "info", msg: "All tickers already open on selected desks." });
+      return;
+    }
+    setBusy(true);
+    try {
+      log({ type: "info", msg: `Building activate ixs for ${toActivate.length} ticker(s)...` });
+      const ixs = await buildActivateInstructions(targets, address, tpMap);
+      log({ type: "info", msg: `Packing ${ixs.length} instruction(s)...` });
+      const txs = await packTxs(ixs, address);
+      log({ type: "info", msg: `${txs.length} transaction(s) to submit.` });
+      const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
+      const ok = results.filter((r) => r.ok).length;
+      const fail = results.length - ok;
+      log({ type: fail ? "err" : "ok", msg: `ACTIVATE DONE: ${ok} confirmed, ${fail} failed.` });
+      if (ok > 0) {
+        await scan({ force: true, silent: true });
+        if (onClaimed) onClaimed();
+      }
+    } catch (e) {
+      log({ type: "err", msg: `ACTIVATE_ABORT: ${e.message}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const totalClaimable = plan
     ? plan.reduce((a, d) => a + d.claimable.length, 0)
+    : 0;
+  const totalNeedsActivation = plan
+    ? plan.reduce((a, d) => a + (d.tickers || []).filter((t) => !t.exists).length, 0)
     : 0;
 
   const selectedDesks = plan ? plan.filter((d) => selected.has(d.asset_id)) : [];
@@ -317,6 +361,14 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
                     >
                       {deskPlan.claimable.length} CLAIMABLE
                     </div>
+                    {(() => {
+                      const need = (deskPlan.tickers || []).filter((t) => !t.exists).length;
+                      return need > 0 ? (
+                        <div className="font-mono text-[8px] leading-tight text-cyan-500/70">
+                          {need} NEEDS ACTIVATE
+                        </div>
+                      ) : null;
+                    })()}
                   </>
                 ) : (
                   <div className="font-mono text-[9px] text-green-500/30">SCAN…</div>
@@ -360,10 +412,29 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         >
           {busy ? "CLAIMING..." : "[CLAIM_ALL_DESKS]"}
         </button>
+        <button
+          onClick={() => runActivate(false)}
+          disabled={!plan || busy || !totalNeedsActivation}
+          className="border border-cyan-500/50 px-2.5 py-1 text-[10px] text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-30"
+        >
+          {busy ? "..." : "[ACTIVATE_SELECTED]"}
+        </button>
+        <button
+          onClick={() => runActivate(true)}
+          disabled={!plan || busy || !totalNeedsActivation}
+          className="border border-cyan-500/70 px-2.5 py-1 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-30"
+        >
+          {busy ? "..." : "[ACTIVATE_ALL_DESKS]"}
+        </button>
       </div>
       {plan && (
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-green-500/60">
           <span>{totalClaimable} claimable ticker(s)</span>
+          {totalNeedsActivation > 0 && (
+            <span className="text-cyan-400">
+              {totalNeedsActivation} ticker(s) need activation
+            </span>
+          )}
           {selectedDesks.length > 0 && (
             <span className="text-emerald-400">
               SELECTED {selectedDesks.length} :: {fmtSol(selectedSol, 4)} · {fmtUsd(selectedUsd)}

@@ -41,6 +41,8 @@ const SYSTEM_PROGRAM_ID = new PublicKey(
 );
 
 const CLAIM_DISC = Buffer.from([62, 198, 214, 193, 213, 159, 108, 210]);
+const OPEN_DISC = Buffer.from([146, 211, 204, 136, 189, 212, 73, 196]);
+const OPEN_EXT_DISC = Buffer.from([218, 121, 110, 45, 87, 244, 170, 225]);
 
 export const STOCKS = [
   { index: 0, symbol: "ANDURIL", mint: "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB", decimals: 9, extended: false },
@@ -302,6 +304,53 @@ export async function buildClaimInstructions(deskPlans, user, tokenProgramMap) {
   for (const d of deskPlans) {
     for (const t of d.claimable) {
       ixs.push(buildClaimIx(user, d.asset_id, t, tokenProgramMap));
+    }
+  }
+  return ixs;
+}
+
+// open_ticker_account(index) / open_ticker_account_ext(index): creates the
+// desk vault's stock token account (nft_stock PDA) for a ticker so the desk
+// can accrue that ticker's distributions. Required when a new ticker is added
+// to the lineup and an existing desk hasn't been activated for it yet. Same
+// accounts as claim minus user_stock (we create the vault account, not the
+// user's). Simulated before signing like claim, so a wrong account list fails
+// safely at sim time.
+function buildOpenTickerIx(user, assetId, ticker, tokenProgramMap) {
+  const userPk = new PublicKey(user);
+  const assetPk = new PublicKey(assetId);
+  const vault = vaultPda(assetPk);
+  const tp = new PublicKey(tokenProgramMap[ticker.mint] || TOKEN_PROGRAM_ID);
+  const nftStock = nftStockAta(vault, ticker.mint, tp);
+  const disc = ticker.extended ? OPEN_EXT_DISC : OPEN_DISC;
+  const keys = [
+    { pubkey: userPk, isSigner: true, isWritable: true },
+    { pubkey: configPda(), isSigner: false, isWritable: false },
+  ];
+  if (ticker.extended) {
+    keys.push({ pubkey: configExtPda(), isSigner: false, isWritable: false });
+  }
+  keys.push({ pubkey: assetPk, isSigner: false, isWritable: false });
+  keys.push({ pubkey: vault, isSigner: false, isWritable: true });
+  if (ticker.extended) {
+    keys.push({ pubkey: vaultExtPda(vault), isSigner: false, isWritable: true });
+  }
+  keys.push({ pubkey: new PublicKey(ticker.mint), isSigner: false, isWritable: false });
+  keys.push({ pubkey: nftStock, isSigner: false, isWritable: true });
+  keys.push({ pubkey: tp, isSigner: false, isWritable: false });
+  keys.push({ pubkey: ATA_PROGRAM_ID, isSigner: false, isWritable: false });
+  keys.push({ pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false });
+  const data = Buffer.concat([disc, Buffer.from([ticker.index])]);
+  return new TransactionInstruction({ programId: PROGRAM_ID, keys, data });
+}
+
+// Build open_ticker_account ixs for every ticker on the given desks whose
+// vault stock account is NOT yet open (exists=false).
+export async function buildActivateInstructions(deskPlans, user, tokenProgramMap) {
+  const ixs = [];
+  for (const d of deskPlans) {
+    for (const t of d.tickers || []) {
+      if (!t.exists) ixs.push(buildOpenTickerIx(user, d.asset_id, t, tokenProgramMap));
     }
   }
   return ixs;

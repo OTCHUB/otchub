@@ -48,6 +48,7 @@ const STOCKS = [
 ];
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_VERSION = 2; // bump to invalidate stale caches (e.g. fixed PDA derivation)
 const BATCH = 100;
 
 function vaultPda(assetStr) {
@@ -100,7 +101,7 @@ async function resolveTokenPrograms() {
 }
 
 async function saveCache(base44, existing, wallet, desks) {
-  const payload = { items: desks };
+  const payload = { items: desks, _v: CACHE_VERSION };
   if (existing?.id) {
     await base44.asServiceRole.entities.ClaimCache.update(existing.id, { desks: payload });
   } else {
@@ -141,7 +142,8 @@ export default async function (req) {
     const cache = cachedRows?.[0] || null;
     const fresh =
       cache?.updated_date &&
-      Date.now() - new Date(cache.updated_date).getTime() < CACHE_TTL_MS;
+      Date.now() - new Date(cache.updated_date).getTime() < CACHE_TTL_MS &&
+      cache?.desks?._v === CACHE_VERSION;
 
     if (!force && cache && fresh) {
       return Response.json({
