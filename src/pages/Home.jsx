@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, Wallet, Coins, Image as ImageIcon, Layers } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import StatCard from "@/components/otc/StatCard";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
 import TrendChart from "@/components/otc/TrendChart";
+import PerDeskChart from "@/components/otc/PerDeskChart";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
-import { fmtSol, fmtUsd, fmtNum, fmtPct, timeAgo } from "@/lib/format";
+import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
 
 export default function Home() {
   const [data, setData] = useState(null);
@@ -47,64 +48,132 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-800 border-t-emerald-400" />
+      <div className="flex min-h-screen items-center justify-center bg-black font-mono">
+        <span className="text-green-400">
+          <span className="animate-pulse">▋</span> LOADING OTC_PULSE...
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">
-              OTC Pulse <span className="font-normal text-slate-500">· Solana</span>
-            </h1>
-            <p className="text-xs text-slate-500">
-              Last update {timeAgo(latest?.created_date)} · {data?.snapshot_count || 0} snapshots
-            </p>
+    <div className="min-h-screen bg-black font-mono text-green-400">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+        {/* Header */}
+        <header className="border border-green-500/30 bg-black p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
+                &gt; OTC_PULSE :: SOLANA
+                <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
+              </h1>
+              <p className="text-[10px] text-green-500/50">
+                LAST_UPDATE {timeAgo(latest?.created_date)} · {data?.snapshot_count || 0} SNAPSHOTS
+              </p>
+            </div>
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+            >
+              <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+              [REFRESH]
+            </button>
           </div>
-          <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-          </button>
+          {error && (
+            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-400">
+              ERR: {error}
+            </div>
+          )}
         </header>
 
-        {error && (
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="SOL Price" value={fmtUsd(latest?.sol_price_usd)} sub="Spot" accent="sky" icon={Wallet} />
-          <StatCard label="OTC Token" value={fmtUsd(latest?.token_price_usd, 5)} sub={fmtPct(latest?.token_price_change_24h)} accent="emerald" icon={Coins} />
-          <StatCard label="NFT Floor" value={fmtSol(latest?.nft_floor_sol)} sub={fmtUsd(latest?.nft_floor_usd)} accent="violet" icon={ImageIcon} />
-          <StatCard label="Desks Minted" value={fmtNum(latest?.desks_minted)} sub={`Supply ${fmtNum(latest?.nft_total_supply)}`} accent="amber" icon={Layers} />
+        {/* Top metrics */}
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <StatCard
+            label="SOL_PRICE"
+            value={fmtUsd(latest?.sol_price_usd)}
+            sub="SPOT_USD"
+            desc="Wrapped SOL spot price"
+            accent="cyan"
+          />
+          <StatCard
+            label="OTC_TOKEN"
+            value={fmtUsd(latest?.token_price_usd, 5)}
+            sub={`24H ${fmtPct(latest?.token_price_change_24h)}`}
+            desc="OTC token spot market price"
+            accent="green"
+          />
+          <StatCard
+            label="NFT_FLOOR"
+            value={fmtSol(latest?.nft_floor_sol)}
+            sub={fmtUsd(latest?.nft_floor_usd)}
+            desc="Lowest Magic Eden listing"
+            accent="amber"
+          />
+          <StatCard
+            label="DESKS_MINTED"
+            value={fmtNum(latest?.desks_minted)}
+            sub={`SUPPLY ${fmtNum(latest?.nft_total_supply)}`}
+            desc="Total OTC desks minted"
+            accent="green"
+          />
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        {/* Secondary metrics */}
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <StatCard
+            label="MKT_CAP"
+            value={fmtCompact(latest?.token_market_cap) === "—" ? "—" : `$${fmtCompact(latest?.token_market_cap)}`}
+            sub="OTC"
+            accent="green"
+          />
+          <StatCard
+            label="VOL_24H"
+            value={fmtCompact(latest?.token_volume_24h) === "—" ? "—" : `$${fmtCompact(latest?.token_volume_24h)}`}
+            sub="OTC"
+            accent="green"
+          />
+          <StatCard
+            label="LIQUIDITY"
+            value={fmtUsd(latest?.token_liquidity_usd)}
+            sub="DEX"
+            accent="green"
+          />
+          <StatCard
+            label="LISTED"
+            value={fmtNum(latest?.nft_listed_count)}
+            sub="NFTs for sale"
+            accent="amber"
+          />
+        </div>
+
+        {/* Arbitrage + Protocol */}
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <ArbitrageCard latest={latest} />
           </div>
           <ProtocolPanel latest={latest} />
         </div>
 
-        <div className="mt-4">
+        {/* Charts */}
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <TrendChart history={data?.history} />
+          <PerDeskChart latest={latest} />
         </div>
 
-        <div className="mt-4">
+        {/* Tables */}
+        <div className="mt-3">
           <DesksTables latest={latest} />
         </div>
 
-        <div className="mt-4">
+        {/* Holdings */}
+        <div className="mt-3">
           <HoldingsGallery holdings={data?.holdings} />
         </div>
+
+        <footer className="mt-4 text-center text-[10px] text-green-500/30">
+          OTC_PULSE v1.0 · DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH
+        </footer>
       </div>
     </div>
   );

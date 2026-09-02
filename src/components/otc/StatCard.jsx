@@ -1,21 +1,23 @@
 import React from "react";
 
-const ACCENTS = {
-  emerald: "text-emerald-400",
-  violet: "text-violet-400",
+const COLOR = {
+  green: "text-green-400",
   amber: "text-amber-400",
-  sky: "text-sky-400",
+  red: "text-red-400",
+  cyan: "text-cyan-400",
 };
 
-export default function StatCard({ label, value, sub, accent = "emerald", icon: Icon }) {
+export default function StatCard({ label, value, sub, desc, accent = "green" }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wide text-slate-400">{label}</span>
-        {Icon && <Icon className={`h-4 w-4 ${ACCENTS[accent] || ACCENTS.emerald}`} />}
+    <div className="border border-green-500/30 bg-black p-3">
+      <div className="text-[10px] uppercase tracking-widest text-green-500/60">{label}</div>
+      <div className={`mt-1 font-mono text-base font-bold sm:text-lg ${COLOR[accent] || COLOR.green}`}>
+        {value}
       </div>
-      <div className="mt-2 text-xl font-semibold text-slate-100">{value}</div>
-      {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+      {sub && <div className="font-mono text-[10px] text-green-600/80">{sub}</div>}
+      {desc && (
+        <div className="mt-1 text-[10px] leading-tight text-green-500/40">{desc}</div>
+      )}
     </div>
   );
 }

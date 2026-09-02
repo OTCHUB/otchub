@@ -19,27 +19,32 @@ export default function TrendChart({ history }) {
   }));
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-      <h3 className="text-sm font-semibold text-slate-200">Price Trends</h3>
-      <div className="mt-4 h-64">
+    <div className="border border-green-500/30 bg-black p-3">
+      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+        PRICE_TRENDS :: USD
+      </div>
+      <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis
               dataKey="t"
-              tickFormatter={(t) => new Date(t).toLocaleDateString()}
-              stroke="#64748b"
-              fontSize={11}
+              tickFormatter={(t) => new Date(t).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}
+              stroke="#1a6b3a"
+              fontSize={10}
+              tick={{ fill: "#2a8b4a" }}
             />
-            <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `$${v}`} />
+            <YAxis stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${v}`} width={50} />
             <Tooltip
               labelFormatter={(t) => new Date(t).toLocaleString()}
               formatter={(v) => fmtUsd(v)}
-              contentStyle={{ background: "#0f172a", border: "#1e293b", borderRadius: 8 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 11 }}
+              labelStyle={{ color: "#22c55e" }}
+              itemStyle={{ color: "#4ade80" }}
             />
-            <Legend />
-            <Line type="monotone" dataKey="token" name="OTC (USD)" stroke="#34d399" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="floor" name="NFT Floor (USD)" stroke="#a78bfa" dot={false} strokeWidth={2} />
+            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Line type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>
