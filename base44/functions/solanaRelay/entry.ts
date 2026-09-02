@@ -75,6 +75,43 @@ export default async function (req) {
       });
     }
 
+    if (mode === "sendSender") {
+      // Helius Sender broadcast (https://www.helius.dev/docs/sending-transactions/
+      // jupiter-swap-api-via-sender): sends the signed tx across all pathways
+      // (Helius, Jito, Harmonic, Rakurai...) for a better landing rate — used by
+      // the swap flow. Publicly available, no plan required. Falls back to the
+      // regular RPC broadcast if Sender is unavailable.
+      const tx = body.tx;
+      if (!tx) return Response.json({ error: "tx required" }, { status: 400 });
+      const senderSend = async () => {
+        const res = await fetch("https://sender.helius-rpc.com/fast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "otc-swap",
+            method: "sendTransaction",
+            params: [tx, { encoding: "base64", skipPreflight: true, maxRetries: 2 }],
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        const json = await res.json().catch(() => null);
+        if (!json || json.error) {
+          throw new Error(json?.error?.message || `sender http ${res.status}`);
+        }
+        if (!json.result) throw new Error(`sender returned no signature: ${JSON.stringify(json).slice(0, 200)}`);
+        return json.result;
+      };
+      try {
+        const sig = await senderSend();
+        return Response.json({ ok: true, sig, via: "sender" });
+      } catch (e) {
+        const r = await sendOne(tx);
+        if (r.error) return Response.json({ error: r.error }, { status: 500 });
+        return Response.json({ ok: true, sig: r.sig, via: "rpc-fallback", senderError: e?.message || null });
+      }
+    }
+
     if (mode === "send") {
       const tx = body.tx;
       if (!tx) return Response.json({ error: "tx required" }, { status: 400 });
