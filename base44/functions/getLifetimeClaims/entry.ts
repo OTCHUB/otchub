@@ -246,9 +246,16 @@ export default async function (req) {
       );
       for (const r of logs || []) {
         if (!r.asset_id || !r.symbol) continue;
+        // Client-side claim logs (legacy logClaims) without a tx signature
+        // can't be deduped against the on-chain scan — which finds the SAME
+        // real claims WITH real signatures — so counting them would double
+        // every such claim. The on-chain scan is authoritative; skip them.
+        if (!r.tx_sig) continue;
+        const key = `${r.tx_sig}|${r.symbol}|${r.asset_id}`;
+        if (seenKeys.has(key)) continue; // double-persisted duplicate row
+        seenKeys.add(key);
         const d = (amountsByDesk[r.asset_id] ||= {});
         d[r.symbol] = (d[r.symbol] || 0) + (Number(r.amount) || 0);
-        seenKeys.add(`${r.tx_sig}|${r.symbol}|${r.asset_id}`);
         noteClaimTime(r.asset_id, r.created_date);
       }
     } catch {

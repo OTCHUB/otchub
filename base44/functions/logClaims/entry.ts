@@ -30,7 +30,11 @@ export default async function (req) {
         value_sol: Number(c?.value_sol) || 0,
         tx_sig: String(c?.tx_sig || ""),
       }))
-      .filter((r) => r.asset_id);
+      // Records without a tx signature can't be deduped against the
+      // authoritative on-chain scan in getLifetimeClaims (which finds the
+      // same claims with signatures), so they'd double-count lifetime
+      // earnings — drop them.
+      .filter((r) => r.asset_id && r.tx_sig);
     if (!records.length) return Response.json({ ok: true, logged: 0 });
 
     await base44.asServiceRole.entities.ClaimLog.bulkCreate(records);
