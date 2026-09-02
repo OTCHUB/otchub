@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { fmtSol, fmtUsd, fmtNum } from "@/lib/format";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
+import ClaimPanel from "@/components/otc/ClaimPanel";
 
 const trunc = (a) => (a ? `${a.slice(0, 4)}...${a.slice(-4)}` : "");
 
@@ -20,7 +21,7 @@ export default function WalletPortfolio({ address, onClear }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  useEffect(() => {
+  const load = React.useCallback(() => {
     let active = true;
     setLoading(true);
     setData(null);
@@ -42,6 +43,8 @@ export default function WalletPortfolio({ address, onClear }) {
       active = false;
     };
   }, [address]);
+
+  useEffect(() => load(), [load]);
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -118,6 +121,13 @@ export default function WalletPortfolio({ address, onClear }) {
           </div>
           <div className="mt-3">
             <HoldingsGallery holdings={data.holdings} byStock={data.by_stock?.items} />
+          </div>
+          <div className="mt-3">
+            <ClaimPanel
+              address={address}
+              holdings={data.holdings}
+              onClaimed={load}
+            />
           </div>
         </>
       )}
