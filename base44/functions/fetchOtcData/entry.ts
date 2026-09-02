@@ -149,8 +149,8 @@ export default async function (req) {
       spread_usd: spreadUsd,
       spread_pct: spreadPct,
       recommendation,
-      by_stock: byStock,
-      per_desk: perDesk,
+      by_stock: { items: byStock },
+      per_desk: { items: perDesk },
     };
 
     const created = await base44.asServiceRole.entities.OtcSnapshot.create(snapshot);
