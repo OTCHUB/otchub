@@ -20,6 +20,7 @@ import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { secrets } from "base44:runtime";
 import { Buffer } from "node:buffer";
 import { PROGRAM_ID, STOCKS, INSTRUCTIONS } from "../../shared/otcIdl.ts";
+import { getSpotPrices } from "../../shared/spotPrices.ts";
 
 // web3.js expects a global Buffer; set it before the module is imported.
 if (!globalThis.Buffer) globalThis.Buffer = Buffer;
@@ -164,37 +165,7 @@ function extractClaimsFromTx(tx, wallet) {
   return claims;
 }
 
-// Spot USD prices for a set of token mints (DexScreener) + SOL.
-// DexScreener caps each response at 30 pairs, and wrapped SOL alone has 30+
-// pairs — so SOL MUST be requested on its own and stocks in small chunks,
-// otherwise later mints' pairs are silently truncated out of the batch
-// (this is why every SOL value showed 0.000).
-async function fetchPricesUsd(mints) {
-  const stockMints = [...new Set(mints)].filter((m) => m && m !== SOL_MINT);
-  const chunks = [[SOL_MINT]];
-  for (let i = 0; i < stockMints.length; i += 5) {
-    chunks.push(stockMints.slice(i, i + 5));
-  }
-  const priceMap = {};
-  for (const chunk of chunks) {
-    try {
-      const res = await fetch(
-        `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`
-      );
-      if (!res.ok) continue;
-      const json = await res.json();
-      for (const p of json.pairs || []) {
-        const m = p.baseToken?.address;
-        if (!m || p.chainId !== "solana" || p.priceUsd == null) continue;
-        const px = parseFloat(p.priceUsd);
-        if (Number.isFinite(px) && priceMap[m] == null) priceMap[m] = px;
-      }
-    } catch {
-      /* ignore chunk */
-    }
-  }
-  return priceMap;
-}
+
 
 export default async function (req) {
   try {
@@ -345,15 +316,10 @@ export default async function (req) {
       }
     }
 
-    // Compute USD/SOL display values from on-chain amounts × current spot.
-    const mintsUsed = new Set([SOL_MINT]);
-    for (const amt of Object.values(amountsByDesk)) {
-      for (const sym of Object.keys(amt)) {
-        const s = STOCKS.find((x) => x.symbol === sym);
-        if (s) mintsUsed.add(s.mint);
-      }
-    }
-    const prices = await fetchPricesUsd([...mintsUsed]);
+    // Compute USD/SOL display values from on-chain amounts × current spot
+    // prices, served from the app-wide shared price cache (one upstream feed
+    // for all users, refreshed on a short TTL).
+    const { prices } = await getSpotPrices(base44);
     const solUsd = prices[SOL_MINT] ?? null;
 
     const byDesk = [];
