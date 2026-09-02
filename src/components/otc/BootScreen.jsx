@@ -45,9 +45,9 @@ export default function BootScreen({ onComplete }) {
       } else {
         clearInterval(id);
         setDone(true);
-        setTimeout(() => onComplete?.(), 700);
+        setTimeout(() => onComplete?.(), 250);
       }
-    }, 170);
+    }, 45);
     return () => clearInterval(id);
   }, [onComplete]);
 
