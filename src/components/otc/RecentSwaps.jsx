@@ -68,11 +68,12 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
       </div>
 
       {/* Header row — DexScreener-style columns */}
-      <div className="grid grid-cols-[46px_1fr_1fr_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
+      <div className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
         <span>SIDE</span>
         <span className="text-right">USD</span>
         <span className="text-right">PRICE ({unit})</span>
-        <span className="text-right">WALLET</span>
+        <span className="text-right">AGE</span>
+        <span className="text-right">WALLET ↗</span>
       </div>
 
       <div className="max-h-56 overflow-y-auto">
@@ -102,7 +103,7 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
                 target="_blank"
                 rel="noreferrer"
                 title={ago(s.time) !== "—" ? `${ago(s.time)} ago · ${s.sig}` : s.sig}
-                className="grid grid-cols-[46px_1fr_1fr_1.4fr] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[9px] last:border-0 hover:bg-green-500/5"
+                className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[9px] last:border-0 hover:bg-green-500/5"
               >
                 <span
                   className={`border px-1 text-center font-bold ${
@@ -121,7 +122,10 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
                     ? fmtUsd(price, 5)
                     : `${Number(price).toFixed(7)} ◎`}
                 </span>
-                <span className="truncate text-right text-green-500/50" title={s.wallet}>
+                <span className="text-right text-green-500/50" title={ago(s.time)}>
+                  {ago(s.time)}
+                </span>
+                <span className="truncate text-right text-green-500/50 hover:text-green-300" title={s.wallet}>
                   {short(s.wallet)}
                 </span>
               </a>
