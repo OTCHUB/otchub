@@ -79,8 +79,17 @@ export async function fetchTokenAccountsByOwner(owner, tokenMint) {
 }
 
 export async function fetchAccountBalanceLamports(address) {
-  const result = await heliusRpc("getBalance", [address]);
-  return result?.value ?? null;
+  try {
+    const result = await heliusRpc("getBalance", [address]);
+    return result?.value ?? null;
+  } catch (e) {
+    try {
+      const result = await solanaRpc("https://api.mainnet-beta.solana.com", "getBalance", [address]);
+      return result?.value ?? null;
+    } catch (e2) {
+      return null;
+    }
+  }
 }
 
 async function solanaRpc(rpcUrl, method, params) {
@@ -131,20 +140,24 @@ export async function fetchTokenSupply(tokenMint) {
 }
 
 export async function fetchCollectionAssets(collectionAddress) {
-  const allAssets = [];
-  let page = 1;
-  while (page <= 20) {
-    const result = await heliusRpc("searchAssets", {
-      grouping: ["collection", collectionAddress],
-      page,
-      limit: 1000,
-    });
-    const items = result?.items || [];
-    allAssets.push(...items);
-    if (items.length < 1000) break;
-    page++;
+  try {
+    const allAssets = [];
+    let page = 1;
+    while (page <= 20) {
+      const result = await heliusRpc("searchAssets", {
+        grouping: ["collection", collectionAddress],
+        page,
+        limit: 1000,
+      });
+      const items = result?.items || [];
+      allAssets.push(...items);
+      if (items.length < 1000) break;
+      page++;
+    }
+    return allAssets;
+  } catch (e) {
+    return null;
   }
-  return allAssets;
 }
 
 export async function fetchMagicEdenStats(symbol) {

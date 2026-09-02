@@ -150,7 +150,10 @@ export default async function (req) {
       tokenPriceSol = tokenPriceUsd / solPriceUsd;
     }
 
-    const [potLamports, meStats, listings, assets, stats, tokenSupply] = await Promise.all([
+    // allSettled: a Helius / Magic Eden / otcdesks outage on ONE call must NOT
+    // abort the whole snapshot — whatever succeeds still gets persisted so the
+    // dashboard keeps refreshing every 5 min instead of going stale for hours.
+    const [potR, meR, lsR, asR, stR, tsR] = await Promise.allSettled([
       fetchAccountBalanceLamports(ADDRESSES.POT),
       fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
       fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL),
@@ -158,6 +161,12 @@ export default async function (req) {
       fetchProtocolStats(),
       fetchTokenSupply(ADDRESSES.OTC_TOKEN_MINT),
     ]);
+    const potLamports = potR.status === "fulfilled" ? potR.value : null;
+    const meStats = meR.status === "fulfilled" ? meR.value : null;
+    const listings = lsR.status === "fulfilled" ? lsR.value : [];
+    const assets = asR.status === "fulfilled" ? asR.value : null;
+    const stats = stR.status === "fulfilled" ? stR.value : null;
+    const tokenSupply = tsR.status === "fulfilled" ? tsR.value : null;
 
     const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
@@ -172,11 +181,21 @@ export default async function (req) {
       ? stats.buybackOtc / Math.pow(10, OTC_DECIMALS)
       : null;
 
-    const totalSupply = assets.length;
+    const assetsOk = Array.isArray(assets);
+    const assetList = assetsOk ? assets : [];
+    // Collection fetch failed (e.g. Helius DAS 500): fall back to the previous
+    // snapshot's NFT counts and KEEP the existing holdings (don't wipe the
+    // gallery on a transient outage).
+    let prevSnap = null;
+    if (!assetsOk) {
+      prevSnap =
+        (await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1))?.[0] || null;
+    }
+    const totalSupply = assetsOk ? assetList.length : (prevSnap?.nft_total_supply ?? 0);
     const perDeskHistory = stats?.perDesk || [];
     const desksMinted = perDeskHistory.length
       ? perDeskHistory[perDeskHistory.length - 1].desks
-      : totalSupply;
+      : (prevSnap?.desks_minted ?? totalSupply);
     const listedCount = meStats?.listedCount ?? null;
     const floorSol =
       meStats?.floorPrice != null
@@ -323,7 +342,7 @@ export default async function (req) {
       return { mintDay: dayRows[idx].day, accrued: acc };
     };
 
-    const holdings = assets.map((a) => {
+    const holdings = assetList.map((a) => {
       const id = a.id || a.address || "";
       const lp = priceMap.get(id);
       const name = a.content?.metadata?.name || a.name || "OTC Desk";
@@ -346,8 +365,10 @@ export default async function (req) {
       };
     });
 
-    await base44.asServiceRole.entities.NftHolding.deleteMany({});
-    if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
+    if (assetsOk) {
+      await base44.asServiceRole.entities.NftHolding.deleteMany({});
+      if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
+    }
 
     return Response.json({
       ok: true,
