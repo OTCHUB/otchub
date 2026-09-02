@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { TreePine, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const TGE = 1_000_000_000;
 const DESK_CAP = 5000;
@@ -65,9 +65,21 @@ export default function SupplyChart({ history, latest }) {
         Math.ceil((max + pad) / 25e6) * 25e6,
       ];
     }
-    const maxD = dv.length ? Math.max(...dv) : 0;
-    const dTop = Math.max(500, Math.ceil((maxD * 1.05) / 500) * 500);
-    return { supplyDomain: sDom, desksDomain: [0, dTop] };
+    // Auto-scale the desks axis around its own min/max (like the supply axis)
+    // so the desks line uses the full plot height instead of pinning flat near
+    // the top of a 0..cap range — keeps both lines visually balanced.
+    let dDom = [0, 500];
+    if (dv.length) {
+      const dMin = Math.min(...dv);
+      const dMax = Math.max(...dv);
+      const dPad = (dMax - dMin) * 0.08 || dMax * 0.02 || 25;
+      dDom = [
+        Math.max(0, Math.floor((dMin - dPad) / 25) * 25),
+        Math.ceil((dMax + dPad) / 25) * 25,
+      ];
+      if (dDom[0] >= dDom[1]) dDom = [dDom[0], dDom[0] + 25];
+    }
+    return { supplyDomain: sDom, desksDomain: dDom };
   }, [data]);
 
   const launchLabel = useMemo(() => {
@@ -92,7 +104,6 @@ export default function SupplyChart({ history, latest }) {
     <div className="border border-green-500/30 bg-black p-3 font-mono text-green-400">
       {/* Header */}
       <div className="flex items-start gap-2">
-        <TreePine className="mt-0.5 h-5 w-5 shrink-0 text-green-400" strokeWidth={2} />
         <div>
           <h3 className="text-base font-bold leading-tight text-green-400">&gt; EVERY_DESK_EATS_SUPPLY</h3>
           <p className="text-[10px] text-green-500/50">
@@ -186,15 +197,8 @@ export default function SupplyChart({ history, latest }) {
       </div>
 
       {/* Footer */}
-      <div className="mt-3 flex items-end justify-between gap-2 border-t border-green-500/20 pt-2">
-        <div className="text-[9px] leading-tight text-green-500/50">
-          <div>DATA_AS_OF: {asOf}</div>
-          <div>SOURCE: OTC_PULSE — ON-CHAIN (MINT/BURN + DISTRIBUTION)</div>
-        </div>
-        <div className="inline-flex items-center gap-1.5 border border-green-500/50 bg-green-500/10 px-2.5 py-1 text-[10px] font-semibold text-green-400">
-          <TreePine className="h-3 w-3" />
-          OTC_PULSE
-        </div>
+      <div className="mt-3 border-t border-green-500/20 pt-2">
+        <div className="text-[9px] leading-tight text-green-500/50">DATA_AS_OF: {asOf}</div>
       </div>
     </div>
   );

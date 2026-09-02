@@ -246,7 +246,7 @@ export default function Home() {
 
         {/* Charts */}
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="ARBITRAGE TREND" defaultOpen={false}>
+          <CollapsibleCard title="ARBITRAGE TREND">
             <ArbitrageChart history={data?.history} />
           </CollapsibleCard>
           <CollapsibleCard title="EARNINGS">
@@ -255,17 +255,17 @@ export default function Home() {
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="ROUNDS" defaultOpen={false}>
+          <CollapsibleCard title="ROUNDS">
             <RoundsChart latest={latest} />
           </CollapsibleCard>
-          <CollapsibleCard title="BUYBACKS" defaultOpen={false}>
+          <CollapsibleCard title="BUYBACKS">
             <BuybacksPanel latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Permissionless global distribute crank */}
         <div className="mt-3">
-          <CollapsibleCard title="☢ DISTRIBUTE :: GLOBAL CRANK" defaultOpen={false}>
+          <CollapsibleCard title="☢ DISTRIBUTE :: GLOBAL CRANK">
             <DistributeCrank wallet={wallet} allDesks={data?.holdings} latest={latest} />
           </CollapsibleCard>
         </div>
@@ -274,14 +274,14 @@ export default function Home() {
           <CollapsibleCard title="PER_DESK_EARN">
             <PerDeskTrendChart latest={latest} />
           </CollapsibleCard>
-          <CollapsibleCard title="BY_STOCK" defaultOpen={false}>
+          <CollapsibleCard title="BY_STOCK">
             <ByStockChart latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Tables */}
         <div className="mt-3">
-          <CollapsibleCard title="DESKS :: DISTRIBUTION" defaultOpen={false}>
+          <CollapsibleCard title="DESKS :: DISTRIBUTION">
             <DesksTables latest={latest} />
           </CollapsibleCard>
         </div>
