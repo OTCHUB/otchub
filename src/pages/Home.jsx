@@ -8,6 +8,7 @@ import ArbitrageChart from "@/components/otc/ArbitrageChart";
 import EarningsChart from "@/components/otc/EarningsChart";
 import RoundsChart from "@/components/otc/RoundsChart";
 import ByStockChart from "@/components/otc/ByStockChart";
+import PerDeskTrendChart from "@/components/otc/PerDeskTrendChart";
 import BuybacksPanel from "@/components/otc/BuybacksPanel";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
@@ -65,6 +66,17 @@ export default function Home() {
 
   const latest = data?.latest;
 
+  // Trailing 7-day average per-desk daily earning (SOL) — used to estimate a
+  // connected wallet's daily earning from its owned (activated) desks.
+  const perDeskItems = latest?.per_desk?.items || [];
+  const sortedPd = [...perDeskItems].sort((a, b) =>
+    String(b.day || "").localeCompare(String(a.day || ""))
+  );
+  const trailingPd = sortedPd.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);
+  const perDeskPerDaySol = trailingPd.length
+    ? trailingPd.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailingPd.length
+    : sortedPd[0]?.per_desk_sol ?? 0;
+
   if (loading || !bootDone) {
     return <BootScreen onComplete={() => setBootDone(true)} />;
   }
@@ -117,7 +129,11 @@ export default function Home() {
         {/* Wallet */}
         <div className="mt-3">
           {wallet ? (
-            <WalletPortfolio address={wallet} onClear={() => setWallet(null)} />
+            <WalletPortfolio
+              address={wallet}
+              onClear={() => setWallet(null)}
+              perDeskPerDaySol={perDeskPerDaySol}
+            />
           ) : (
             <WalletConnect onConnected={setWallet} />
           )}
@@ -207,7 +223,8 @@ export default function Home() {
           <BuybacksPanel latest={latest} />
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <PerDeskTrendChart latest={latest} />
           <ByStockChart latest={latest} />
         </div>
 

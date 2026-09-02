@@ -16,7 +16,7 @@ function Metric({ label, value, sub, accent = "text-green-300" }) {
   );
 }
 
-export default function WalletPortfolio({ address, onClear }) {
+export default function WalletPortfolio({ address, onClear, perDeskPerDaySol = 0 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -101,10 +101,10 @@ export default function WalletPortfolio({ address, onClear }) {
               accent="text-emerald-400"
             />
             <Metric
-              label="CLAIMED_EARN"
-              value="—"
-              sub="no claim data"
-              accent="text-green-500/50"
+              label="EST_EARN_PER_DAY"
+              value={fmtSol((data.desks_owned || 0) * (perDeskPerDaySol || 0), 4)}
+              sub={`≈ ${fmtUsd((data.desks_owned || 0) * (perDeskPerDaySol || 0) * (data.sol_price_usd || 0))} · ${fmtNum(data.desks_owned)} desks`}
+              accent="text-emerald-400"
             />
             <Metric
               label="STOCK_HOLDING"
