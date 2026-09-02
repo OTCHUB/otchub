@@ -415,11 +415,15 @@ async function withTimeout(promise, ms, label) {
 // Anything still unseen after the polls is RE-BROADCAST once with the same
 // signed bytes (idempotent — Helius returns "already processed" if it just
 // landed) while the blockhash is still valid, which normally unsticks it.
-async function ensureConfirmed(entries, onLog) {
+async function ensureConfirmed(entries, onLog, onConfirm) {
   if (!entries || !entries.length) return;
   const pending = new Map(entries.map((e) => [e.sig, e.b64]));
-  for (const delay of [4000, 6000, 8000]) {
-    await new Promise((r) => setTimeout(r, delay));
+  const DELAYS = [4000, 6000, 8000];
+  for (let a = 0; a < DELAYS.length; a++) {
+    // surface each wait cycle so the UI can show the txs are being tracked,
+    // not stuck — a silent poll loop looks exactly like a frozen app.
+    onConfirm?.({ pending: pending.size, attempt: a + 1, attempts: DELAYS.length });
+    await new Promise((r) => setTimeout(r, DELAYS[a]));
     let statuses = [];
     try {
       const r = await relay("confirm", { sigs: [...pending.keys()] });
@@ -591,6 +595,7 @@ export async function executeClaimChunked(
     onProgress?.({ group: groupNo, totalGroups, phase: "send", desks: [], signaturesLeft: totalGroups - groupNo });
     const sentEntries = [];
     for (let k = 0; k < signed.length; k++) {
+      onProgress?.({ group: groupNo, totalGroups, phase: "send", desks: [], signaturesLeft: totalGroups - groupNo, txCur: k + 1, txTotal: signed.length });
       try {
         const b64 = Buffer.from(signed[k]).toString("base64");
         const r = await withTimeout(relay("send", { tx: b64 }), 60000, `G${groupNo} TX ${k + 1} broadcast`);
@@ -603,7 +608,10 @@ export async function executeClaimChunked(
       }
     }
     // make sure the whole group actually LANDED before the next one starts
-    await ensureConfirmed(sentEntries, onLog);
+    onProgress?.({ group: groupNo, totalGroups, phase: "confirm", desks: [], signaturesLeft: totalGroups - groupNo, pending: sentEntries.length });
+    await ensureConfirmed(sentEntries, onLog, (c2) =>
+      onProgress?.({ group: groupNo, totalGroups, phase: "confirm", desks: [], signaturesLeft: totalGroups - groupNo, ...c2 })
+    );
     // brief pause so the next group's blockhash is fresh and prior state committed
     if (c + chunkSize < ixs.length) await new Promise((r) => setTimeout(r, 2000));
   }
@@ -1114,6 +1122,7 @@ export async function executePairedClaim(
     });
     const sentEntries = [];
     for (let k = 0; k < signed.length; k++) {
+      onProgress?.({ group: groupNo, totalGroups, phase: "send", desks, signaturesLeft: totalGroups - groupNo, txCur: k + 1, txTotal: signed.length });
       try {
         const b64 = Buffer.from(signed[k]).toString("base64");
         const r = await withTimeout(relay("send", { tx: b64 }), 60000, `G${groupNo} TX ${k + 1} broadcast`);
@@ -1126,7 +1135,10 @@ export async function executePairedClaim(
       }
     }
     // make sure the whole group actually LANDED before the next one starts
-    await ensureConfirmed(sentEntries, onLog);
+    onProgress?.({ group: groupNo, totalGroups, phase: "confirm", desks, signaturesLeft: totalGroups - groupNo, pending: sentEntries.length });
+    await ensureConfirmed(sentEntries, onLog, (c2) =>
+      onProgress?.({ group: groupNo, totalGroups, phase: "confirm", desks, signaturesLeft: totalGroups - groupNo, ...c2 })
+    );
     // brief pause so prior sends commit and the next group's blockhash is fresh
     if (g + 1 < totalGroups) await new Promise((r) => setTimeout(r, 1500));
   }

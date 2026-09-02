@@ -70,7 +70,7 @@ function packCrankTxs(ixs, user, blockhash, microLamports) {
 // Direct broadcast of already-signed txs via the Helius RPC relay, followed
 // by a landing check (pending txs are re-broadcast while the blockhash is
 // still valid — idempotent).
-async function sendWaveDirect(b64s, waveNo, onLog, results) {
+async function sendWaveDirect(b64s, waveNo, onLog, results, onProgress, totalWaves) {
   const sends = await sendMany(b64s);
   const sentEntries = [];
   for (let i = 0; i < sends.length; i++) {
@@ -84,7 +84,10 @@ async function sendWaveDirect(b64s, waveNo, onLog, results) {
       results.push({ ok: false, reason: s.reason });
     }
   }
-  await ensureConfirmed(sentEntries, onLog);
+  onProgress?.({ group: waveNo, totalGroups: totalWaves, phase: "confirm", signaturesLeft: totalWaves - waveNo, pending: sentEntries.length });
+  await ensureConfirmed(sentEntries, onLog, (c) =>
+    onProgress?.({ group: waveNo, totalGroups: totalWaves, phase: "confirm", signaturesLeft: totalWaves - waveNo, ...c })
+  );
 }
 
 // Execute a permissionless distribute(index) sweep. ixs must be slot-major
@@ -174,7 +177,7 @@ export async function executeCrank(ixs, user, signAllTransactionsRaw, onLog, onP
       phase: "send",
       signaturesLeft: totalWaves - w - 1,
     });
-    await sendWaveDirect(b64s, waveNo, onLog, results);
+    await sendWaveDirect(b64s, waveNo, onLog, results, onProgress, totalWaves);
     // brief pause so prior sends commit and the next wave's blockhash is fresh
     if (w + 1 < totalWaves) await sleep(1500);
   }

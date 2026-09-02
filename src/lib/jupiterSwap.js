@@ -105,7 +105,7 @@ export async function simulateSwapTx(base64Tx) {
 // Aborts before signing if the tx's fee payer isn't the connected wallet
 // (guards against a tampered/baited transaction not meant for this user) or
 // if simulation fails (no wasted fee, no broken-tx signing).
-export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey) {
+export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey, onPhase) {
   // VersionedTransaction has no static .from — the deserializer is .deserialize.
   const unsignedTx = VersionedTransaction.deserialize(new Uint8Array(Buffer.from(base64Tx, "base64")));
 
@@ -123,12 +123,14 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
     }
   }
 
+  onPhase?.("sim");
   onLog({ type: "info", msg: "Simulating swap tx..." });
   const sim = await simulateSwapTx(base64Tx);
   if (!sim.ok) {
     onLog({ type: "err", msg: `SIM_FAIL: ${sim.err}` });
     return { ok: false, reason: sim.err };
   }
+  onPhase?.("sign");
   onLog({ type: "sim", msg: `Sim OK (${sim.units} CU). Requesting signature...` });
   let signedBytes;
   try {
@@ -140,10 +142,12 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
 
   try {
     // Broadcast through the app's Helius RPC relay (plain sendTransaction).
+    onPhase?.("send");
     const r = await relay("send", { tx: Buffer.from(signedBytes).toString("base64") });
     const sig = r.sig;
     onLog({ type: "ok", msg: `SWAP SENT ${sig}`, sig });
     // make sure the swap actually landed — re-broadcast if stuck pending
+    onPhase?.("confirm");
     onLog({ type: "info", msg: "Confirming landing..." });
     await ensureConfirmed(
       [{ sig, b64: Buffer.from(signedBytes).toString("base64") }],
