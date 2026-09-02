@@ -17,89 +17,15 @@
 // so a slightly stale cached balance is caught safely at sign time.
 
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import { Buffer } from "node:buffer";
-import { heliusRpc } from "../../shared/otcSources.ts";
 import { acquireLock, releaseLock } from "../../shared/dataLock.ts";
+import { readVaultStock } from "../../shared/vaultBalances.ts";
 
-// web3.js expects a global Buffer; set it before the module is imported.
-if (!globalThis.Buffer) globalThis.Buffer = Buffer;
-const { PublicKey } = await import("npm:@solana/web3.js@1.98.4");
 
-const PROGRAM_ID = new PublicKey("AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW");
-const ATA_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-const TOKEN_2022_PROGRAM_ID = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
-
-// Same stock registry as the client (src/lib/otcClaim.js). Kept in sync so the
-// backend can derive vault stock ATAs without the client.
-const STOCKS = [
-  { index: 0, symbol: "ANDURIL", mint: "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB", decimals: 9, extended: false },
-  { index: 1, symbol: "OPENAI", mint: "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF", decimals: 9, extended: false },
-  { index: 2, symbol: "AAPLx", mint: "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp", decimals: 8, extended: false },
-  { index: 3, symbol: "MSFTx", mint: "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX", decimals: 8, extended: false },
-  { index: 4, symbol: "NVDAx", mint: "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", decimals: 8, extended: false },
-  { index: 5, symbol: "AMZNx", mint: "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg", decimals: 8, extended: false },
-  { index: 6, symbol: "CRCLx", mint: "XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1", decimals: 8, extended: false },
-  { index: 7, symbol: "SPCXx", mint: "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8", decimals: 8, extended: false },
-  { index: 8, symbol: "ANTHROPIC", mint: "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw", decimals: 9, extended: false },
-  { index: 9, symbol: "POLYMARKET", mint: "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP", decimals: 9, extended: false },
-  { index: 10, symbol: "KALSHI", mint: "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua", decimals: 9, extended: true },
-  { index: 11, symbol: "NEURALINK", mint: "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S", decimals: 9, extended: true },
-  { index: 12, symbol: "OTC", mint: "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump", decimals: 6, extended: true },
-];
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_VERSION = 2; // bump to invalidate stale caches (e.g. fixed PDA derivation)
-const BATCH = 100;
 
-function vaultPda(assetStr) {
-  const assetPk = new PublicKey(assetStr);
-  const [vault] = PublicKey.findProgramAddressSync(
-    [Buffer.from("vault"), assetPk.toBuffer()],
-    PROGRAM_ID
-  );
-  return vault;
-}
 
-// Associated token account PDA seeds are [mint, owner, tokenProgram] under the
-// ATA program — the token program is a REQUIRED seed. The previous derivation
-// omitted it, producing wrong addresses (every account read as non-existent,
-// so all balances showed 0). This now matches the client's
-// getAssociatedTokenAddressSync(mint, vault, true, tp, ATA_PROGRAM).
-function nftStockAta(vault, mintStr, tokenProgramPk) {
-  const tp = tokenProgramPk || TOKEN_PROGRAM_ID;
-  // Custom seed order [vault, tokenProgram, mint] (verified on-chain) — NOT the
-  // standard [mint, owner, tokenProgram] ATA order.
-  const [addr] = PublicKey.findProgramAddressSync(
-    [vault.toBuffer(), tp.toBuffer(), new PublicKey(mintStr).toBuffer()],
-    ATA_PROGRAM_ID
-  );
-  return addr;
-}
-
-// Resolve whether each stock mint lives under the standard Token program or
-// Token-2022 (the "extended" tickers use Token-2022). Needed to derive the
-// correct vault ATA. Defaults to the standard Token program on any failure.
-async function resolveTokenPrograms() {
-  const mints = STOCKS.map((s) => s.mint);
-  let value;
-  try {
-    const result = await heliusRpc("getMultipleAccounts", [
-      mints,
-      { encoding: "base64" },
-    ]);
-    value = result?.value || [];
-  } catch {
-    value = mints.map(() => null);
-  }
-  const map = {};
-  const t22 = TOKEN_2022_PROGRAM_ID.toBase58();
-  for (let i = 0; i < mints.length; i++) {
-    map[mints[i]] =
-      value[i]?.owner === t22 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-  }
-  return map;
-}
 
 async function saveCache(base44, existing, wallet, desks) {
   const payload = { items: desks, _v: CACHE_VERSION };
@@ -198,75 +124,19 @@ export default async function (req) {
       return Response.json({ ok: true, fresh: true, desks: [], wallet, desks_count: 0 });
     }
 
-    // Resolve each stock mint's token program (Token vs Token-2022) so the
-    // vault ATA is derived with the correct [mint, vault, tokenProgram] seeds.
-    const tpMap = await resolveTokenPrograms();
-
-    // Build the flat list of vault stock ATA addresses to read.
-    const vaults = desks.map((d) => vaultPda(d.asset_id));
-    const flat = []; // {d, t, addr}
-    for (let d = 0; d < desks.length; d++) {
-      for (let t = 0; t < STOCKS.length; t++) {
-        flat.push({
-          d,
-          t,
-          addr: nftStockAta(vaults[d], STOCKS[t].mint, tpMap[STOCKS[t].mint]).toBase58(),
-        });
-      }
-    }
-
-    // Read all account infos (chunked — getMultipleAccountsInfo caps at 100).
-    const info = new Map(); // addr -> { exists, amount, tokenProgram }
-    for (let i = 0; i < flat.length; i += BATCH) {
-      const slice = flat.slice(i, i + BATCH);
-      const pubkeys = slice.map((x) => x.addr);
-      let value;
-      try {
-        const result = await heliusRpc("getMultipleAccounts", [
-          pubkeys,
-          { encoding: "jsonParsed" },
-        ]);
-        value = result?.value || [];
-      } catch (e) {
-        value = pubkeys.map(() => null);
-      }
-      for (let j = 0; j < slice.length; j++) {
-        const acc = value[j];
-        if (!acc) {
-          info.set(slice[j].addr, { exists: false, amount: 0, tokenProgram: null });
-          continue;
-        }
-        const tokenProgram = acc.owner || null; // top-level: the SPL program
-        const vaultOwner = acc?.data?.parsed?.info?.owner || null;
-        const amtStr = acc?.data?.parsed?.info?.tokenAmount?.amount;
-        const amount = amtStr != null ? Number(amtStr) : 0;
-        info.set(slice[j].addr, {
-          exists: vaultOwner === vaults[slice[j].d].toBase58(),
-          amount,
-          tokenProgram,
-        });
-      }
-    }
-
-    // Assemble per-desk results.
-    const out = desks.map((d, di) => {
-      const tickers = STOCKS.map((s, t) => {
-        const tp = tpMap[s.mint];
-        const addr = nftStockAta(vaults[di], s.mint, tp).toBase58();
-        const r = info.get(addr) || { exists: false, amount: 0, tokenProgram: null };
-        return {
-          index: s.index,
-          symbol: s.symbol,
-          mint: s.mint,
-          decimals: s.decimals,
-          extended: s.extended,
-          amount: r.exists ? r.amount : 0,
-          exists: r.exists,
-          token_program: r.exists ? r.tokenProgram : (tp ? tp.toBase58() : null),
-        };
-      });
-      const claimable = tickers.filter((x) => x.exists && x.amount > 0);
-      return { asset_id: d.asset_id, name: d.name, image_url: d.image_url, tickers, claimable };
+    // Real on-chain vault balances via the shared reader — one authoritative
+    // implementation shared with the ingest's listing integrity check, so the
+    // claim scan and the snapshot can never disagree on what a vault holds.
+    const vaultStock = await readVaultStock(desks.map((d) => d.asset_id));
+    const out = desks.map((d) => {
+      const v = vaultStock.get(d.asset_id);
+      return {
+        asset_id: d.asset_id,
+        name: d.name,
+        image_url: d.image_url,
+        tickers: v?.tickers || [],
+        claimable: v?.claimable || [],
+      };
     });
 
     await saveCache(base44, cache, wallet, out);

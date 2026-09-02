@@ -15,6 +15,8 @@ import {
   fetchTokenSupply,
 } from "./otcSources.ts";
 import { acquireLock, releaseLock } from "./dataLock.ts";
+import { readVaultStock } from "./vaultBalances.ts";
+import { getSpotPrices, SOL_MINT } from "./spotPrices.ts";
 
 const LAMPORTS_PER_SOL = 1e9;
 const OTC_DECIMALS = 6;
@@ -394,6 +396,52 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
       listing_price_usd: lp != null && solPriceUsd ? lp * ME_TOTAL_MARKUP * solPriceUsd : null,
     };
   });
+
+  // LISTING INTEGRITY CHECK — run BEFORE the holdings are persisted: a listed
+  // desk is only a real buy opportunity if its vault still holds stock. The
+  // accrued values computed above are THEORETICAL (summed from distribution
+  // history) — an owner who claimed out still carries the estimate, and
+  // persisting it would mark a stockless listing as a stocked snipe. Read the
+  // LISTED desks' real vault balances on-chain (same shared reader the claim
+  // scan uses) and replace the estimate with the verified live value — 0 when
+  // the vault is empty, so every consumer of this snapshot (gallery, arbitrage
+  // fallback, charts) starts from the truth.
+  if (assetsOk) {
+    const listedIds = holdings.filter((h) => h.is_listed).map((h) => h.asset_id);
+    if (listedIds.length) {
+      const [vaultStockR, spotR] = await Promise.allSettled([
+        readVaultStock(listedIds),
+        getSpotPrices(base44),
+      ]);
+      if (vaultStockR.status === "fulfilled" && spotR.status === "fulfilled") {
+        const prices = spotR.value.prices || {};
+        const solUsd = prices[SOL_MINT] ?? solPriceUsd;
+        for (const h of holdings) {
+          if (!h.is_listed) continue;
+          const v = vaultStockR.value.get(h.asset_id);
+          if (!v) continue;
+          if (!v.hasStock) {
+            // Verified empty vault — no stock to claim after buying it.
+            h.accrued_value_sol = 0;
+            h.accrued_value_usd = 0;
+          } else {
+            let usd = 0;
+            for (const t of v.tickers) {
+              if (t.exists && t.amount > 0) {
+                usd += (t.amount / 10 ** t.decimals) * (prices[t.mint] || 0);
+              }
+            }
+            // Overwrite only when the stock could actually be valued; with a
+            // full price gap keep the estimate rather than zeroing real stock.
+            if (usd > 0) {
+              h.accrued_value_sol = solUsd ? usd / solUsd : h.accrued_value_sol;
+              h.accrued_value_usd = usd;
+            }
+          }
+        }
+      }
+    }
+  }
 
   if (assetsOk) {
     await base44.asServiceRole.entities.NftHolding.deleteMany({});
