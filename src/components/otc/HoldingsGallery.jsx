@@ -1,23 +1,106 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
+import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
+import { base44 } from "@/api/base44Client";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 
 const ME_BASE = "https://magiceden.io/item-details";
+// Sentinel wallet key so the claim scanner caches the LISTED desks' vault
+// holdings separately from any real wallet's cache (shared across all users).
+const LISTED_CACHE_WALLET = "__listed_holdings__";
 
 export default function HoldingsGallery({ holdings, byStock }) {
   const [mode, setMode] = useState("SNIPE");
   const [sel, setSel] = useState(null);
+  const [realHold, setRealHold] = useState({}); // asset_id -> { hasStock, holdingUsd, holdingSol, loaded }
+  const [scanning, setScanning] = useState(false);
+
   const all = holdings || [];
   const listed = all.filter((h) => h.is_listed && h.listing_price_sol != null);
+
+  // Fetch ACTUAL on-chain vault stock balances for the listed desks. The
+  // snapshot's accrued_value is a THEORETICAL estimate summed from the
+  // protocol's distribution history — a desk whose owner already claimed
+  // still shows a high estimate but holds ZERO real stock. Buying it on
+  // Magic Eden based on that estimate buys an empty desk. This reads the
+  // true vault balances (reusing scanWalletClaims with a sentinel wallet so
+  // the result is cached server-side and shared across users) and prices
+  // them client-side, so SNIPE only flags desks that really hold stock and
+  // empty listed desks get a NO_STOCK warning.
+  const scanReal = async (force = false) => {
+    if (!listed.length) return;
+    setScanning(true);
+    try {
+      const assets = listed.map((h) => ({ asset_id: h.asset_id, name: h.name, image_url: h.image_url }));
+      const res = await base44.functions.invoke("scanWalletClaims", {
+        wallet: LISTED_CACHE_WALLET,
+        force,
+        assets,
+      });
+      const desks = res?.data?.desks || [];
+      const mints = new Set([SOL_MINT]);
+      for (const d of desks) for (const t of d.tickers || []) mints.add(t.mint);
+      const prices = await fetchTokenPricesUsd([...mints]);
+      const solPrice = prices?.[SOL_MINT] ?? null;
+      const map = {};
+      for (const d of desks) {
+        let usd = 0;
+        let hasStock = false;
+        for (const t of d.tickers || []) {
+          if (t.exists && t.amount > 0) {
+            hasStock = true;
+            usd += (t.amount / 10 ** t.decimals) * (prices?.[t.mint] || 0);
+          }
+        }
+        map[d.asset_id] = {
+          hasStock,
+          holdingUsd: usd,
+          holdingSol: solPrice ? usd / solPrice : 0,
+          loaded: true,
+        };
+      }
+      setRealHold(map);
+    } catch {
+      /* ignore — fall back to estimate */
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    scanReal(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listed.length]);
+
+  // Real on-chain vault holding, falling back to the snapshot estimate while
+  // the live scan loads (or if it failed). This is the value buyers should
+  // trust — not the theoretical accrued estimate.
+  const holdSol = (h) => {
+    const r = realHold[h.asset_id];
+    if (r?.loaded) return r.holdingSol || 0;
+    return h.accrued_value_sol || 0;
+  };
+  const holdUsd = (h) => {
+    const r = realHold[h.asset_id];
+    if (r?.loaded) return r.holdingUsd || 0;
+    return h.accrued_value_usd || 0;
+  };
+  const isLive = (h) => !!realHold[h.asset_id]?.loaded;
+  const hasRealStock = (h) => (realHold[h.asset_id]?.loaded ? !!realHold[h.asset_id].hasStock : true);
+
   const withSpread = (arr) =>
-    arr.map((h) => ({ ...h, spread_sol: (h.accrued_value_sol || 0) - (h.listing_price_sol || 0) }));
+    arr.map((h) => ({ ...h, spread_sol: holdSol(h) - (h.listing_price_sol || 0) }));
   // LISTED: lowest listing price first (cheapest on secondary market)
   const byPriceAsc = [...listed].sort((a, b) => (a.listing_price_sol || 0) - (b.listing_price_sol || 0));
-  // STOCK: highest stock holding first (most accrued value)
-  const byStockDesc = [...all].sort((a, b) => (b.accrued_value_sol || 0) - (a.accrued_value_sol || 0));
-  // SNIPE: best of both worlds — highest net (stock holding − listing price)
-  const snipes = withSpread(listed).sort((a, b) => b.spread_sol - a.spread_sol);
+  // STOCK: highest REAL vault holding first
+  const byStockDesc = [...all].sort((a, b) => holdSol(b) - holdSol(a));
+  // SNIPE: best net (REAL stock holding − listing price), only desks that
+  // actually hold stock on-chain. Empty listed desks are excluded so you
+  // never snipe an NFT with no holding.
+  const snipes = withSpread(listed.filter((h) => hasRealStock(h))).sort(
+    (a, b) => b.spread_sol - a.spread_sol
+  );
   const list = (mode === "LISTED" ? byPriceAsc : mode === "STOCK" ? byStockDesc : snipes).slice(0, 60);
 
   return (
@@ -26,34 +109,78 @@ export default function HoldingsGallery({ holdings, byStock }) {
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
           NFT_HOLDINGS :: {all.length} · LISTED {listed.length} · PRICES INCL. 2% FEE + 5% ROYALTY
         </span>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
           {["LISTED", "STOCK", "SNIPE"].map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={`border px-2 py-0.5 font-mono text-[10px] ${mode === m ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"}`}>[{m}]</button>
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`border px-2 py-0.5 font-mono text-[10px] ${mode === m ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"}`}
+            >
+              [{m}]
+            </button>
           ))}
+          <button
+            onClick={() => scanReal(true)}
+            disabled={scanning || !listed.length}
+            className="border border-cyan-500/40 px-2 py-0.5 font-mono text-[10px] text-cyan-400 hover:border-cyan-400 disabled:opacity-30"
+            title="Re-read real on-chain vault balances for listed desks"
+          >
+            {scanning ? "[LIVE…]" : "[RESCAN_LIVE]"}
+          </button>
         </div>
       </div>
+      <p className="mt-1 font-mono text-[9px] leading-snug text-cyan-500/60">
+        STK_HLD shows REAL on-chain vault stock (LIVE), not the snapshot estimate. SNIPE only
+        flags listed desks that actually hold stock — empty vaults are marked NO_STOCK so you
+        don't buy a desk that's already been claimed out.
+      </p>
+
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         {list.map((h) => {
-          const spread = (h.accrued_value_sol || 0) - (h.listing_price_sol || 0);
-          const snipe = h.is_listed && h.listing_price_sol != null && spread > 0.0001;
+          const spread = holdSol(h) - (h.listing_price_sol || 0);
+          const live = isLive(h);
+          const hasStock = hasRealStock(h);
+          const noStock = live && !hasStock && h.is_listed;
+          const snipe = h.is_listed && h.listing_price_sol != null && hasStock && spread > 0.0001;
           return (
-            <div key={h.asset_id} onClick={() => setSel(h)} className={`border text-left hover:border-green-500/50 cursor-pointer ${snipe ? "border-emerald-400 bg-emerald-500/10" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black" : "border-green-500/20 bg-black"}`}>
+            <div
+              key={h.asset_id}
+              onClick={() => setSel(h)}
+              className={`border text-left hover:border-green-500/50 ${noStock ? "border-red-500/40 bg-red-500/5 cursor-pointer" : snipe ? "border-emerald-400 bg-emerald-500/10 cursor-pointer" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black cursor-pointer" : "border-green-500/20 bg-black cursor-pointer"}`}
+            >
               <div className="relative aspect-square">
                 {h.image_url ? <Image src={h.image_url} fittingType="fill" className="h-full w-full" /> : <div className="flex h-full items-center justify-center font-mono text-[10px] text-green-500/30">NO_IMG</div>}
                 {h.is_listed && h.listing_price_sol != null && <span className="absolute right-1 top-1 bg-black/80 px-1 font-mono text-[9px] text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}</span>}
                 {snipe && <span className="absolute left-1 top-1 bg-emerald-500/90 px-1 font-mono text-[9px] font-bold text-black">SNIPE</span>}
+                {noStock && <span className="absolute left-1 top-1 bg-red-500/90 px-1 font-mono text-[9px] font-bold text-black">NO_STOCK</span>}
               </div>
               <div className="border-t border-green-500/20 p-1.5">
                 <div className="truncate font-mono text-[10px] text-green-300">{h.name}</div>
                 {h.is_listed && h.listing_price_sol != null ? (
                   <>
                     <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
-                    <div className="font-mono text-[9px] text-green-500/60">STK_HLD {fmtSol(h.accrued_value_sol, 3)} · {fmtUsd(h.accrued_value_usd, 2)}</div>
-                    <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : "text-amber-400/70"}`}>NET(STK−LST) {fmtSol(spread, 3)}</div>
-                    <a href={`${ME_BASE}/${h.asset_id}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-1 inline-block border border-emerald-500/50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
+                    <div className={`font-mono text-[9px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
+                      STK_HLD {fmtSol(holdSol(h), 3)} · {fmtUsd(holdUsd(h), 2)}{" "}
+                      <span className={live ? "text-cyan-400/70" : "text-amber-400/60"}>[{live ? "LIVE" : "EST"}]</span>
+                    </div>
+                    <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : noStock ? "text-red-400/80" : "text-amber-400/70"}`}>
+                      {noStock ? "VAULT_EMPTY — claimed out" : `NET(STK−LST) ${fmtSol(spread, 3)}`}
+                    </div>
+                    <a
+                      href={`${ME_BASE}/${h.asset_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`mt-1 inline-block border px-1.5 py-0.5 font-mono text-[9px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
+                    >
+                      [BUY_ON_ME ↗]
+                    </a>
                   </>
                 ) : (
-                  <div className="font-mono text-[9px] text-green-500/60">STK_HLD {fmtSol(h.accrued_value_sol, 3)} · {fmtUsd(h.accrued_value_usd, 2)}</div>
+                  <div className={`font-mono text-[9px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
+                    STK_HLD {fmtSol(holdSol(h), 3)} · {fmtUsd(holdUsd(h), 2)}{" "}
+                    <span className={live ? "text-cyan-400/70" : "text-amber-400/60"}>[{live ? "LIVE" : "EST"}]</span>
+                  </div>
                 )}
               </div>
             </div>
