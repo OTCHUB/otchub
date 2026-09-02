@@ -8,7 +8,7 @@ import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
-export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
+export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifetimeData, refreshLifetime }) {
   const [selected, setSelected] = useState(() => new Set());
   const [tpMap, setTpMap] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -16,7 +16,6 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState([]);
   const [prices, setPrices] = useState({});
-  const [lifetime, setLifetime] = useState({}); // asset_id -> {value_sol, value_usd, count, tickers}
   const [cleared, setCleared] = useState(() => new Set()); // desks claimed & emptied this session
   const [pullOwed, setPullOwed] = useState(false); // OFF = atomic distribute+claim pairs (fast); ON = also activate + distribute ALL owed backlog first
   const [progress, setProgress] = useState(null); // { group, totalGroups, phase } live chunk progress
@@ -37,18 +36,14 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
     return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const loadLifetime = async (w, force = false) => {
-    try {
-      const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w, force });
-      const payload = res?.data || {};
-      if (payload.error) return;
-      const map = {};
-      for (const d of payload.by_desk || []) map[d.asset_id] = d;
-      setLifetime(map);
-    } catch {
-      /* ignore */
-    }
-  };
+  // Per-desk lifetime claimed totals come from the parent wallet panel (the
+  // single shared getLifetimeClaims fetch) so connecting doesn't fire a second
+  // identical on-chain scan alongside the portfolio's own.
+  const lifetime = React.useMemo(() => {
+    const map = {};
+    for (const d of lifetimeData?.by_desk || []) map[d.asset_id] = d;
+    return map;
+  }, [lifetimeData]);
 
   // USD spot price per mint, plus SOL spot (keyed by SOL_MINT). Re-fetched
   // whenever the scan plan changes so claim values stay current.
@@ -152,11 +147,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, desks.length]);
 
-  // Load this wallet's per-desk lifetime claimed totals on mount.
-  useEffect(() => {
-    if (!address) return;
-    loadLifetime(address);
-  }, [address]);
+
 
   // Chunked claim pipeline for large runs (300+ claimable). Wallets can't sign
   // 100+ txs in one prompt reliably (they reject or the blockhash expires), so
@@ -243,7 +234,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan }) {
         // OTC claim history (force bypasses the 5-min cache) so the totals
         // reflect exactly what landed in this run — no client estimate.
         log({ type: "info", msg: "Refreshing lifetime totals from on-chain history..." });
-        await loadLifetime(address, true);
+        await refreshLifetime?.(true);
         log({ type: "ok", msg: "Lifetime totals refreshed from on-chain claim history." });
         // Re-scan the vault balances (force bypasses the 5-min scan cache).
         // Claims are already confirmed on-chain, so just-claimed tickers now

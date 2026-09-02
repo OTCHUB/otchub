@@ -7,10 +7,12 @@ import HelpNote from "@/components/otc/HelpNote";
 import Pager from "@/components/otc/Pager";
 
 const ME_BASE = "https://magiceden.io/item-details";
-const PAGE_SIZE = 12;
 
-export default function HoldingsGallery({ holdings, byStock }) {
-  const [mode, setMode] = useState("SNIPE");
+export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned }) {
+  const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
+  // Wallet variant: 3 rows of cards per page (15 cards on the 5-col desktop
+  // grid); the collection-wide view keeps its original 12.
+  const PAGE_SIZE = walletOwned ? 15 : 12;
   const [sel, setSel] = useState(null);
   const [pageNo, setPageNo] = useState(0);
 
@@ -50,7 +52,18 @@ export default function HoldingsGallery({ holdings, byStock }) {
   );
   // Full sorted dataset for the active mode; the gallery shows ONE page at a
   // time so the panel keeps its allocated space no matter how big holdings get.
-  const full = mode === "LISTED" ? byPriceAsc : mode === "STOCK" ? byStockDesc : snipes;
+  // Wallet variant: just INVENTORY (all owned desks) and LISTING (own
+  // listings) — no SNIPE mode, which only makes sense when sniping other
+  // people's listings in the collection.
+  const full = walletOwned
+    ? mode === "LISTING"
+      ? byPriceAsc
+      : byStockDesc
+    : mode === "LISTED"
+    ? byPriceAsc
+    : mode === "STOCK"
+    ? byStockDesc
+    : snipes;
   const pages = Math.max(1, Math.ceil(full.length / PAGE_SIZE));
   const page = Math.min(pageNo, pages - 1);
   const list = full.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
@@ -62,12 +75,21 @@ export default function HoldingsGallery({ holdings, byStock }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
           NFT_HOLDINGS :: {all.length} · LISTED {listed.length}
+          {floorSol != null && (
+            <span className="text-cyan-300">
+              {" · FLOOR "}
+              {fmtSol(floorSol, 3)} ◎
+              {walletOwned
+                ? ` × ${all.length} DESKS = ${fmtSol(floorSol * all.length, 3)} ◎`
+                : ""}
+            </span>
+          )}
         </span>
         <span className="text-[9px] text-green-500/40">PRICES INCL. 2% FEE + 5% ROYALTY</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <div className="inline-flex overflow-hidden border border-green-500/30">
-          {["LISTED", "STOCK", "SNIPE"].map((m, i) => (
+          {(walletOwned ? ["INVENTORY", "LISTING"] : ["LISTED", "STOCK", "SNIPE"]).map((m, i) => (
             <button
               key={m}
               onClick={() => {
@@ -101,7 +123,7 @@ export default function HoldingsGallery({ holdings, byStock }) {
           const live = isLive(h);
           const hasStock = hasRealStock(h);
           const noStock = live && !hasStock && h.is_listed;
-          const snipe = h.is_listed && h.listing_price_sol != null && hasStock && spread > 0.0001;
+          const snipe = !walletOwned && h.is_listed && h.listing_price_sol != null && hasStock && spread > 0.0001;
           return (
             <div
               key={h.asset_id}

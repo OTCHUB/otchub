@@ -52,25 +52,25 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   // LIFETIME_EARN: authoritative — seeded instantly from the persisted ClaimLog
   // DB, then kept current by an incremental on-chain claim scan. Re-fetch with
   // force after a claim so the new claim is picked up right away.
+  // This component is the SINGLE owner of the fetch: the claim tool consumes
+  // the result via props, so connecting never fires two identical on-chain
+  // scans that can race each other into double-persisted claim records.
   const loadLifetime = React.useCallback(
-    (force) => {
-      let active = true;
+    (force) =>
       base44.functions
         .invoke("getLifetimeClaims", { wallet: address, force: force === true })
         .then((r) => {
-          if (active && r?.data && !r.data.error) setLifetime(r.data);
+          if (r?.data && !r.data.error) setLifetime(r.data);
         })
         .catch(() => {
           /* lifetime stays hidden on failure */
-        });
-      return () => {
-        active = false;
-      };
-    },
+        }),
     [address]
   );
 
-  useEffect(() => loadLifetime(false), [loadLifetime]);
+  useEffect(() => {
+    loadLifetime(false);
+  }, [loadLifetime]);
 
   // Called by ClaimPanel with its live desk-vault scan: the exact on-chain
   // stock amounts a claim would deliver right now, priced at spot.
@@ -211,17 +211,21 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
             </div>
           )}
           <div className="mt-3">
-            <HoldingsGallery holdings={data.holdings} byStock={data.by_stock?.items} />
+            <HoldingsGallery
+              holdings={data.holdings}
+              byStock={data.by_stock?.items}
+              floorSol={data?.nft_floor_sol}
+              walletOwned
+            />
           </div>
           <div className="mt-3">
             <ClaimPanel
               address={address}
               holdings={data.holdings}
-              onClaimed={() => {
-                load();
-                loadLifetime(true);
-              }}
+              onClaimed={() => load()}
               onScan={handleScan}
+              lifetimeData={lifetime}
+              refreshLifetime={loadLifetime}
             />
           </div>
         </>

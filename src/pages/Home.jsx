@@ -324,7 +324,7 @@ export default function Home() {
         {/* Holdings */}
         <div className="mt-3">
           <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
-            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} />
+            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
           </CollapsibleCard>
         </div>
 

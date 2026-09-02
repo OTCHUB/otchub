@@ -201,7 +201,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
                       x2={x}
                       y1={yH}
                       y2={yL}
-                      className={isUp ? "stroke-emerald-400/70" : "stroke-red-400/70"}
+                      className={isUp ? "stroke-green-400/80" : "stroke-red-400/70"}
                       strokeWidth="1"
                       vectorEffect="non-scaling-stroke"
                     />
@@ -210,7 +210,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
                       width={w}
                       y={Math.min(yO, yC)}
                       height={Math.max(0.6, Math.abs(yO - yC))}
-                      className={isUp ? "fill-emerald-500/80" : "fill-red-500/80"}
+                      className={isUp ? "fill-green-400/70" : "fill-red-400/70"}
                     />
                   </g>
                 );
@@ -221,7 +221,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
                 x2="100"
                 y1={scale.y(last.c)}
                 y2={scale.y(last.c)}
-                className={up ? "stroke-emerald-400/50" : "stroke-red-400/50"}
+                className={up ? "stroke-green-400/50" : "stroke-red-400/50"}
                 strokeWidth="1"
                 strokeDasharray="2 2"
                 vectorEffect="non-scaling-stroke"
@@ -237,8 +237,8 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
             <div
               className={`pointer-events-none absolute right-1 border px-1 font-mono text-[8px] ${
                 up
-                  ? "border-emerald-500/40 bg-black/80 text-emerald-400"
-                  : "border-red-500/40 bg-black/80 text-red-400"
+                  ? "border-green-500/40 bg-black/80 text-green-400"
+                  : "border-red-400/40 bg-black/80 text-red-400"
               }`}
               style={{ top: `calc(${Math.min(94, Math.max(0, scale.y(last.c)))}% - 6px)` }}
             >
