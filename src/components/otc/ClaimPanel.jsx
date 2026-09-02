@@ -50,8 +50,8 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   };
 
   const runClaim = async (allDesks) => {
-    const provider = getConnectedProvider(address);
-    if (!provider) {
+    const signer = getSignerForAddress(address);
+    if (!signer) {
       log({ type: "err", msg: "No signing wallet connected for this address." });
       return;
     }
@@ -75,7 +75,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
       log({ type: "info", msg: `Packing ${ixs.length} instruction(s) into txs...` });
       const txs = await packTxs(ixs, address);
       log({ type: "info", msg: `${txs.length} transaction(s) to submit.` });
-      const results = await executeClaimTxs(txs, provider, log);
+      const results = await executeClaimTxs(txs, signer.signTransactionRaw, log);
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
       log({
