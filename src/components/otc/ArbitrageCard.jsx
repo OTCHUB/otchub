@@ -151,6 +151,17 @@ export default function ArbitrageCard({ latest, holdings }) {
           >
             [→ MINT · SWAP OTC]
           </button>
+          {recKey === "mint" && (
+            <a
+              href="https://otcdesks.cash/mint"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-amber-500/60 bg-amber-500/10 px-2 py-1 font-mono text-[10px] font-bold text-amber-400 hover:bg-amber-500/20"
+              title="Mint a fresh OTC desk on the official protocol app"
+            >
+              [→ MINT ↗ otcdesks.cash]
+            </a>
+          )}
         </div>
       </div>
     </div>
