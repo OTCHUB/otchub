@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 import StatCard from "@/components/otc/StatCard";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
-import TrendChart from "@/components/otc/TrendChart";
+import ArbitrageChart from "@/components/otc/ArbitrageChart";
 import EarningsChart from "@/components/otc/EarningsChart";
 import RoundsChart from "@/components/otc/RoundsChart";
 import ByStockChart from "@/components/otc/ByStockChart";
@@ -198,7 +198,7 @@ export default function Home() {
 
         {/* Charts */}
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <TrendChart history={data?.history} />
+          <ArbitrageChart history={data?.history} />
           <EarningsChart latest={latest} />
         </div>
 
