@@ -22,9 +22,10 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
   const loadLifetime = async (w) => {
     try {
       const res = await base44.functions.invoke("getLifetimeClaims", { wallet: w });
-      if (res?.error) return;
+      const payload = res?.data || {};
+      if (payload.error) return;
       const map = {};
-      for (const d of res.by_desk || []) map[d.asset_id] = d;
+      for (const d of payload.by_desk || []) map[d.asset_id] = d;
       setLifetime(map);
     } catch {
       /* ignore */
@@ -93,13 +94,15 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
         force,
         assets: desks.map((d) => ({ asset_id: d.asset_id, name: d.name, image_url: d.image_url })),
       });
-      if (res?.error) throw new Error(res.error);
-      const list = applyScan(res.desks);
+      // invoke returns an axios response — the function payload lives in res.data
+      const payload = res?.data || {};
+      if (payload.error) throw new Error(payload.error);
+      const list = applyScan(payload.desks);
       if (!silent) {
         const totalClaimable = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
         log({
           type: totalClaimable ? "ok" : "info",
-          msg: `${res.cached ? "CACHED" : "FRESH"} scan: ${totalClaimable} claimable ticker(s) across ${list.length} desk(s).`,
+          msg: `${payload.cached ? "CACHED" : "FRESH"} scan: ${totalClaimable} claimable ticker(s) across ${list.length} desk(s).`,
         });
       }
       return list;
@@ -117,7 +120,7 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
     if (!address || !desks.length) return;
     scan({ force: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]);
+  }, [address, desks.length]);
 
   // Load this wallet's per-desk lifetime claimed totals on mount.
   useEffect(() => {
@@ -406,25 +409,11 @@ export default function ClaimPanel({ address, holdings, onClaimed }) {
           {busy ? "CLAIMING..." : "[CLAIM_SELECTED]"}
         </button>
         <button
-          onClick={() => runClaim(true)}
-          disabled={!plan || busy || !totalClaimable}
-          className="border border-emerald-500/70 px-2.5 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-30"
-        >
-          {busy ? "CLAIMING..." : "[CLAIM_ALL_DESKS]"}
-        </button>
-        <button
           onClick={() => runActivate(false)}
           disabled={!plan || busy || !totalNeedsActivation}
           className="border border-cyan-500/50 px-2.5 py-1 text-[10px] text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-30"
         >
           {busy ? "..." : "[ACTIVATE_SELECTED]"}
-        </button>
-        <button
-          onClick={() => runActivate(true)}
-          disabled={!plan || busy || !totalNeedsActivation}
-          className="border border-cyan-500/70 px-2.5 py-1 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-30"
-        >
-          {busy ? "..." : "[ACTIVATE_ALL_DESKS]"}
         </button>
       </div>
       {plan && (
