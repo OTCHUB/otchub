@@ -262,37 +262,40 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect 
         </button>
       </div>
 
-      <div className="mt-2 break-all border border-green-500/20 bg-black px-2 py-1.5 font-mono text-[11px] text-emerald-400">
+      <div
+        className="mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[10px] text-emerald-400"
+        title={OTC_MINT}
+      >
         $OTC :: <span className="text-green-300">{OTC_MINT}</span>
       </div>
 
       {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
-      <div className="mt-2 grid grid-cols-3 gap-1 sm:grid-cols-5">
-        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+      <div className="mt-2 grid grid-cols-5 gap-1">
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
             {mcap != null ? `$${fmtCompact(mcap)}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">1H</div>
           <div className={ch1h == null ? "text-green-500/40" : ch1h >= 0 ? "text-emerald-400" : "text-red-400"}>
             {ch1h != null ? `${ch1h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch1h))}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">24H</div>
           <div className={ch24h == null ? "text-green-500/40" : ch24h >= 0 ? "text-emerald-400" : "text-red-400"}>
             {ch24h != null ? `${ch24h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch24h))}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">LIQ</div>
           <div className="text-cyan-300">
             {liq != null ? `$${fmtCompact(liq)}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">VOL_24H</div>
           <div className="text-cyan-300">
             {vol != null ? `$${fmtCompact(vol)}` : "—"}
@@ -500,7 +503,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect 
           <button
             onClick={doSwap}
             disabled={busy || !wallet}
-            className={`mt-3 w-full border py-2 font-mono text-[11px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
+            className={`mt-2 w-full border py-1.5 font-mono text-[11px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
               isBuy
                 ? "border-emerald-500/60 text-emerald-300"
                 : "border-cyan-400/60 text-cyan-300"

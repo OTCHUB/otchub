@@ -10,9 +10,9 @@ const ME_BASE = "https://magiceden.io/item-details";
 
 export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
-  // Wallet variant: 3 rows of cards per page (15 cards on the 5-col desktop
-  // grid); the collection-wide view keeps its original 12.
-  const PAGE_SIZE = walletOwned ? 15 : 12;
+  // Wallet variant: exactly 3 rows of cards per page on a fixed 3-column
+  // grid (9 cards); the collection-wide view keeps its original layout.
+  const PAGE_SIZE = walletOwned ? 9 : 12;
   const [sel, setSel] = useState(null);
   const [pageNo, setPageNo] = useState(0);
 
@@ -117,7 +117,11 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
         desk that's already been claimed out.
       </HelpNote>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+      <div
+        className={`mt-3 grid gap-2 ${
+          walletOwned ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5"
+        }`}
+      >
         {list.map((h) => {
           const spread = holdSol(h) - (h.listing_price_sol || 0);
           const live = isLive(h);

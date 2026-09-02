@@ -164,7 +164,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
       </div>
 
       {/* Plot */}
-      <div className="relative h-32 w-full">
+      <div className="relative h-24 w-full">
         {scale && candles.length >= 2 ? (
           <>
             <svg
@@ -269,19 +269,17 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
         )}
       </div>
 
-      {/* Series note */}
-      <div className="border-t border-green-500/10 px-2 py-1 font-mono text-[8px] text-green-500/40">
-        SERIES :: {candles.length} {tf} CANDLE(S) ·{" "}
+      {/* Series + liq-marker note (single compact line) */}
+      <div className="border-t border-green-500/10 px-2 py-0.5 font-mono text-[8px] text-green-500/40">
+        {candles.length} {tf} CANDLE(S) ·{" "}
         {src === "FULL"
-          ? "FULL HISTORY SINCE POOL_INCEPTION :: GECKOTERMINAL OHLCV"
+          ? "FULL HISTORY :: GECKOTERMINAL"
           : src === "FAILED"
-          ? "FEED OFFLINE :: SNAPSHOT AGGREGATION"
+          ? "FEED OFFLINE :: SNAPSHOT"
           : "FETCHING…"}
-      </div>
-      <div className="border-t border-green-500/10 px-2 pb-1 font-mono text-[8px] text-green-500/40">
-        LIQ_MARKERS :: <span className="text-cyan-400">+ ADD</span> /{" "}
-        <span className="text-amber-400">− REMOVE</span> · SNAPSHOT LIQ Δ &gt; 0.5%
-        {liqMarkers.length > 0 && ` · ${liqMarkers.length} EVENT(S)`}
+        {" · LIQ "}
+        <span className="text-cyan-400">+ADD</span>/<span className="text-amber-400">−RMV</span>
+        {liqMarkers.length > 0 && ` (${liqMarkers.length})`}
       </div>
     </div>
   );
