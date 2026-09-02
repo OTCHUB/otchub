@@ -47,6 +47,7 @@ export default async function (req) {
     );
     return Response.json({ ok: true, triggering: true });
   } catch (error) {
+    console.error(`otcWebhook error: ${error?.message || error}`);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
