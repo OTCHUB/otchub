@@ -70,7 +70,7 @@ export async function simulateSwapTx(base64Tx) {
 // Aborts before signing if the tx's fee payer isn't the connected wallet
 // (guards against a tampered/baited transaction not meant for this user) or
 // if simulation fails (no wasted fee, no broken-tx signing).
-export async function executeSwap(base64Tx, provider, onLog, userPublicKey) {
+export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey) {
   const unsignedTx = VersionedTransaction.from(Buffer.from(base64Tx, "base64"));
 
   // Safety: the fee payer (first account key) must be the connected wallet.
@@ -94,16 +94,16 @@ export async function executeSwap(base64Tx, provider, onLog, userPublicKey) {
     return { ok: false, reason: sim.err };
   }
   onLog({ type: "sim", msg: `Sim OK (${sim.units} CU). Requesting signature...` });
-  let signed;
+  let signedBytes;
   try {
-    signed = await provider.signTransaction(unsignedTx);
+    signedBytes = await signTransactionRaw(unsignedTx);
   } catch (e) {
     onLog({ type: "err", msg: `SIGN_REJECTED: ${e.message}` });
     return { ok: false, reason: "rejected" };
   }
 
   try {
-    const sig = await conn().sendRawTransaction(signed.serialize(), {
+    const sig = await conn().sendRawTransaction(Buffer.from(signedBytes), {
       skipPreflight: true,
       maxRetries: 3,
     });

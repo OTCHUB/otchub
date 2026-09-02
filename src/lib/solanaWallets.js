@@ -4,6 +4,7 @@
 // does NOT inject a window global), so a single button handles every brand.
 
 import { getWallets as getStandardWallets } from "@wallet-standard/app";
+import { setConnectedWallet } from "@/lib/walletSigner";
 
 function windowWallets() {
   const w = typeof window !== "undefined" ? window : {};
@@ -51,7 +52,8 @@ export function detectWallets() {
 
 export async function connectWallet(entry) {
   if (entry?.kind === "standard" && entry.wallet) {
-    const connect = entry.wallet.features["standard:connect"].connect;
+    const connect = entry.wallet.features["standard:connect"]?.connect;
+    if (!connect) throw new Error("Wallet does not support standard:connect");
     const out = await connect();
     const account = out?.accounts?.[0] || entry.wallet.accounts?.[0];
     const pk =
@@ -59,9 +61,13 @@ export async function connectWallet(entry) {
       account?.publicKey?.toString?.() ||
       (typeof account?.publicKey === "string" ? account.publicKey : null);
     if (!pk) throw new Error("Wallet returned no public key");
+    setConnectedWallet(entry, account, pk);
     return pk;
   }
   // injected
   const res = await entry.provider.connect();
-  return res?.publicKey?.toString?.() || (typeof res?.publicKey === "string" ? res.publicKey : null) || null;
+  const pk =
+    res?.publicKey?.toString?.() || (typeof res?.publicKey === "string" ? res.publicKey : null) || null;
+  if (pk) setConnectedWallet(entry, null, pk);
+  return pk;
 }

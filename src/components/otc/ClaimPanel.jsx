@@ -6,8 +6,8 @@ import {
   buildClaimInstructions,
   packTxs,
   executeClaimTxs,
-  getConnectedProvider,
 } from "@/lib/otcClaim";
+import { getSignerForAddress } from "@/lib/walletSigner";
 
 export default function ClaimPanel({ address, holdings, onClaimed }) {
   const [selected, setSelected] = useState(() => new Set());

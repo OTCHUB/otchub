@@ -257,7 +257,11 @@ async function simulate(tx) {
 }
 
 // Execute a list of (already-built) transactions: simulate -> sign -> send.
-export async function executeClaimTxs(txs, provider, onLog) {
+// `signTransactionRaw(tx)` returns signed serialized bytes (Uint8Array); it
+// delegates to the connected wallet (injected or Wallet Standard) and never
+// exposes private keys. Simulation runs first so a failing tx is skipped
+// before signing (no fee spent).
+export async function executeClaimTxs(txs, signTransactionRaw, onLog) {
   const results = [];
   for (let i = 0; i < txs.length; i++) {
     const tx = txs[i];
@@ -269,16 +273,16 @@ export async function executeClaimTxs(txs, provider, onLog) {
       continue;
     }
     onLog({ type: "sim", msg: `TX ${i + 1} sim OK (${sim.units} CU). requesting signature...` });
-    let signed;
+    let signedBytes;
     try {
-      signed = await provider.signTransaction(tx);
+      signedBytes = await signTransactionRaw(tx);
     } catch (e) {
       onLog({ type: "err", msg: `TX ${i + 1} SIGN_REJECTED: ${e.message}` });
       results.push({ ok: false, reason: "rejected" });
       break; // user rejected — stop the batch
     }
     try {
-      const sig = await conn().sendRawTransaction(signed.serialize(), {
+      const sig = await conn().sendRawTransaction(Buffer.from(signedBytes), {
         skipPreflight: true,
         maxRetries: 3,
       });
@@ -304,25 +308,3 @@ export async function buildClaimInstructions(deskPlans, user, tokenProgramMap) {
 }
 
 export { packTxs };
-
-// Find the connected browser wallet provider whose publicKey matches `address`.
-export function getConnectedProvider(address) {
-  if (typeof window === "undefined") return null;
-  const candidates = [
-    window.phantom?.solana,
-    window.solana,
-    window.solflare,
-    window.backpack,
-    window.jupiter,
-  ].filter(Boolean);
-  for (const p of candidates) {
-    try {
-      if (p.publicKey && p.publicKey.toString() === address && p.signTransaction) {
-        return p;
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return null;
-}

@@ -8,7 +8,7 @@ import {
   getSwapTx,
   executeSwap,
 } from "@/lib/jupiterSwap";
-import { getConnectedProvider } from "@/lib/otcClaim";
+import { getSignerForAddress } from "@/lib/walletSigner";
 
 const LAMPORTS_PER_SOL = 1e9;
 const SLIPPAGE_OPTIONS = [
@@ -62,9 +62,9 @@ export default function JupiterSwapPanel({ wallet }) {
       setErr("Connect a wallet first");
       return;
     }
-    const provider = getConnectedProvider(wallet);
-    if (!provider || !provider.signTransaction) {
-      setErr("No signing wallet connected for this address");
+    const signer = getSignerForAddress(wallet);
+    if (!signer) {
+      setErr("Connect this wallet (above) to sign");
       return;
     }
     const sol = parseFloat(amount);
@@ -81,7 +81,7 @@ export default function JupiterSwapPanel({ wallet }) {
       setQuote(q);
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
       const built = await getSwapTx(q, wallet);
-      const res = await executeSwap(built.swapTransaction, provider, log, wallet);
+      const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet);
       if (res.ok) log({ type: "ok", msg: "SWAP COMPLETE" });
     } catch (e) {
       log({ type: "err", msg: `SWAP_ABORT: ${e.message}` });
