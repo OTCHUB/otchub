@@ -15,6 +15,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
   const PAGE_SIZE = walletOwned ? 9 : 12;
   const [sel, setSel] = useState(null);
   const [pageNo, setPageNo] = useState(0);
+  const [query, setQuery] = useState("");
 
   const all = holdings || [];
   const listed = all.filter((h) => h.is_listed && h.listing_price_sol != null);
@@ -64,9 +65,13 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
     : mode === "STOCK"
     ? byStockDesc
     : snipes;
-  const pages = Math.max(1, Math.ceil(full.length / PAGE_SIZE));
+  // Desk-number search: match the typed text (e.g. 1602) against the desk
+  // name/number across ALL modes — inventory, listings, stock and snipes.
+  const q = query.trim().toLowerCase();
+  const filtered = q ? full.filter((h) => (h.name || "").toLowerCase().includes(q)) : full;
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const page = Math.min(pageNo, pages - 1);
-  const list = full.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const list = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -101,6 +106,30 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
               {m}
             </button>
           ))}
+        </div>
+        <div className="inline-flex items-center gap-1 border border-green-500/30 px-1.5">
+          <span className="font-mono text-[10px] text-green-500/40">FIND</span>
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPageNo(0);
+            }}
+            placeholder="#1602"
+            inputMode="numeric"
+            className="h-[36px] w-24 bg-transparent font-mono text-[10px] text-green-300 placeholder:text-green-500/30 focus:outline-none"
+          />
+          {query && (
+            <button
+              onClick={() => {
+                setQuery("");
+                setPageNo(0);
+              }}
+              className="font-mono text-[10px] text-green-500/50 hover:text-green-300"
+            >
+              [x]
+            </button>
+          )}
         </div>
         <button
           onClick={() => rescan()}
@@ -172,9 +201,9 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
             </div>
           );
         })}
-        {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">NO_DATA</div>}
+        {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">{q ? `NO_MATCH :: "${query.trim()}"` : "NO_DATA"}</div>}
       </div>
-      <Pager page={page} pages={pages} onPage={setPageNo} total={full.length} label="DESKS" />
+      <Pager page={page} pages={pages} onPage={setPageNo} total={filtered.length} label="DESKS" />
       <HoldingsDetail h={sel} byStock={byStock} onClose={() => setSel(null)} />
     </div>
   );
