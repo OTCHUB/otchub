@@ -266,14 +266,14 @@ export default function Home() {
 
         {/* Desk pot revenue by source (stacked) */}
         <div className="mt-3">
-          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES" defaultOpen={false}>
+          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES">
             <PotSourcesChart latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Tables */}
         <div className="mt-3">
-          <CollapsibleCard title="DESKS :: DISTRIBUTION" defaultOpen={false}>
+          <CollapsibleCard title="DESKS :: DISTRIBUTION">
             <DesksTables latest={latest} />
           </CollapsibleCard>
         </div>
