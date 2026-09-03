@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
-import { Link } from "react-router-dom";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
@@ -147,13 +146,6 @@ export default function Home() {
               >
                 [OTC_APP ↗]
               </a>
-              <Link
-                to="/about"
-                className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="What OTC Hub is and who builds it"
-              >
-                [ABOUT]
-              </Link>
               <button
                 onClick={refresh}
                 disabled={refreshing}
