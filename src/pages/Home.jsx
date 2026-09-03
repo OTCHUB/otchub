@@ -9,6 +9,7 @@ import ArbitrageChart from "@/components/otc/ArbitrageChart";
 import EarningsChart from "@/components/otc/EarningsChart";
 import RoundsChart from "@/components/otc/RoundsChart";
 import ByStockChart from "@/components/otc/ByStockChart";
+import PotSourcesChart from "@/components/otc/PotSourcesChart";
 import PerDeskTrendChart from "@/components/otc/PerDeskTrendChart";
 import SupplyChart from "@/components/otc/SupplyChart";
 import BuybacksPanel from "@/components/otc/BuybacksPanel";
@@ -312,6 +313,13 @@ export default function Home() {
           </CollapsibleCard>
           <CollapsibleCard title="BY_STOCK">
             <ByStockChart latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Desk pot revenue by source (stacked) */}
+        <div className="mt-3">
+          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES">
+            <PotSourcesChart latest={latest} />
           </CollapsibleCard>
         </div>
 

@@ -116,6 +116,9 @@
     "by_stock": {
       "type": "object"
     },
+    "pot_sources": {
+      "type": "object"
+    },
     "per_desk": {
       "type": "object"
     },

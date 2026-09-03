@@ -13,6 +13,7 @@ import {
 } from "./otcSources.ts";
 import { acquireLock, releaseLock } from "./dataLock.ts";
 import { STOCKS } from "./otcIdl.ts";
+import { scanPotSources } from "./potSources.ts";
 import { readVaultStock } from "./vaultBalances.ts";
 import { getSpotPrices, SOL_MINT } from "./spotPrices.ts";
 
@@ -322,6 +323,19 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   const perDeskAccruedUsd =
     perDeskAccruedSol != null && solPriceUsd ? perDeskAccruedSol * solPriceUsd : null;
 
+  // DESK-POT REVENUE BY SOURCE (mint surcharge / launchpad fees / other):
+  // incremental on-chain scan of the pot's SOL inflow txs (shared/potSources).
+  // The days map + cursor carry forward snapshot-to-snapshot; best-effort —
+  // on any failure the previous snapshot's data is kept unchanged.
+  const prevForSources = await latestSnapshot(base44);
+  let potSources = prevForSources?.pot_sources ?? null;
+  try {
+    const scanned = await scanPotSources(potSources);
+    if (scanned) potSources = scanned;
+  } catch (e) {
+    console.warn("potSources scan failed:", e?.message || e);
+  }
+
   const snapshot = {
     sol_price_usd: solPriceUsd,
     token_price_usd: tokenPriceUsd,
@@ -368,6 +382,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     spread_pct: spreadPct,
     recommendation,
     by_stock: { items: byStock },
+    pot_sources: potSources,
     per_desk: { items: perDesk },
     buybacks: {
       items: (stats?.buybacks || []).map((b) => ({
