@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
-import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim } from "@/lib/otcClaim";
+import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim, probeOwed } from "@/lib/otcClaim";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -19,6 +19,8 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
   const [cleared, setCleared] = useState(() => new Set()); // desks claimed & emptied this session
   const [pullOwed, setPullOwed] = useState(false); // OFF = atomic distribute+claim pairs (fast); ON = also activate + distribute ALL owed backlog first
   const [progress, setProgress] = useState(null); // { group, totalGroups, phase } live chunk progress
+  const [owed, setOwed] = useState(null); // PULL_OWED probe: asset_id -> { items: [{symbol, mint, decimals, amount}] }
+  const [probing, setProbing] = useState(false);
 
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
@@ -50,7 +52,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
   useEffect(() => {
     if (!plan) return;
     const mints = new Set([SOL_MINT]);
-    for (const d of plan) for (const t of d.claimable || []) mints.add(t.mint);
+    for (const d of plan) for (const t of d.tickers || []) mints.add(t.mint);
     let cancelled = false;
     (async () => {
       const p = await fetchTokenPricesUsd([...mints]);
@@ -69,6 +71,13 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
     }, 0);
   const deskSolValue = (dp) =>
     solPriceUsd ? deskUsdValue(dp) / solPriceUsd : null;
+  // USD value of a desk's probe-detected owed backlog (only PULL_OWED can
+  // reach it — the fast path claims stock already in the vault).
+  const owedUsdFor = (o) =>
+    (o?.items || []).reduce(
+      (s, t) => s + (t.amount / 10 ** t.decimals) * (prices[t.mint] || 0),
+      0
+    );
 
   const toggle = (id) =>
     setSelected((prev) => {
@@ -104,6 +113,22 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
     return list;
   };
 
+  // PULL_OWED probe: unsigned simulations (no fee, no wallet prompt) check
+  // whether any desk has owed backlog in the protocol pot that only a
+  // PULL_OWED run would move into the vault. Runs in the background after
+  // every scan; the result drives the NEEDED / NOT NEEDED verdict.
+  const runProbe = async (list) => {
+    if (!address || !list?.length) return;
+    setProbing(true);
+    try {
+      setOwed(await probeOwed(list, address));
+    } catch {
+      /* probe is best-effort — the verdict falls back to NOT NEEDED */
+    } finally {
+      setProbing(false);
+    }
+  };
+
   const scan = async (opts = {}) => {
     const force = opts.force !== false; // default true
     const silent = opts.silent === true;
@@ -123,6 +148,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
       const payload = res?.data || {};
       if (payload.error) throw new Error(payload.error);
       const list = applyScan(payload.desks);
+      runProbe(list); // background — never blocks the scan
       if (!silent) {
         const totalClaimable = list.reduce((a, d) => a + (d.claimable?.length || 0), 0);
         log({
@@ -180,7 +206,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
     setBusy(true);
     try {
       const claimable = targets.filter((d) => d.claimable.length);
-      if (!claimable.length) {
+      if (!claimable.length && !pullOwed) {
         log({ type: "err", msg: "Nothing to claim — no claimable tickers. Toggle [PULL_OWED] to pull owed backlog first." });
         return;
       }
@@ -209,6 +235,28 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
         orderedIxs.push(...claimIxs);
         log({ type: "info", msg: `CLAIM :: ${claimable.length} desk(s), ${claimIxs.length} claimable ticker(s).` });
         results = await executeClaimChunked(orderedIxs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+        // The sweep above may have delivered backlog into vaults that had
+        // NOTHING claimable at scan time — those desks were excluded from
+        // `claimable` and would end the run still full. Re-scan the targets
+        // and fast-path claim whatever was newly delivered, in the same run.
+        const rescanned = await scan({ force: true, silent: true });
+        const newClaimable = (rescanned || []).filter(
+          (d) => targetIds.has(d.asset_id) && d.claimable?.length
+        );
+        if (newClaimable.length) {
+          log({
+            type: "info",
+            msg: `BACKLOG :: ${newClaimable.length} desk(s) received newly delivered stock — claiming...`,
+          });
+          const pairs = await buildClaimPairs(newClaimable, address, tpMap);
+          const r2 = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+          results.push(...r2);
+          setCleared((prev) => {
+            const n = new Set(prev);
+            for (const d of newClaimable) n.add(d.asset_id);
+            return n;
+          });
+        }
       } else {
         // Fast path: one atomic [distribute(slot), claim(ticker)] tx per
         // claimable ticker. Each tx is self-contained (its claim depends only
@@ -223,7 +271,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
       const fail = results.length - ok;
       log({ type: fail ? "err" : "ok", msg: `DONE :: ${ok} confirmed, ${fail} failed (of ${results.length} tx).` });
 
-      if (ok > 0 && claimable.length) {
+      if (ok > 0) {
         if (onClaimed) onClaimed();
         setCleared((prev) => {
           const n = new Set(prev);
@@ -256,6 +304,11 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
   const totalNeedsActivation = plan
     ? plan.reduce((a, d) => a + (d.tickers || []).filter((t) => !t.exists).length, 0)
     : 0;
+  // Verdict: is PULL_OWED needed? Owed backlog detected by the probe, or
+  // ticker accounts that must be activated first (the fast path can reach
+  // neither).
+  const owedTotalUsd = owed ? [...owed.values()].reduce((s, o) => s + owedUsdFor(o), 0) : 0;
+  const pullNeeded = owedTotalUsd > 0 || totalNeedsActivation > 0;
   const allUsd = plan ? plan.reduce((s, d) => s + deskUsdValue(d), 0) : 0;
   const allSol = solPriceUsd ? allUsd / solPriceUsd : null;
 
@@ -327,7 +380,9 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
 
       <HelpNote label="[?] HOW_IT_WORKS" className="mt-2">
         Each ticker is probed unsigned (no fee) for how many distributes its claim needs; failing
-        sims are skipped (no fee spent); the program enforces you own the NFT. PULL_OWED ON also
+        sims are skipped (no fee spent); the program enforces you own the NFT. The PULL_OWED
+        verdict is probed the same way — a free unsigned distribute per empty ticker shows
+        whether owed backlog exists that only PULL_OWED can pull. PULL_OWED ON also
         opens missing accounts and pulls the full owed backlog first (more approvals; run
         occasionally). NOTE: claims drain the vault to ZERO on-chain, but desks re-accrue new
         stock continuously — balances that reappear after a claim (marked ↻ NEW_ACCRUAL) are
@@ -434,6 +489,15 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
                         </div>
                       ) : null;
                     })()}
+                    {(() => {
+                      const o = owed?.get(d.asset_id);
+                      if (!o?.items?.length) return null;
+                      return (
+                        <div className="font-mono text-[8px] leading-tight text-cyan-300/80">
+                          OWED ≥ {fmtUsd(owedUsdFor(o), 2)} · PULL_OWED
+                        </div>
+                      );
+                    })()}
                   </>
                 ) : (
                   <div className="font-mono text-[9px] text-green-500/30">SCAN…</div>
@@ -493,6 +557,19 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
           {totalNeedsActivation > 0 && (
             <span className="text-cyan-400">
               {totalNeedsActivation} ticker(s) need activation
+            </span>
+          )}
+          {!busy && (
+            <span
+              className={pullNeeded ? "text-cyan-300" : "text-emerald-400/70"}
+              title="Probed unsigned on-chain: would PULL_OWED deliver stock the fast path can't reach?"
+            >
+              PULL_OWED ::{" "}
+              {probing
+                ? "PROBING…"
+                : pullNeeded
+                ? `NEEDED — ≥${fmtUsd(owedTotalUsd, 2)} owed${totalNeedsActivation ? ` · ${totalNeedsActivation} to activate` : ""}`
+                : "NOT NEEDED"}
             </span>
           )}
           {selected.size > 0 && (

@@ -793,6 +793,82 @@ export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
   return pairs;
 }
 
+// ---- PULL_OWED probe ----
+// Answers "is PULL_OWED needed?" for the claim panel: does any desk hold owed
+// backlog in the protocol pot that the fast path cannot reach? The fast path
+// only claims tickers already IN the vault, so the only gap is tickers whose
+// vault account exists but holds 0. For each such ticker we simulate ONE
+// distribute(slot) — unsigned, never committed, no fee, no wallet prompt —
+// and read the simulated POST balance of the vault's stock account: delivered
+// > 0 means the protocol owes stock that only a PULL_OWED run would move.
+// One distribute advances one round, so the true backlog is >= the probe's
+// reading (the UI shows "OWED >=").
+const PROBE_MAX_JOBS = 45;
+
+export async function probeOwed(desks, user) {
+  const out = new Map(); // asset_id -> { items: [{symbol, mint, decimals, amount}] }
+  if (!desks?.length || !user) return out;
+
+  const tpMap = {};
+  for (const d of desks) {
+    for (const t of d.tickers || []) {
+      if (t.token_program) tpMap[t.mint] = t.token_program;
+    }
+  }
+  const jobs = [];
+  for (const d of desks) {
+    for (const t of d.tickers || []) {
+      if (!t.exists || t.amount > 0) continue; // fast path covers non-empty vaults
+      const slot = SLOT_BY_SYMBOL[t.symbol];
+      if (!slot) continue;
+      const vault = vaultPda(new PublicKey(d.asset_id));
+      const tp = new PublicKey(tpMap[t.mint] || TOKEN_2022_PROGRAM_ID.toBase58());
+      jobs.push({
+        asset_id: d.asset_id,
+        ticker: t,
+        ix: buildDistributeIx(d.asset_id, slot.slot, slot.mint, tpMap),
+        nftStock: nftStockAta(vault, t.mint, tp).toBase58(),
+      });
+    }
+  }
+  if (!jobs.length) return out;
+  const bounded = jobs.slice(0, PROBE_MAX_JOBS);
+
+  const txs = await packTxs(bounded.map((j) => j.ix), user);
+  await mapLimit(txs, 3, async (tx) => {
+    try {
+      const members = bounded.filter((j) =>
+        tx.instructions.some((ix) => ix.keys.some((k) => k.pubkey.toBase58() === j.nftStock))
+      );
+      if (!members.length) return;
+      const b64 = tx
+        .serialize({ requireAllSignatures: false, verifySignatures: false })
+        .toString("base64");
+      const r = await relay("simulate", { tx: b64, accounts: members.map((m) => m.nftStock) });
+      if (r.err || !Array.isArray(r.postAccounts)) return;
+      members.forEach((m, i) => {
+        const data = r.postAccounts[i];
+        if (!data) return;
+        const buf = Buffer.from(data, "base64");
+        if (buf.length < ACCOUNT_SIZE) return;
+        const amount = Number(AccountLayout.decode(buf).amount);
+        if (!(amount > 0)) return;
+        const entry = out.get(m.asset_id) || { items: [] };
+        entry.items.push({
+          symbol: m.ticker.symbol,
+          mint: m.ticker.mint,
+          decimals: m.ticker.decimals,
+          amount,
+        });
+        out.set(m.asset_id, entry);
+      });
+    } catch {
+      /* skip unreadable probe tx */
+    }
+  });
+  return out;
+}
+
 // distribute(slot) advances a desk ONE coin/round at a time for that slot
 // (verified against the live program: a desk behind R rounds needs R distribute
 // calls before its claim clears UndistributedBalance 6022). So the "atomic

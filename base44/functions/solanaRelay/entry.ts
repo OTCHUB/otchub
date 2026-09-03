@@ -59,9 +59,22 @@ export default async function (req) {
     if (mode === "simulate") {
       const tx = body.tx;
       if (!tx) return Response.json({ error: "tx required" }, { status: 400 });
+      // Optional includeAccounts: the caller can request the simulated
+      // POST-execution state of specific accounts (the claim panel's
+      // PULL_OWED probe uses this to read what a distribute would deliver).
+      // State is never committed — simulation only.
+      const incl = Array.isArray(body.accounts)
+        ? body.accounts.filter((k) => typeof k === "string").slice(0, 20)
+        : [];
       const r = await heliusRpc("simulateTransaction", [
         tx,
-        { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed", encoding: "base64" },
+        {
+          sigVerify: false,
+          replaceRecentBlockhash: true,
+          commitment: "confirmed",
+          encoding: "base64",
+          ...(incl.length ? { accounts: { encoding: "base64", addresses: incl } } : {}),
+        },
       ]);
       const v = r?.value || {};
       return Response.json({
@@ -69,6 +82,7 @@ export default async function (req) {
         err: v.err ? JSON.stringify(v.err) : null,
         logs: v.logs || [],
         units: v.unitsConsumed ?? null,
+        postAccounts: Array.isArray(v.accounts) ? v.accounts : null,
       });
     }
 
