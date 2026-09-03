@@ -14,6 +14,7 @@
 // Gaps from a rate-limited run fall back to the previously cached values.
 
 import { STOCKS } from "./otcIdl.ts";
+import { ADDRESSES, fetchDasTokenInfo } from "./otcSources.ts";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 const OTC_PAIR_ADDR = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
@@ -99,7 +100,13 @@ export async function getSpotPrices(base44) {
       pairs.find(
         (x) => String(x.pairAddress).toLowerCase() === OTC_PAIR_ADDR.toLowerCase()
       ) ||
-      pairs.find((x) => x.chainId === "solana") ||
+      // Never fall back to an arbitrary solana pair — that would serve another
+      // token's price as $OTC. Match on the OTC base token instead.
+      pairs.find(
+        (x) =>
+          x.chainId === "solana" &&
+          String(x.baseToken?.address).toLowerCase() === ADDRESSES.OTC_TOKEN_MINT.toLowerCase()
+      ) ||
       null;
   }
   if (solR.status === "fulfilled") {
@@ -120,10 +127,40 @@ export async function getSpotPrices(base44) {
     for (const k of Object.keys(row.prices)) {
       if (prices[k] == null) prices[k] = row.prices[k];
     }
-    if (!otcPair && row.otc_pair) otcPair = row.otc_pair;
   }
 
-  const payload = { prices, otc_pair: pairSummary(otcPair) };
+  // $OTC pair summary, merged PER-FIELD with the previous cache row so a
+  // partial upstream response never wipes fields (price/mcap/volume/
+  // liquidity/changes) we already had — a null overwrite here is exactly
+  // what made the dashboard ticker flicker to "-".
+  let otcSummary = pairSummary(otcPair);
+  if (otcSummary) {
+    const prevPair = row?.otc_pair || {};
+    otcSummary = Object.fromEntries(
+      Object.entries(otcSummary).map(([k, v]) => [k, v ?? prevPair[k] ?? null])
+    );
+  } else {
+    otcSummary = row?.otc_pair || null;
+  }
+
+  // Helius DAS fallback (verified price, cached server-side ≤10 min): keeps
+  // the OTC + SOL prices alive through DexScreener outages / rate-limits at
+  // zero extra DexScreener cost. https://www.helius.dev/docs/das/get-tokens
+  if (otcSummary?.price_usd == null) {
+    const das = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
+    if (das?.priceUsd != null) {
+      otcSummary = { ...(otcSummary || {}), price_usd: das.priceUsd };
+      if (prices[ADDRESSES.OTC_TOKEN_MINT] == null) {
+        prices[ADDRESSES.OTC_TOKEN_MINT] = das.priceUsd;
+      }
+    }
+  }
+  if (prices[SOL_MINT] == null) {
+    const dasSol = await fetchDasTokenInfo(SOL_MINT);
+    if (dasSol?.priceUsd != null) prices[SOL_MINT] = dasSol.priceUsd;
+  }
+
+  const payload = { prices, otc_pair: otcSummary };
   if (row?.id) {
     await base44.asServiceRole.entities.PriceCache.update(row.id, payload);
   } else {

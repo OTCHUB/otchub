@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import { ADDRESSES, fetchTokenSupply } from "../../shared/otcSources.ts";
+import { ADDRESSES, fetchDasTokenInfo } from "../../shared/otcSources.ts";
 
 export default async function (req) {
   try {
@@ -33,10 +33,13 @@ export default async function (req) {
     const DEPOSIT_OLD = 1_000_000;
     const DEPOSIT_NEW = 100_000;
 
+    // Exact on-chain supply via Helius DAS (keyed RPC). This used to call
+    // fetchTokenSupply, which hit DexScreener on EVERY dashboard load — a
+    // major driver of the intermittent rate-limit gaps on the price ticker.
     let liveSupply = latest?.token_total_supply ?? null;
     try {
-      const live = await fetchTokenSupply(ADDRESSES.OTC_TOKEN_MINT);
-      if (live != null) liveSupply = live;
+      const das = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
+      if (das?.supply != null) liveSupply = das.supply;
     } catch (e) {
       /* keep snapshot/null anchor */
     }

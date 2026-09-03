@@ -5,14 +5,11 @@
 import {
   ADDRESSES,
   fetchDasTokenInfo,
-  fetchDexScreenerToken,
-  fetchSolPriceUsd,
   fetchAccountBalanceLamports,
   fetchCollectionAssets,
   fetchMagicEdenStats,
   fetchMagicEdenListings,
   fetchProtocolStats,
-  fetchTokenSupply,
 } from "./otcSources.ts";
 import { acquireLock, releaseLock } from "./dataLock.ts";
 import { readVaultStock } from "./vaultBalances.ts";
@@ -33,22 +30,24 @@ const latestSnapshot = async (base44) => {
   return recent?.[0] || null;
 };
 
-// Lightweight price-only refresh: fetch JUST DexScreener OTC price + SOL spot,
-// then recompute the price-derived fields on the latest snapshot in place.
-// Skips all heavy on-chain / Magic Eden / otcdesks calls so it can run every
-// minute without rate-limiting. created_date is NOT touched (only updated_date
+// Lightweight price-only refresh: pull OTC + SOL spot prices from the GLOBAL
+// shared price cache (shared/spotPrices.ts), then recompute the price-derived
+// fields on the latest snapshot in place. Skips all heavy on-chain / Magic
+// Eden / otcdesks calls so it can run every minute without rate-limiting.
+// created_date is NOT touched (only updated_date
 // bumps), so the 5-min full-snapshot cadence + history stay intact and the
 // full-fetch freshness gate still works. Returns the response payload, or
 // null when no snapshot exists yet (caller should fall through to a full fetch).
 export async function priceOnlyRefresh(base44) {
-  const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
-  let solPriceUsd = await fetchSolPriceUsd();
-  let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
-  let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
-  // Helius DAS price (verified token, cached ≤10 min) as a fresh fallback
-  // when DexScreener is rate-limited. https://www.helius.dev/docs/das/get-tokens
-  const dasInfo = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
-  if (tokenPriceUsd == null && dasInfo?.priceUsd != null) tokenPriceUsd = dasInfo.priceUsd;
+  // All prices come from the GLOBAL shared price cache (shared/spotPrices.ts):
+  // one upstream round-trip per TTL window serves every refresh, every user
+  // and every backend consumer — this path adds ZERO extra DexScreener calls
+  // (it previously burned 2 direct requests on every refresh).
+  const spot = await getSpotPrices(base44);
+  const otcPair = spot.otc_pair || {};
+  let solPriceUsd = spot.prices[SOL_MINT] ?? null;
+  let tokenPriceUsd = otcPair.price_usd ?? null;
+  let tokenPriceSol = otcPair.price_native ?? null;
 
   const p = await latestSnapshot(base44);
   if (!p) return null;
@@ -105,7 +104,6 @@ export async function priceOnlyRefresh(base44) {
     updated: p.id,
     token_price_usd: tokenPriceUsd,
     sol_price_usd: solPriceUsd,
-    das_price_usd: dasInfo?.priceUsd ?? null,
     recommendation,
   };
 }
@@ -159,19 +157,24 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     }
   }
 
-  // DexScreener calls run sequentially to avoid concurrent rate-limiting
-  const pair = await fetchDexScreenerToken(ADDRESSES.OTC_TOKEN_MINT);
-  let solPriceUsd = await fetchSolPriceUsd();
+  // ALL prices come from the global shared price cache (shared/spotPrices.ts):
+  // one upstream round-trip per TTL window for the whole app, with Helius DAS
+  // + last-known-value fallbacks built in. The ingest used to burn its own
+  // direct DexScreener requests here — a major driver of the intermittent
+  // rate-limit gaps on the dashboard.
+  const spot = await getSpotPrices(base44);
+  const pair = spot.otc_pair || {};
+  let solPriceUsd = spot.prices[SOL_MINT] ?? null;
+  let tokenPriceUsd = pair.price_usd ?? null;
+  let tokenPriceSol = pair.price_native ?? null;
 
-  // Helius DAS getAsset (showFungible): verified USD price (cached ≤10 min)
-  // plus exact on-chain supply — fills price/supply gaps whenever DexScreener
-  // or getTokenSupply fails. https://www.helius.dev/docs/das/get-tokens
+  // Helius DAS getAsset (showFungible): exact decimal-adjusted on-chain
+  // supply, plus a verified USD price as a cold-cache fallback.
+  // https://www.helius.dev/docs/das/get-tokens
   const dasInfo = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
-
-  // Fall back to last known prices if DexScreener is rate-limited this run
-  let tokenPriceUsd = pair ? parseFloat(pair.priceUsd) : null;
-  let tokenPriceSol = pair ? parseFloat(pair.priceNative) : null;
   if (tokenPriceUsd == null && dasInfo?.priceUsd != null) tokenPriceUsd = dasInfo.priceUsd;
+
+  // Fall back to last known prices if even the shared cache is cold
   if (tokenPriceUsd == null || solPriceUsd == null || tokenPriceSol == null) {
     const p = await latestSnapshot(base44);
     if (p) {
@@ -187,22 +190,26 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // allSettled: a Helius / Magic Eden / otcdesks outage on ONE call must NOT
   // abort the whole snapshot — whatever succeeds still gets persisted so the
   // dashboard keeps refreshing instead of going stale for hours.
-  const [potR, meR, lsR, asR, stR, tsR] = await Promise.allSettled([
+  const [potR, meR, lsR, asR, stR] = await Promise.allSettled([
     fetchAccountBalanceLamports(ADDRESSES.POT),
     fetchMagicEdenStats(ADDRESSES.MAGIC_EDEN_SYMBOL),
     fetchMagicEdenListings(ADDRESSES.MAGIC_EDEN_SYMBOL),
     fetchCollectionAssets(ADDRESSES.NFT_COLLECTION),
     fetchProtocolStats(),
-    fetchTokenSupply(ADDRESSES.OTC_TOKEN_MINT),
   ]);
   const potLamports = potR.status === "fulfilled" ? potR.value : null;
   const meStats = meR.status === "fulfilled" ? meR.value : null;
   const listings = lsR.status === "fulfilled" ? lsR.value : [];
   const assets = asR.status === "fulfilled" ? asR.value : null;
   const stats = stR.status === "fulfilled" ? stR.value : null;
-  // Supply fallback: DAS getAsset carries the exact decimal-adjusted
-  // on-chain supply, so a getTokenSupply outage doesn't stall burn metrics.
-  const tokenSupply = tsR.status === "fulfilled" ? tsR.value : dasInfo?.supply ?? null;
+  // Exact decimal-adjusted on-chain supply straight from Helius DAS getAsset
+  // (fetched above) — no direct DexScreener/RPC supply call needed. Fall back
+  // to the previous snapshot's supply on the rare DAS gap.
+  let tokenSupply = dasInfo?.supply ?? null;
+  if (tokenSupply == null) {
+    const ps = await latestSnapshot(base44);
+    tokenSupply = ps?.token_total_supply ?? null;
+  }
 
   const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
@@ -225,9 +232,16 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   }
   const totalSupply = assetsOk ? assetList.length : (prevSnap?.nft_total_supply ?? 0);
   const perDeskHistory = stats?.perDesk || [];
-  const desksMinted = perDeskHistory.length
-    ? perDeskHistory[perDeskHistory.length - 1].desks
-    : (prevSnap?.desks_minted ?? totalSupply);
+  // AUTHORITATIVE desk supply: the Helius DAS collection scan counts every
+  // desk that exists on-chain right now. otcdesks.cash's daily history lags
+  // real mints (its latest rollup sat dozens of desks behind the chain), so
+  // use the on-chain count whenever the scan succeeded and fall back to the
+  // site history / previous snapshot only when the scan failed.
+  const desksMinted = assetsOk
+    ? totalSupply
+    : perDeskHistory.length
+      ? perDeskHistory[perDeskHistory.length - 1].desks
+      : (prevSnap?.desks_minted ?? totalSupply);
   const listedCount = meStats?.listedCount ?? null;
   const floorSol =
     meStats?.floorPrice != null
@@ -296,15 +310,15 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     sol_price_usd: solPriceUsd,
     token_price_usd: tokenPriceUsd,
     token_price_sol: tokenPriceSol,
-    token_market_cap: pair?.marketCap
-      ? parseFloat(pair.marketCap)
-      : stats?.marketCap ??
-        (tokenPriceUsd != null && dasInfo?.supply != null
-          ? tokenPriceUsd * dasInfo.supply
-          : null),
-    token_volume_24h: pair?.volume?.h24 ? parseFloat(pair.volume.h24) : stats?.volume24h ?? null,
-    token_liquidity_usd: pair?.liquidity?.usd ? parseFloat(pair.liquidity.usd) : null,
-    token_price_change_24h: pair?.priceChange?.h24 ? parseFloat(pair.priceChange.h24) : null,
+    token_market_cap:
+      pair.market_cap ??
+      stats?.marketCap ??
+      (tokenPriceUsd != null && dasInfo?.supply != null
+        ? tokenPriceUsd * dasInfo.supply
+        : null),
+    token_volume_24h: pair.volume_24h ?? stats?.volume24h ?? null,
+    token_liquidity_usd: pair.liquidity_usd ?? null,
+    token_price_change_24h: pair.change_24h ?? null,
     nft_floor_sol: floorSol,
     nft_floor_usd: floorUsd,
     nft_listed_count: listedCount,
