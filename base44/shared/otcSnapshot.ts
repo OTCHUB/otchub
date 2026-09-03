@@ -316,10 +316,14 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   const protocolDistributedSol = solOf(stats?.distributed);
   const roundsTotal = perDeskHistory.reduce((a, d) => a + (d.rounds || 0), 0);
 
-  const perDeskAccruedSol =
-    desksMinted > 0 && protocolDistributedSol != null
-      ? protocolDistributedSol / desksMinted
-      : null;
+  // Per-desk lifetime accrual MUST come from the DESK-ONLY channel: the
+  // otcdesks "distributed" headline mixes launchpad-holder payouts (GPRO/PUMP/
+  // SPYx/... rows, ~3136 of 3813 SOL) into the total, which overstated the
+  // per-desk figure by ~2.2x. The perDesk history is desk-only (validated:
+  // lamports is per-desk/day and lamports x desks tracks the daily "spent"
+  // almost exactly), so its lifetime sum / current desks is the true average.
+  const deskChannelSol = perDesk.reduce((a, d) => a + (d.total_earned_sol || 0), 0);
+  const perDeskAccruedSol = desksMinted > 0 ? deskChannelSol / desksMinted : null;
   const perDeskAccruedUsd =
     perDeskAccruedSol != null && solPriceUsd ? perDeskAccruedSol * solPriceUsd : null;
 

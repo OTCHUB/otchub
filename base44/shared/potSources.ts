@@ -6,15 +6,18 @@
 // per-source split, and its global "distributed" figure mixes launchpad-holder
 // payouts with desk distributions. The pot's actual inflow transactions ARE
 // attributable on-chain:
-//   - MINT: desk mint surcharge — 90% of the 0.5 SOL per-mint surcharge,
-//     deposited by the OTC program inside the mint tx itself.
+//   - MINT: desk-mint channel — the 0.45 SOL pot share of the 0.5 SOL
+//     surcharge PLUS the proceeds of selling the 100k-OTC deposit via
+//     PumpAMM, all deposited by the OTC program inside the mint tx (verified
+//     on-chain: mint txs bundle PumpAMM + PumpFun + OTC instructions and the
+//     pot nets ~0.68 SOL per mint).
 //   - ROYALTY: Magic Eden desk-sale creator royalties (5%) — deposited
 //     directly into the pot inside each marketplace sale tx (verified
 //     on-chain: pot inflows inside ME v1 escrow / v2 marketplace program txs).
-//   - LAUNCHPAD: launcher creator fees — the pot's share is settled per-trade
-//     through pump.fun bonding-curve / PumpAMM fee txs (verified on-chain: the
-//     pot receives ~9.98% of each settled fee, matching the newsletter's
-//     "10% Pot" launcher split).
+//   - LAUNCHPAD: per-swap fee settlements arriving through pump.fun /
+//     PumpAMM fee txs — the launcher creator-fee pot share and/or the $OTC
+//     trading-tax pot share, which are indistinguishable on-chain (both
+//     land as micro fee-recipient deposits in swap txs).
 //   - OTHER: everything else — the $OTC trading-tax share (80% pot per the
 //     newsletter) arrives without a per-swap-attributable pot deposit pattern
 //     ($OTC pumpswap swaps never touch the pot directly), plus sweeps and

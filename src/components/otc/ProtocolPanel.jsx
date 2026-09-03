@@ -31,7 +31,7 @@ export default function ProtocolPanel({ latest }) {
       </div>
       <div className="mt-2">
         <Row label="POT_BALANCE" value={fmtSol(latest?.pot_sol_balance)} desc="SOL held in the pot wallet" />
-        <Row label="TOTAL_DISTRIBUTED" value={fmtSol(latest?.protocol_distributed_sol)} desc="SOL paid out to desks" />
+        <Row label="TOTAL_DISTRIBUTED" value={fmtSol(latest?.protocol_distributed_sol)} desc="SOL paid out: desks + launchpad holders" />
         <Row label="EARNED" value={fmtSol(latest?.protocol_earned_sol)} desc="Gross SOL collected by protocol" />
         <Row label="OWED_TO_POT" value={fmtSol(latest?.protocol_owed_sol)} desc="Pending distribution to pot" />
         <Row label="ROUNDS" value={fmtNum(latest?.rounds_total)} desc="Distribution rounds completed" />
