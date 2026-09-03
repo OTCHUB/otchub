@@ -37,12 +37,13 @@ export default function PotSourcesChart({ latest }) {
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
-        POT_REVENUE :: BY SOURCE (SOL/DAY · STACKED)
+        POT_INFLOW :: BY SOURCE (SOL/DAY · STACKED)
       </div>
       <div className="mt-1 text-[9px] leading-snug text-green-500/40">
-        desk pot SOL inflow, measured on-chain · MINT (0.45 SOL surcharge + 100k-OTC deposit sale
-        proceeds per mint) · ME_ROYALTY (5% creator fee on desk sales → pot) · LAUNCHPAD/TAX
-        (per-swap fee settlements → pot) · UNATTRIB (sweeps &amp; misc)
+        pot SOL inflow, measured on-chain · MINT (0.45 SOL surcharge + 100k-OTC deposit sale
+        proceeds per mint) · ME_ROYALTY (5% creator fee on desk sales → pot) · LAUNCHPAD
+        (launcher fee settlements — mostly PASS-THROUGH to launchpad holders, only ~10% stays
+        for desks) · UNATTRIB (sweeps &amp; misc)
         {ps?.since ? ` · tracking since ${ps.since}` : ""}
       </div>
       {rows.length === 0 ? (
