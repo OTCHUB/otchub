@@ -41,7 +41,7 @@ const LAMPORTS_PER_SOL = 1e9;
 const PAGE_LIMIT = 100; // Helius REST page cap
 const MAX_PAGES = 10; // incremental walk depth when the cursor is far behind
 const FIRST_RUN_PAGES = 40; // version reset: deep one-time backfill (4000 txs)
-const BACKFILL_PAGES = 10; // per-run budget extending history backward
+const BACKFILL_PAGES = 30; // per-run budget extending history backward (~3000 txs/run)
 // Backfill walks the pot's tx history ALL the way back to the protocol's
 // first pot deposit (bounded pages per ingest), so the day map covers the
 // full protocol lifetime — later sources (e.g. royalties) simply show as
