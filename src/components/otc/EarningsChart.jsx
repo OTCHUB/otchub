@@ -12,7 +12,6 @@ import {
 } from "recharts";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
-import DeskPotSimulator from "@/components/otc/DeskPotSimulator";
 
 function Metric({ label, value, sub, accent = "text-green-300" }) {
   return (
@@ -24,44 +23,12 @@ function Metric({ label, value, sub, accent = "text-green-300" }) {
   );
 }
 
-// Overlay modes for the single merged earnings chart: the per-desk daily
-// earning line, the APR trend, or the breakeven trend — one at a time so the
-// chart stays compact and every line keeps its own readable right axis.
-const OVERLAYS = {
-  EARN: {
-    label: "EARN",
-    key: "avg",
-    name: "AVG_DESK",
-    stroke: "#4ade80",
-    fmtTick: (v, unit) => (unit === "USD" ? `$${+v.toFixed(2)}` : `${+v.toFixed(3)}`),
-    fmtTip: (v, fmt) => fmt(v),
-  },
-  APR: {
-    label: "APR",
-    key: "apr",
-    name: "APR_%",
-    stroke: "#22d3ee",
-    fmtTick: (v) => `${+v.toFixed(0)}%`,
-    fmtTip: (v) => `${v.toFixed(1)}%`,
-  },
-  BE: {
-    label: "BREAKEVEN",
-    key: "be",
-    name: "BREAKEVEN_D",
-    stroke: "#fbbf24",
-    fmtTick: (v) => `${+v.toFixed(0)}d`,
-    fmtTip: (v) => `${v.toFixed(1)} days`,
-  },
-};
-
 export default function EarningsChart({ latest, history }) {
   const [unit, setUnit] = useState("USD");
-  const [overlay, setOverlay] = useState("EARN");
   const raw = latest?.per_desk?.items || [];
   const solUsd = latest?.sol_price_usd || 0;
   const toUnit = (sol) => (unit === "USD" ? sol * solUsd : sol);
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 2) : fmtSol(v, 3));
-  const ov = OVERLAYS[overlay];
 
   // The feed's newest UTC day may still be RUNNING (partial). Closed days
   // drive the trend lines, the trailing average and the headline
@@ -121,44 +88,25 @@ export default function EarningsChart({ latest, history }) {
             EARNINGS :: {unit} / DAY
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
-            bars = total into desks · overlay = per-desk yield trend
+            bars = total into desks · lines = avg/desk · APR · breakeven
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-1">
-          <div className="inline-flex overflow-hidden border border-green-500/30">
-            {Object.values(OVERLAYS).map((o, i) => (
-              <button
-                key={o.key}
-                onClick={() => setOverlay(o.key)}
-                className={`px-2 py-1 font-mono text-[10px] ${
-                  i > 0 ? "border-l border-green-500/30" : ""
-                } ${
-                  overlay === o.key
-                    ? "bg-emerald-500/15 text-emerald-400"
-                    : "text-green-500/60 hover:text-green-400"
-                }`}
-              >
-                [{o.label}]
-              </button>
-            ))}
-          </div>
-          <div className="inline-flex overflow-hidden border border-green-500/30">
-            {["USD", "SOL"].map((u) => (
-              <button
-                key={u}
-                onClick={() => setUnit(u)}
-                className={`px-2 py-1 font-mono text-[10px] ${
-                  u === "SOL" ? "border-l border-green-500/30" : ""
-                } ${
-                  unit === u
-                    ? "bg-emerald-500/15 text-emerald-400"
-                    : "border-green-500/30 text-green-500/60"
-                }`}
-              >
-                [{u}]
-              </button>
-            ))}
-          </div>
+        <div className="inline-flex overflow-hidden border border-green-500/30">
+          {["USD", "SOL"].map((u) => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              className={`px-2 py-1 font-mono text-[10px] ${
+                u === "SOL" ? "border-l border-green-500/30" : ""
+              } ${
+                unit === u
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "text-green-500/60 hover:text-green-400"
+              }`}
+            >
+              [{u}]
+            </button>
+          ))}
         </div>
       </div>
 
@@ -191,11 +139,11 @@ export default function EarningsChart({ latest, history }) {
 
       <HelpNote label="[?] METHODOLOGY">
         Bars show TOTAL earnings pushed into desk vaults per day — today's bar is still growing.
-        The overlay line (toggle EARN / APR / BREAKEVEN) uses CLOSED days only: today's running
-        day and the single-desk bootstrap days are excluded so the trend reflects finished days.
-        APR = that day's per-desk earning annualized vs that day's NFT floor. BREAKEVEN = days to
-        recoup the floor at that day's earning rate. The 1D RUNNING cards track today's partial
-        day until it closes.
+        The AVG_DESK line (green) is that day's per-desk earning; APR_% (cyan) is that earning
+        annualized vs that day's NFT floor; BREAKEVEN_D (amber) is days to recoup the floor at
+        that day's rate. Lines use CLOSED days only: today's running day and the single-desk
+        bootstrap days are excluded so the trend reflects finished days. The 1D RUNNING cards
+        track today's partial day until it closes.
       </HelpNote>
 
       <div className="mt-2 h-52 sm:h-64">
@@ -212,13 +160,31 @@ export default function EarningsChart({ latest, history }) {
               width={56}
             />
             <YAxis
-              yAxisId="ov"
+              yAxisId="avg"
               orientation="right"
-              stroke={ov.stroke}
-              fontSize={10}
-              tick={{ fill: ov.stroke }}
-              tickFormatter={(v) => ov.fmtTick(v, unit)}
-              width={48}
+              stroke="#4ade80"
+              fontSize={9}
+              tick={{ fill: "#4ade80" }}
+              tickFormatter={(v) => (unit === "USD" ? `$${+v.toFixed(2)}` : `${+v.toFixed(3)}`)}
+              width={46}
+            />
+            <YAxis
+              yAxisId="apr"
+              orientation="right"
+              stroke="#22d3ee"
+              fontSize={9}
+              tick={{ fill: "#22d3ee" }}
+              tickFormatter={(v) => `${+v.toFixed(0)}%`}
+              width={40}
+            />
+            <YAxis
+              yAxisId="be"
+              orientation="right"
+              stroke="#fbbf24"
+              fontSize={9}
+              tick={{ fill: "#fbbf24" }}
+              tickFormatter={(v) => `${+v.toFixed(0)}d`}
+              width={40}
             />
             <Tooltip
               contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
@@ -226,26 +192,46 @@ export default function EarningsChart({ latest, history }) {
               formatter={(v, n) => {
                 if (v == null) return [n === "AVG_DESK" ? "— excluded (running)" : "—", n];
                 if (n === "TOTAL") return [fmt(v), n];
-                return [ov.fmtTip(v, fmt), n];
+                if (n === "APR_%") return [`${v.toFixed(1)}%`, n];
+                if (n === "BREAKEVEN_D") return [`${v.toFixed(1)} days`, n];
+                return [fmt(v), n];
               }}
             />
             <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Bar yAxisId="unit" dataKey="total" name="TOTAL" fill="#0a3a1a" stroke="#1a6b3a" />
             <Line
-              yAxisId="ov"
+              yAxisId="avg"
               type="monotone"
-              dataKey={ov.key}
-              name={ov.name}
-              stroke={ov.stroke}
-              dot={{ r: 2, fill: ov.stroke }}
+              dataKey="avg"
+              name="AVG_DESK"
+              stroke="#4ade80"
+              dot={{ r: 2, fill: "#4ade80" }}
+              strokeWidth={1.5}
+              connectNulls
+            />
+            <Line
+              yAxisId="apr"
+              type="monotone"
+              dataKey="apr"
+              name="APR_%"
+              stroke="#22d3ee"
+              dot={false}
+              strokeWidth={1.5}
+              connectNulls
+            />
+            <Line
+              yAxisId="be"
+              type="monotone"
+              dataKey="be"
+              name="BREAKEVEN_D"
+              stroke="#fbbf24"
+              dot={false}
               strokeWidth={1.5}
               connectNulls
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-
-      <DeskPotSimulator latest={latest} />
     </div>
   );
 }
