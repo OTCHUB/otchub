@@ -8,6 +8,9 @@
 // attributable on-chain:
 //   - MINT: desk mint surcharge — 90% of the 0.5 SOL per-mint surcharge,
 //     deposited by the OTC program inside the mint tx itself.
+//   - ROYALTY: Magic Eden desk-sale creator royalties (5%) — deposited
+//     directly into the pot inside each marketplace sale tx (verified
+//     on-chain: pot inflows inside ME v1 escrow / v2 marketplace program txs).
 //   - LAUNCHPAD: launcher creator fees — the pot's share is settled per-trade
 //     through pump.fun bonding-curve / PumpAMM fee txs (verified on-chain: the
 //     pot receives ~9.98% of each settled fee, matching the newsletter's
@@ -31,10 +34,17 @@ const POT = ADDRESSES.POT;
 const OTC_PROGRAM = ADDRESSES.PROGRAM;
 const PUMPFUN_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 const PUMPAMM_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+const ME_V1_PROGRAM = "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K"; // Magic Eden v1 escrow
+const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc"; // Magic Eden v2 marketplace
+const ME_PROGRAMS = new Set([ME_V1_PROGRAM, ME_V2_PROGRAM]);
 const LAMPORTS_PER_SOL = 1e9;
 const PAGE_LIMIT = 100; // Helius REST page cap
 const MAX_PAGES = 10; // first run backfills up to 1000 txs; later runs are 1 page
 const KEEP_DAYS = 30;
+// Bucket layout version. Bumping resets the day map + cursor so history is
+// re-backfilled with the new source split (e.g. v2 carved royalties out of
+// the old "other" bucket — without a reset those days would double-count).
+const SOURCES_VERSION = 2;
 
 async function fetchPotTxs(before) {
   const key = secrets.get("HELIUS_API_KEY");
@@ -56,6 +66,7 @@ function classify(t) {
   const progs = new Set((t.instructions || []).map((i) => i.programId));
   let source = "other";
   if (progs.has(OTC_PROGRAM)) source = "mint";
+  else if ([...progs].some((p) => ME_PROGRAMS.has(p))) source = "royalty";
   else if (progs.has(PUMPFUN_PROGRAM) || progs.has(PUMPAMM_PROGRAM)) source = "launchpad";
   return {
     source,
@@ -69,7 +80,10 @@ function classify(t) {
 // day, pruned to the last KEEP_DAYS. Throws on API failure so the caller can
 // keep the previous snapshot's data untouched.
 export async function scanPotSources(prev) {
-  const prevCursor = prev?.cursor || null;
+  // Only carry forward a day map of the same bucket layout; a version bump
+  // re-backfills from scratch so old buckets never mix with new ones.
+  const carry = prev && prev._v === SOURCES_VERSION ? prev : null;
+  const prevCursor = carry?.cursor || null;
   let newestSig = null;
   let before = null;
   const collected = [];
@@ -95,9 +109,9 @@ export async function scanPotSources(prev) {
   if (!newestSig) return null;
 
   // Merge the new inflows into the carried-forward day map.
-  const merged = { ...(prev?.days || {}) };
+  const merged = { ...(carry?.days || {}) };
   for (const c of collected) {
-    const d = (merged[c.day] = merged[c.day] || { mint: 0, launchpad: 0, other: 0 });
+    const d = (merged[c.day] = merged[c.day] || { mint: 0, royalty: 0, launchpad: 0, other: 0 });
     d[c.source] = (d[c.source] || 0) + c.sol;
   }
   const dayKeys = Object.keys(merged).sort();
@@ -107,13 +121,15 @@ export async function scanPotSources(prev) {
     const d = merged[k] || {};
     days[k] = {
       mint: +(d.mint || 0).toFixed(6),
+      royalty: +(d.royalty || 0).toFixed(6),
       launchpad: +(d.launchpad || 0).toFixed(6),
       other: +(d.other || 0).toFixed(6),
     };
   }
   return {
+    _v: SOURCES_VERSION,
     days,
     cursor: newestSig,
-    since: prev?.since || dayKeys[0] || null,
+    since: carry?.since || dayKeys[0] || null,
   };
 }

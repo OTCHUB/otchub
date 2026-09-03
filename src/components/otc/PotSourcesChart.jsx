@@ -8,6 +8,7 @@ import { fmtSol } from "@/lib/format";
 // ($OTC trading-tax sweeps and misc — no per-swap pot deposit pattern exists).
 const SEGMENTS = [
   { key: "mint", name: "MINT", fill: "#166534" },
+  { key: "royalty", name: "ME_ROYALTY", fill: "#0e7490" },
   { key: "launchpad", name: "LAUNCHPAD", fill: "#22c55e" },
   { key: "other", name: "UNATTRIB", fill: "#b45309" },
 ];
@@ -21,6 +22,7 @@ export default function PotSourcesChart({ latest }) {
     .map(([day, d]) => ({
       day: day.slice(5),
       mint: +(d.mint || 0).toFixed(4),
+      royalty: +(d.royalty || 0).toFixed(4),
       launchpad: +(d.launchpad || 0).toFixed(4),
       other: +(d.other || 0).toFixed(4),
     }));
@@ -36,8 +38,9 @@ export default function PotSourcesChart({ latest }) {
         POT_REVENUE :: BY SOURCE (SOL/DAY · STACKED)
       </div>
       <div className="mt-1 text-[9px] leading-snug text-green-500/40">
-        desk pot SOL inflow, measured on-chain · MINT surcharge (90% of 0.5 SOL/mint) · LAUNCHPAD fees
-        (10% of launcher fees → pot) · UNATTRIB ($OTC tax sweeps &amp; misc)
+        desk pot SOL inflow, measured on-chain · MINT surcharge (90% of 0.5 SOL/mint) · ME_ROYALTY (5%
+        creator fee on desk sales → pot) · LAUNCHPAD fees (10% of launcher fees → pot) · UNATTRIB
+        ($OTC tax sweeps &amp; misc)
         {ps?.since ? ` · tracking since ${ps.since}` : ""}
       </div>
       {rows.length === 0 ? (
