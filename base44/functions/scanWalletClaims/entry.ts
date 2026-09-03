@@ -107,8 +107,14 @@ export default async function (req) {
     // Scan lock: two concurrent scans for the same wallet (double connect,
     // claim + portfolio panels racing) would burn duplicate RPC reads and
     // interleave cache writes. First scan wins; the loser serves the existing
-    // cache instead of double-scanning.
-    const lock = await acquireLock(base44, `wscan_${wallet}`, 90 * 1000);
+    // cache instead of double-scanning. A FORCE scan (the post-claim rescan)
+    // retries once before falling back — serving the pre-claim cache there
+    // would reset nothing and invite re-firing already-claimed desks.
+    let lock = null;
+    for (let attempt = 0; attempt < 2 && !lock?.acquired; attempt++) {
+      lock = await acquireLock(base44, `wscan_${wallet}`, 90 * 1000);
+      if (!lock.acquired && attempt === 0) await new Promise((r) => setTimeout(r, 3000));
+    }
     if (!lock.acquired) {
       return Response.json({
         ok: true,

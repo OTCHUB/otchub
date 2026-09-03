@@ -272,7 +272,6 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
       log({ type: fail ? "err" : "ok", msg: `DONE :: ${ok} confirmed, ${fail} failed (of ${results.length} tx).` });
 
       if (ok > 0) {
-        if (onClaimed) onClaimed();
         setCleared((prev) => {
           const n = new Set(prev);
           for (const d of claimable) n.add(d.asset_id);
@@ -289,8 +288,21 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
         // read ZERO — without this the stale plan keeps listing them as
         // claimable and invites a pointless re-claim of empty vaults.
         log({ type: "info", msg: "Refreshing desk claimable balances..." });
-        await scan({ force: true, silent: true });
-        log({ type: "ok", msg: "Claimable balances refreshed — cleared desks now show 0." });
+        const rescanned = await scan({ force: true, silent: true });
+        if (rescanned) {
+          log({ type: "ok", msg: "Claimable balances refreshed — cleared desks now show 0." });
+        } else {
+          log({
+            type: "err",
+            msg: "Rescan failed — counts may be stale. Press [SCAN_DESKS] before claiming again.",
+          });
+        }
+        // Reload the portfolio LAST. It unmounts/remounts this panel, and by
+        // then the post-claim vault scan above is already cached — so the
+        // remounted panel serves zeros. Firing it earlier orphaned the
+        // refreshes: the panel remounted mid-run, served the pre-claim cache
+        // within its TTL, and claimable counts never reset.
+        if (onClaimed) onClaimed();
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
