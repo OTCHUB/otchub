@@ -1,13 +1,15 @@
 import React from "react";
 import { fmtSol, fmtNum, fmtUsd } from "@/lib/format";
 
+// One-line rows: the per-row explanation moves into a hover tooltip (title)
+// so the panel fits roughly twice as many readings in the same height.
 const Row = ({ label, value, desc }) => (
-  <div className="border-b border-green-500/10 py-1.5 last:border-0">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] text-green-500/60">{label}</span>
-      <span className="font-mono text-xs text-green-300">{value}</span>
-    </div>
-    {desc && <div className="text-[9px] leading-tight text-green-500/30">{desc}</div>}
+  <div
+    className="flex items-center justify-between border-b border-green-500/10 py-1 last:border-0"
+    title={desc}
+  >
+    <span className="text-[11px] text-green-500/60">{label}</span>
+    <span className="font-mono text-xs text-green-300">{value}</span>
   </div>
 );
 

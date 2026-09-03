@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
-import StatCard from "@/components/otc/StatCard";
+import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
 import ArbitrageChart from "@/components/otc/ArbitrageChart";
@@ -22,7 +22,7 @@ import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
-import { fmtSol, fmtUsd, fmtNum, fmtPct, fmtCompact, timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 
 export default function Home() {
@@ -181,65 +181,8 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        {/* Top metrics */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            label="SOL_PRICE"
-            value={fmtUsd(latest?.sol_price_usd)}
-            sub="SPOT_USD"
-            desc="Wrapped SOL spot price"
-            accent="cyan"
-          />
-          <StatCard
-            label="OTC_TOKEN"
-            value={fmtUsd(latest?.token_price_usd, 5)}
-            sub={`24H ${fmtPct(latest?.token_price_change_24h)}`}
-            desc="OTC token spot market price"
-            accent="green"
-          />
-          <StatCard
-            label="NFT_FLOOR"
-            value={fmtSol(latest?.secondary_cost_sol)}
-            sub={fmtUsd(latest?.secondary_cost_usd)}
-            desc="ME floor incl. 2% + 5% fees"
-            accent="amber"
-          />
-          <StatCard
-            label="DESKS_MINTED"
-            value={fmtNum(latest?.desks_minted)}
-            sub={`SUPPLY ${fmtNum(latest?.nft_total_supply)}`}
-            desc="Total OTC desks minted"
-            accent="green"
-          />
-        </div>
-
-        {/* Secondary metrics */}
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            label="MKT_CAP"
-            value={fmtCompact(latest?.token_market_cap) === "—" ? "—" : `$${fmtCompact(latest?.token_market_cap)}`}
-            sub="OTC"
-            accent="green"
-          />
-          <StatCard
-            label="VOL_24H"
-            value={fmtCompact(latest?.token_volume_24h) === "—" ? "—" : `$${fmtCompact(latest?.token_volume_24h)}`}
-            sub="OTC"
-            accent="green"
-          />
-          <StatCard
-            label="LIQUIDITY"
-            value={fmtUsd(latest?.token_liquidity_usd)}
-            sub="DEX"
-            accent="green"
-          />
-          <StatCard
-            label="LISTED"
-            value={fmtNum(latest?.nft_listed_count)}
-            sub="NFTs for sale"
-            accent="amber"
-          />
-        </div>
+        {/* All 8 headline metrics in one dense ticker strip */}
+        <MetricsStrip latest={latest} />
 
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
@@ -322,14 +265,14 @@ export default function Home() {
 
         {/* Desk pot revenue by source (stacked) */}
         <div className="mt-3">
-          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES">
+          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES" defaultOpen={false}>
             <PotSourcesChart latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Tables */}
         <div className="mt-3">
-          <CollapsibleCard title="DESKS :: DISTRIBUTION">
+          <CollapsibleCard title="DESKS :: DISTRIBUTION" defaultOpen={false}>
             <DesksTables latest={latest} />
           </CollapsibleCard>
         </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
+import HelpNote from "@/components/otc/HelpNote";
 
 export default function RoundsChart({ latest }) {
   const raw = latest?.per_desk?.items || [];
@@ -79,11 +80,11 @@ export default function RoundsChart({ latest }) {
           </div>
         </div>
       </div>
-      <div className="mt-1 text-[8px] leading-snug text-green-500/40">
+      <HelpNote label="[?] POT_BAL / OWED_LEGEND">
         POT_BAL = SOL sitting in the pot right now. OWED_BACKLOG = desk earnings
         not yet pushed into vaults — cleared by a permissionless distribute
         (runs automatically when claiming). Rounds are driven by buyback spend.
-      </div>
+      </HelpNote>
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>

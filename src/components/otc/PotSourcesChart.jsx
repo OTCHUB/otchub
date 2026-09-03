@@ -1,6 +1,7 @@
 import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { fmtSol } from "@/lib/format";
+import HelpNote from "@/components/otc/HelpNote";
 
 // Stacked daily bars of the desk pot's on-chain SOL inflow by revenue source:
 // desk mint surcharge (90% of the 0.5 SOL per-mint surcharge), launchpad fees
@@ -39,13 +40,13 @@ export default function PotSourcesChart({ latest }) {
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
         POT_INFLOW :: BY SOURCE (SOL/DAY · STACKED)
       </div>
-      <div className="mt-1 text-[9px] leading-snug text-green-500/40">
+      <HelpNote label="[?] SOURCE_LEGEND">
         pot SOL inflow, measured on-chain · MINT (0.45 SOL surcharge + 100k-OTC deposit sale
         proceeds per mint) · ME_ROYALTY (5% creator fee on desk sales → pot) · LAUNCHPAD
         (launcher fee settlements — mostly PASS-THROUGH to launchpad holders, only ~10% stays
         for desks) · UNATTRIB (sweeps &amp; misc)
         {ps?.since ? ` · tracking since ${ps.since}` : ""}
-      </div>
+      </HelpNote>
       {rows.length === 0 ? (
         <div className="py-6 text-center text-[11px] text-green-500/40">
           NO_DATA — source tracking begins with the next snapshot ingest
