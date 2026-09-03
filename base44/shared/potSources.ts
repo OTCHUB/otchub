@@ -41,9 +41,12 @@ const LAMPORTS_PER_SOL = 1e9;
 const PAGE_LIMIT = 100; // Helius REST page cap
 const MAX_PAGES = 10; // incremental walk depth when the cursor is far behind
 const FIRST_RUN_PAGES = 40; // version reset: deep one-time backfill (4000 txs)
-const BACKFILL_PAGES = 5; // per-run budget extending history backward
-const TARGET_DAYS = 14; // stop backfilling once the day map is this deep
-const KEEP_DAYS = 30;
+const BACKFILL_PAGES = 10; // per-run budget extending history backward
+// Backfill walks the pot's tx history ALL the way back to the protocol's
+// first pot deposit (bounded pages per ingest), so the day map covers the
+// full protocol lifetime — later sources (e.g. royalties) simply show as
+// zero-buckets on earlier days when they didn't exist yet.
+const KEEP_DAYS = 730;
 // Bucket layout version. Bumping resets the day map + cursor so history is
 // re-backfilled with the new source split (e.g. v2 carved royalties out of
 // the old "other" bucket — without a reset those days would double-count).
@@ -119,10 +122,11 @@ export async function scanPotSources(prev) {
   }
   if (!newestSig) return null;
 
-  // Backward backfill (bounded): each run continues from the oldest signature
-  // ever seen, extending day history for the 14-day chart. Only runs while
-  // the day map is still shallower than TARGET_DAYS, so total cost is capped.
-  if (carry && oldest && Object.keys(carry.days || {}).length < TARGET_DAYS) {
+  // Backward backfill (bounded pages per run): each ingest continues from
+  // the oldest signature ever seen, walking back toward the protocol's first
+  // pot deposit. Stops automatically once the tx history is exhausted
+  // (oldest = null) — until then every run extends the map by ~1000 txs.
+  if (carry && oldest) {
     let bfBefore = oldest;
     for (let page = 0; page < BACKFILL_PAGES; page++) {
       const txs = await fetchPotTxs(bfBefore);

@@ -16,9 +16,11 @@ const SEGMENTS = [
 export default function PotSourcesChart({ latest }) {
   const ps = latest?.pot_sources;
   const days = ps?.days || {};
+  // Full protocol-lifetime history: the backend backfills day-by-day back to
+  // the pot's first inflow tx, so show every tracked day (not just a window)
+  // — this surfaces when each revenue source actually came online.
   const rows = Object.entries(days)
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-14)
     .map(([day, d]) => ({
       day: day.slice(5),
       mint: +(d.mint || 0).toFixed(4),
@@ -49,11 +51,18 @@ export default function PotSourcesChart({ latest }) {
         </div>
       ) : (
         <>
-          <div className="mt-2 h-64">
+          <div className="mt-2 h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-                <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#1a6b3a"
+                  fontSize={10}
+                  tick={{ fill: "#2a8b4a" }}
+                  interval="preserveStartEnd"
+                  minTickGap={12}
+                />
                 <YAxis
                   stroke="#1a6b3a"
                   fontSize={10}
@@ -93,7 +102,9 @@ export default function PotSourcesChart({ latest }) {
                 )}
               </span>
             ))}
-            <span className="text-emerald-400/80">TOTAL {fmtSol(grandTotal, 3)} · last {rows.length}d</span>
+            <span className="text-emerald-400/80">
+              TOTAL {fmtSol(grandTotal, 3)} · full history ({rows.length}d tracked)
+            </span>
           </div>
         </>
       )}
