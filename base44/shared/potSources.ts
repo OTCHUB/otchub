@@ -39,12 +39,15 @@ const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc"; // Magic Ed
 const ME_PROGRAMS = new Set([ME_V1_PROGRAM, ME_V2_PROGRAM]);
 const LAMPORTS_PER_SOL = 1e9;
 const PAGE_LIMIT = 100; // Helius REST page cap
-const MAX_PAGES = 10; // first run backfills up to 1000 txs; later runs are 1 page
+const MAX_PAGES = 10; // incremental walk depth when the cursor is far behind
+const FIRST_RUN_PAGES = 40; // version reset: deep one-time backfill (4000 txs)
+const BACKFILL_PAGES = 5; // per-run budget extending history backward
+const TARGET_DAYS = 14; // stop backfilling once the day map is this deep
 const KEEP_DAYS = 30;
 // Bucket layout version. Bumping resets the day map + cursor so history is
 // re-backfilled with the new source split (e.g. v2 carved royalties out of
 // the old "other" bucket — without a reset those days would double-count).
-const SOURCES_VERSION = 2;
+const SOURCES_VERSION = 3;
 
 async function fetchPotTxs(before) {
   const key = secrets.get("HELIUS_API_KEY");
@@ -85,10 +88,12 @@ export async function scanPotSources(prev) {
   const carry = prev && prev._v === SOURCES_VERSION ? prev : null;
   const prevCursor = carry?.cursor || null;
   let newestSig = null;
+  let oldest = carry?.oldest || null;
   let before = null;
   const collected = [];
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  const walkCap = prevCursor ? MAX_PAGES : FIRST_RUN_PAGES;
+  for (let page = 0; page < walkCap; page++) {
     const txs = await fetchPotTxs(before);
     if (!Array.isArray(txs) || !txs.length) break;
     if (!newestSig) newestSig = txs[0].signature;
@@ -103,10 +108,40 @@ export async function scanPotSources(prev) {
       const c = classify(t);
       if (c) collected.push(c);
     }
-    if (hitCursor || txs.length < PAGE_LIMIT) break;
-    before = txs[txs.length - 1].signature;
+    const lastSig = txs[txs.length - 1].signature;
+    if (hitCursor) break; // older history is anchored at carry.oldest
+    if (txs.length < PAGE_LIMIT) {
+      oldest = null; // walked to the beginning of the pot's tx history
+      break;
+    }
+    oldest = lastSig;
+    before = lastSig;
   }
   if (!newestSig) return null;
+
+  // Backward backfill (bounded): each run continues from the oldest signature
+  // ever seen, extending day history for the 14-day chart. Only runs while
+  // the day map is still shallower than TARGET_DAYS, so total cost is capped.
+  if (carry && oldest && Object.keys(carry.days || {}).length < TARGET_DAYS) {
+    let bfBefore = oldest;
+    for (let page = 0; page < BACKFILL_PAGES; page++) {
+      const txs = await fetchPotTxs(bfBefore);
+      if (!Array.isArray(txs) || !txs.length) {
+        oldest = null;
+        break;
+      }
+      for (const t of txs) {
+        const c = classify(t);
+        if (c) collected.push(c);
+      }
+      if (txs.length < PAGE_LIMIT) {
+        oldest = null;
+        break;
+      }
+      bfBefore = txs[txs.length - 1].signature;
+      oldest = bfBefore;
+    }
+  }
 
   // Merge the new inflows into the carried-forward day map.
   const merged = { ...(carry?.days || {}) };
@@ -130,6 +165,7 @@ export async function scanPotSources(prev) {
     _v: SOURCES_VERSION,
     days,
     cursor: newestSig,
-    since: carry?.since || dayKeys[0] || null,
+    oldest: oldest || null,
+    since: dayKeys[0] || carry?.since || null,
   };
 }
