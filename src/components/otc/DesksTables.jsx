@@ -45,7 +45,7 @@ export default function DesksTables({ latest }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <PagedTable
-        title="BY_STOCK :: DISTRIBUTIONS"
+        title="BY_STOCK :: DESK ROTATION (13) · DISTRIBUTIONS"
         headers={
           <>
             <Th className="text-left">SYMBOL</Th>

@@ -12,10 +12,10 @@ export default function ByStockChart({ latest }) {
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
-        BY_STOCK :: DISTRIBUTIONS (SOL)
+        BY_STOCK :: DESK DISTRIBUTIONS (SOL)
       </div>
       <div className="mt-1 text-[9px] text-green-500/40">
-        total SOL distributed per stock · top 12
+        13-stock desk rotation only · launchpad (launcher) payouts excluded · top 12
       </div>
       <div className="mt-3 h-72">
         <ResponsiveContainer width="100%" height="100%">

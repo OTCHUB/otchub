@@ -12,6 +12,7 @@ import {
   fetchProtocolStats,
 } from "./otcSources.ts";
 import { acquireLock, releaseLock } from "./dataLock.ts";
+import { STOCKS } from "./otcIdl.ts";
 import { readVaultStock } from "./vaultBalances.ts";
 import { getSpotPrices, SOL_MINT } from "./spotPrices.ts";
 
@@ -273,7 +274,22 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
       spreadUsd > 0.0001 ? "buy_secondary" : spreadUsd < -0.0001 ? "mint" : "neutral";
   }
 
-  const byStock = (stats?.byStock || []).map((s) => ({
+  // DESK DISTRIBUTIONS ONLY: the otcdesks.cash stats feed's byStock list also
+  // contains LAUNCHER (launchpad) reward tokens — GPRO, PUMP, SPYx, WBTC, memes
+  // and even junk rows ("TEST") — that desk vaults can never hold. Per the
+  // protocol's newsletter, launcher fees pay 75% to LAUNCHPAD holders and only
+  // 10% funnels into the desk pot, so crediting those rows to desk holders would
+  // be misleading. Desk vaults accrue ONLY the 13-stock rotation (otcIdl
+  // STOCKS), so keep exactly those mints — deduped by mint (the feed repeats
+  // rows, e.g. SPCXx) — and drop everything else.
+  const DESK_ROTATION_MINTS = new Set(STOCKS.map((s) => s.mint));
+  const byStockFeed = new Map();
+  for (const s of stats?.byStock || []) {
+    if (!DESK_ROTATION_MINTS.has(s.mint)) continue;
+    const prev = byStockFeed.get(s.mint);
+    if (!prev || (s.distributed || 0) > (prev.distributed || 0)) byStockFeed.set(s.mint, s);
+  }
+  const byStock = [...byStockFeed.values()].map((s) => ({
     symbol: s.symbol,
     mint: s.mint,
     distributed_sol: s.distributed ? s.distributed / LAMPORTS_PER_SOL : 0,
