@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { fmtSol, fmtUsd } from "@/lib/format";
 
-export default function EarningsChart({ latest }) {
+export default function EarningsChart({ latest, history }) {
   const [unit, setUnit] = useState("USD");
   const raw = latest?.per_desk?.items || [];
   const solUsd = latest?.sol_price_usd || 0;
@@ -32,6 +32,8 @@ export default function EarningsChart({ latest }) {
         day: String(d.day),
         total: toUnit(totalSol),
         avg: desks > 1 ? toUnit(d.per_desk_sol) : null,
+        desks,
+        pd: d.per_desk_sol || 0,
       };
     });
 
@@ -49,6 +51,28 @@ export default function EarningsChart({ latest }) {
   // APR = daily per-desk earning annualized against the desk's floor cost.
   const apr1dPct = todayPerDeskSol && floorSol > 0 ? (todayPerDeskSol / floorSol) * 365 * 100 : null;
   const aprAvgPct = trailingAvgSol && floorSol > 0 ? (trailingAvgSol / floorSol) * 365 * 100 : null;
+
+  // Daily floor from snapshot history (last floor recorded per day) so the
+  // trend uses each day's ACTUAL floor, not today's.
+  const floorByDay = {};
+  for (const h of history || []) {
+    if (h?.nft_floor_sol != null && h?.t) {
+      floorByDay[String(h.t).slice(0, 10)] = h.nft_floor_sol;
+    }
+  }
+  // APR + breakeven per day (bootstrap single-desk days excluded, same as the
+  // avg line) — runs up to the actual current day so the yield direction is
+  // visible.
+  const trend = data
+    .filter((d) => d.desks > 1)
+    .map((d) => {
+      const floor = floorByDay[d.day] ?? floorSol;
+      return {
+        day: d.day.slice(5),
+        apr: floor > 0 && d.pd > 0 ? (d.pd / floor) * 365 * 100 : null,
+        be: floor > 0 && d.pd > 0 ? floor / d.pd : null,
+      };
+    });
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -103,6 +127,52 @@ export default function EarningsChart({ latest }) {
             <Line yAxisId="avg" type="monotone" dataKey="avg" name="AVG_DESK" stroke="#4ade80" dot={{ r: 2, fill: "#4ade80" }} strokeWidth={1.5} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* APR + breakeven trend — shows whether the yield is rising or fading */}
+      <div className="mt-3 border-t border-green-500/20 pt-2">
+        <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+          APR &amp; BREAKEVEN :: TREND (PER DESK / DAY)
+        </div>
+        <div className="mt-1 text-[9px] text-green-500/40">
+          APR = daily per-desk earning annualized vs that day's NFT floor · BE = days to recoup
+          the floor at that day's earning rate · bootstrap days excluded
+        </div>
+        <div className="mt-1 h-40 sm:h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={trend} margin={{ top: 4, right: 10, bottom: 0, left: -18 }}>
+              <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+              <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+              <YAxis
+                yAxisId="apr"
+                stroke="#1a6b3a"
+                fontSize={10}
+                tick={{ fill: "#2a8b4a" }}
+                tickFormatter={(v) => `${v}%`}
+                width={50}
+              />
+              <YAxis
+                yAxisId="be"
+                orientation="right"
+                stroke="#1a6b3a"
+                fontSize={10}
+                tick={{ fill: "#2a8b4a" }}
+                tickFormatter={(v) => `${v}d`}
+                width={40}
+              />
+              <Tooltip
+                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+                labelStyle={{ color: "#22c55e" }}
+                formatter={(v, n) =>
+                  v == null ? ["—", n] : [n === "APR" ? `${v.toFixed(1)}%` : `${v.toFixed(1)} days`, n]
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+              <Line yAxisId="apr" type="monotone" dataKey="apr" name="APR" stroke="#22d3ee" dot={{ r: 2, fill: "#22d3ee" }} strokeWidth={1.5} connectNulls />
+              <Line yAxisId="be" type="monotone" dataKey="be" name="BREAKEVEN" stroke="#fbbf24" dot={{ r: 2, fill: "#fbbf24" }} strokeWidth={1.5} connectNulls />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

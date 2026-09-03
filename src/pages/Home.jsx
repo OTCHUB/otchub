@@ -294,7 +294,7 @@ export default function Home() {
             <ArbitrageChart history={data?.history} />
           </CollapsibleCard>
           <CollapsibleCard title="EARNINGS">
-            <EarningsChart latest={latest} />
+            <EarningsChart latest={latest} history={data?.history} />
           </CollapsibleCard>
         </div>
 
