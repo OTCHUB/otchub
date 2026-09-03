@@ -28,11 +28,7 @@ export default function PerDeskTrendChart({ latest }) {
   const sorted = [...raw].sort((a, b) =>
     String(b.day || "").localeCompare(String(a.day || ""))
   );
-  // 7d avg uses CLOSED days only — today's running (partial) day would drag
-  // the reference line down while it's still accruing.
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const closed = sorted.filter((d) => String(d.day || "") !== todayKey);
-  const trailing = closed.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);
+  const trailing = sorted.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);
   const avgSol = trailing.length
     ? trailing.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailing.length
     : null;
