@@ -8,7 +8,16 @@ import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 
-export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifetimeData, refreshLifetime }) {
+export default function ClaimPanel({
+  address,
+  holdings,
+  onClaimed,
+  onScan,
+  lifetimeData,
+  refreshLifetime,
+  command,
+  onCommandDone,
+}) {
   const [selected, setSelected] = useState(() => new Set());
   const [tpMap, setTpMap] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -186,7 +195,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
   //   owed backlog from the protocol pot into the vaults first, so the claims
   //   in the same run capture the freshly-distributed stock too. Adds ~desks×13
   //   instructions → more groups/approvals; run occasionally, not every claim.
-  const runClaimAll = async () => {
+  const runClaimAll = async (explicitIds = null) => {
     const signer = getSignerForAddress(address);
     if (!signer) {
       log({ type: "err", msg: "No signing wallet connected for this address." });
@@ -196,8 +205,11 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
       log({ type: "err", msg: "Nothing to claim — run a scan first." });
       return;
     }
-    // Operate on selected desks, or all owned desks if none are selected.
-    const targetIds = selected.size ? selected : new Set(plan.map((d) => d.asset_id));
+    // Operate on the desks named by the caller (a single desk from the
+    // holdings dialog), else the selected desks, else all owned desks.
+    const targetIds = new Set(
+      explicitIds || (selected.size ? [...selected] : plan.map((d) => d.asset_id))
+    );
     const targets = plan.filter((d) => targetIds.has(d.asset_id));
     if (!targets.length) {
       log({ type: "err", msg: "Nothing to claim — run a scan first." });
@@ -311,6 +323,72 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
       setProgress(null);
     }
   };
+
+  // ACTIVATE_ONLY: open a desk's missing ticker accounts (the claim
+  // pre-requisite — distributions can only land in vaults whose accounts
+  // exist) WITHOUT claiming. Aimed at a single desk from the holdings
+  // dialog; reuses the chunked executor and refresh ordering of the claim runs.
+  const runActivateOnly = async (ids) => {
+    const signer = getSignerForAddress(address);
+    if (!signer) {
+      log({ type: "err", msg: "No signing wallet connected for this address." });
+      return;
+    }
+    if (!plan || !plan.length) {
+      log({ type: "err", msg: "Nothing to activate — run a scan first." });
+      return;
+    }
+    const targets = plan.filter((d) => ids.includes(d.asset_id));
+    if (!targets.length) {
+      log({ type: "err", msg: "Desk not found in the vault scan." });
+      return;
+    }
+    const missing = targets.flatMap((d) => (d.tickers || []).filter((t) => !t.exists));
+    if (!missing.length) {
+      log({ type: "ok", msg: `ACTIVATE :: ${targets[0].name} — all ticker accounts already open.` });
+      return;
+    }
+    setBusy(true);
+    setProgress(null);
+    try {
+      const actIxs = await buildActivateInstructions(targets, address, tpMap);
+      log({ type: "info", msg: `ACTIVATE :: opening ${actIxs.length} ticker account(s) for ${targets.length} desk(s).` });
+      const results = await executeClaimChunked(actIxs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+      const ok = results.filter((r) => r.ok).length;
+      log({
+        type: results.length - ok ? "err" : "ok",
+        msg: `DONE :: ${ok} confirmed, ${results.length - ok} failed (of ${results.length} tx).`,
+      });
+      const rescanned = await scan({ force: true, silent: true });
+      if (rescanned) log({ type: "ok", msg: "Vault scan refreshed — activation state updated." });
+      if (ok > 0 && onClaimed) onClaimed();
+    } catch (e) {
+      log({ type: "err", msg: `ACTIVATE_ABORT: ${e.message}` });
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
+
+  // Desk-level commands from the holdings detail dialog: claim this desk's
+  // earnings or activate its missing ticker accounts. Both reuse the exact
+  // pipelines above — the dialog just aims them at one desk. Waits until the
+  // vault scan plan is loaded and no other run is in flight.
+  useEffect(() => {
+    if (!command || !plan || busy) return;
+    const desk = plan.find((p) => p.asset_id === command.assetId);
+    if (!desk) {
+      onCommandDone?.();
+      return;
+    }
+    setSelected(new Set([command.assetId]));
+    (async () => {
+      if (command.mode === "activate") await runActivateOnly([command.assetId]);
+      else await runClaimAll([command.assetId]);
+      onCommandDone?.();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [command, plan, busy]);
 
   const totalClaimable = plan ? plan.reduce((a, d) => a + d.claimable.length, 0) : 0;
   const totalNeedsActivation = plan
@@ -553,7 +631,7 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
           [PULL_OWED:{pullOwed ? "ON" : "OFF"}]
         </button>
         <button
-          onClick={runClaimAll}
+          onClick={() => runClaimAll()}
           disabled={!plan || busy || !desks.length}
           className="border border-emerald-500/60 px-3 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
         >

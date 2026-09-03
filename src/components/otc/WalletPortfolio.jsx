@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { fmtSol, fmtUsd, fmtNum } from "@/lib/format";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
@@ -23,6 +23,9 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   const [err, setErr] = useState(null);
   const [lifetime, setLifetime] = useState(null); // on-chain lifetime claim totals
   const [claim, setClaim] = useState(null); // { sol, usd } live vault-scan claimable
+  const [scanPlan, setScanPlan] = useState(null); // per-desk vault scan from the claim tool
+  const [deskCommand, setDeskCommand] = useState(null); // { assetId, mode, nonce } from the holdings dialog
+  const claimRef = useRef(null);
 
   const load = React.useCallback(() => {
     let active = true;
@@ -75,6 +78,7 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   // Called by ClaimPanel with its live desk-vault scan: the exact on-chain
   // stock amounts a claim would deliver right now, priced at spot.
   const handleScan = (desks) => {
+    setScanPlan(desks || null);
     const mints = new Set([SOL_MINT]);
     for (const d of desks || []) {
       for (const t of d.claimable || []) mints.add(t.mint);
@@ -94,6 +98,14 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
         /* keep previous totals */
       }
     })();
+  };
+
+  // Per-desk action from the holdings dialog: aim the claim tool at ONE desk
+  // (claim its earnings / activate its accounts), then bring the tool into
+  // view so its progress bar, status overlay and log are visible.
+  const runDeskCommand = (assetId, mode) => {
+    setDeskCommand({ assetId, mode, nonce: Date.now() });
+    setTimeout(() => claimRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const desks = data?.desks_owned || 0;
@@ -216,9 +228,11 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
               byStock={data.by_stock?.items}
               floorSol={data?.nft_floor_sol}
               walletOwned
+              claimPlan={scanPlan}
+              onDeskCommand={runDeskCommand}
             />
           </div>
-          <div className="mt-3">
+          <div className="mt-3" ref={claimRef}>
             <ClaimPanel
               address={address}
               holdings={data.holdings}
@@ -226,6 +240,8 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
               onScan={handleScan}
               lifetimeData={lifetime}
               refreshLifetime={loadLifetime}
+              command={deskCommand}
+              onCommandDone={() => setDeskCommand(null)}
             />
           </div>
         </>

@@ -3,10 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 
-export default function HoldingsDetail({ h, byStock, onClose }) {
+export default function HoldingsDetail({
+  h,
+  byStock,
+  onClose,
+  walletOwned,
+  claimDesk,
+  onClaim,
+  onActivate,
+}) {
   if (!h) return null;
   const spread = (h.accrued_value_sol || 0) - (h.listing_price_sol || 0);
   const snipe = h.is_listed && h.listing_price_sol != null && spread > 0.0001;
+  const needActivate = (claimDesk?.tickers || []).filter((t) => !t.exists).length;
 
   const totalPerDesk = (byStock || []).reduce((a, s) => a + (s.per_desk_sol || 0), 0) || 1;
   const breakdown = (byStock || [])
@@ -49,6 +58,26 @@ export default function HoldingsDetail({ h, byStock, onClose }) {
                 </div>
               </>
             )}
+            {walletOwned && (
+              <div className="pt-1 text-[10px]">
+                {claimDesk ? (
+                  <>
+                    <div className={claimDesk.claimable.length ? "text-emerald-400" : "text-green-500/50"}>
+                      {claimDesk.claimable.length} CLAIMABLE_TICKER(S){" "}
+                      {claimDesk.claimable.length > 0 && "[CLAIMABLE]"}
+                    </div>
+                    {needActivate > 0 && (
+                      <div className="text-cyan-400/80">{needActivate} NEEDS_ACTIVATE</div>
+                    )}
+                    {!claimDesk.claimable.length && !needActivate && (
+                      <div className="text-green-500/40">VAULT_CLEAR — stock re-accrues over time</div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-green-500/40">VAULT_SCAN…</div>
+                )}
+              </div>
+            )}
             <div className="break-all text-green-500/40">ID: {h.asset_id}</div>
             {breakdown.length > 0 && (
               <div className="pt-1">
@@ -66,7 +95,28 @@ export default function HoldingsDetail({ h, byStock, onClose }) {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-          <a href={`https://magiceden.io/item-details/${h.asset_id}`} target="_blank" rel="noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center border border-emerald-500/50 px-3 font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
+          {walletOwned ? (
+            <>
+              <button
+                onClick={() => onClaim?.(h.asset_id)}
+                disabled={!claimDesk}
+                title="Claim this desk's vault stock straight to your wallet via the claim tool"
+                className="flex min-h-[44px] flex-1 items-center justify-center border border-emerald-500/60 px-3 font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
+              >
+                [CLAIM_EARNINGS]
+              </button>
+              <button
+                onClick={() => onActivate?.(h.asset_id)}
+                disabled={!claimDesk}
+                title="Open this desk's missing ticker accounts so distributions can land in its vault"
+                className="flex min-h-[44px] flex-1 items-center justify-center border border-cyan-500/50 px-3 font-bold text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+              >
+                [ACTIVATE_DESK]
+              </button>
+            </>
+          ) : (
+            <a href={`https://magiceden.io/item-details/${h.asset_id}`} target="_blank" rel="noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center border border-emerald-500/50 px-3 font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
+          )}
           <a href={`https://solscan.io/token/${h.asset_id}`} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center border border-green-500/30 px-3 text-green-400 hover:bg-green-500/10">[SOLSCAN]</a>
         </div>
       </DialogContent>

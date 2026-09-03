@@ -8,7 +8,7 @@ import Pager from "@/components/otc/Pager";
 
 const ME_BASE = "https://magiceden.io/item-details";
 
-export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned }) {
+export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned, claimPlan, onDeskCommand }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
   // Wallet variant: exactly 3 rows of cards per page on a fixed 3-column
   // grid (9 cards); the collection-wide view keeps its original layout.
@@ -204,7 +204,21 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
         {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">{q ? `NO_MATCH :: "${query.trim()}"` : "NO_DATA"}</div>}
       </div>
       <Pager page={page} pages={pages} onPage={setPageNo} total={filtered.length} label="DESKS" />
-      <HoldingsDetail h={sel} byStock={byStock} onClose={() => setSel(null)} />
+      <HoldingsDetail
+        h={sel}
+        byStock={byStock}
+        onClose={() => setSel(null)}
+        walletOwned={walletOwned}
+        claimDesk={claimPlan?.find((p) => p.asset_id === sel?.asset_id) || null}
+        onClaim={(id) => {
+          setSel(null);
+          onDeskCommand?.(id, "claim");
+        }}
+        onActivate={(id) => {
+          setSel(null);
+          onDeskCommand?.(id, "activate");
+        }}
+      />
     </div>
   );
 }
