@@ -2,6 +2,7 @@ import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
+import { SOL_MINT } from "@/lib/stockPrices";
 
 export default function HoldingsDetail({
   h,
@@ -9,6 +10,8 @@ export default function HoldingsDetail({
   onClose,
   walletOwned,
   claimDesk,
+  claimPrices,
+  lifetimeDesk,
   onClaim,
   onActivate,
 }) {
@@ -16,6 +19,13 @@ export default function HoldingsDetail({
   const spread = (h.accrued_value_sol || 0) - (h.listing_price_sol || 0);
   const snipe = h.is_listed && h.listing_price_sol != null && spread > 0.0001;
   const needActivate = (claimDesk?.tickers || []).filter((t) => !t.exists).length;
+  // Accurate claimable + lifetime values — same live vault scan, spot prices
+  // and on-chain claim history as the claim tool.
+  const cUsd = (claimDesk?.claimable || []).reduce(
+    (s, t) => s + (t.amount / 10 ** t.decimals) * (claimPrices?.[t.mint] || 0),
+    0
+  );
+  const cSol = claimPrices?.[SOL_MINT] ? cUsd / claimPrices[SOL_MINT] : null;
 
   const totalPerDesk = (byStock || []).reduce((a, s) => a + (s.per_desk_sol || 0), 0) || 1;
   const breakdown = (byStock || [])
@@ -63,9 +73,17 @@ export default function HoldingsDetail({
                 {claimDesk ? (
                   <>
                     <div className={claimDesk.claimable.length ? "text-emerald-400" : "text-green-500/50"}>
-                      {claimDesk.claimable.length} CLAIMABLE_TICKER(S){" "}
-                      {claimDesk.claimable.length > 0 && "[CLAIMABLE]"}
+                      CLAIMABLE: {fmtSol(cSol, 4)} · {fmtUsd(cUsd, 2)} ·{" "}
+                      {claimDesk.claimable.length} ticker(s){" "}
+                      <span className="text-cyan-400/70">[LIVE VAULT SCAN]</span>
                     </div>
+                    {lifetimeDesk && (
+                      <div className="text-amber-400/80">
+                        LT_CLAIMED: {fmtSol(lifetimeDesk.value_sol, 4)} · {fmtUsd(lifetimeDesk.value_usd, 2)}
+                        {lifetimeDesk.last_claim_at &&
+                          ` · LAST_CLAIM ${new Date(lifetimeDesk.last_claim_at).toLocaleDateString()}`}
+                      </div>
+                    )}
                     {needActivate > 0 && (
                       <div className="text-cyan-400/80">{needActivate} NEEDS_ACTIVATE</div>
                     )}

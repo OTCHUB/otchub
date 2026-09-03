@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
+import { SOL_MINT } from "@/lib/stockPrices";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
 import HelpNote from "@/components/otc/HelpNote";
@@ -8,8 +9,9 @@ import Pager from "@/components/otc/Pager";
 
 const ME_BASE = "https://magiceden.io/item-details";
 
-export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned, claimPlan, onDeskCommand }) {
+export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned, claimPlan, claimPrices, lifetimeByDesk, onDeskCommand }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
+  const solUsdSpot = claimPrices?.[SOL_MINT] ?? null;
   // Wallet variant: exactly 3 rows of cards per page on a fixed 3-column
   // grid (9 cards); the collection-wide view keeps its original layout.
   const PAGE_SIZE = walletOwned ? 9 : 12;
@@ -156,6 +158,15 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
           const live = isLive(h);
           const hasStock = hasRealStock(h);
           const noStock = live && !hasStock && h.is_listed;
+          // Accurate per-desk figures — the SAME live vault scan and on-chain
+          // claim history the claim tool uses, not snapshot estimates.
+          const cd = walletOwned ? claimPlan?.find((p) => p.asset_id === h.asset_id) : null;
+          const cUsd = (cd?.claimable || []).reduce(
+            (s, t) => s + (t.amount / 10 ** t.decimals) * (claimPrices?.[t.mint] || 0),
+            0
+          );
+          const cSol = solUsdSpot ? cUsd / solUsdSpot : null;
+          const lt = walletOwned ? lifetimeByDesk?.[h.asset_id] : null;
           const snipe = !walletOwned && h.is_listed && h.listing_price_sol != null && hasStock && spread > 0.0001;
           return (
             <div
@@ -171,7 +182,24 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
               </div>
               <div className="border-t border-green-500/20 p-1.5">
                 <div className="truncate font-mono text-[10px] text-green-300">{h.name}</div>
-                {h.is_listed && h.listing_price_sol != null ? (
+                {walletOwned ? (
+                  <>
+                    {h.is_listed && h.listing_price_sol != null && (
+                      <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
+                    )}
+                    {cd ? (
+                      <div className={`font-mono text-[9px] ${cd.claimable.length ? "text-emerald-400" : "text-green-500/50"}`}>
+                        CLAIM {fmtSol(cSol, 3)} · {fmtUsd(cUsd, 2)} · {cd.claimable.length}T{" "}
+                        <span className="text-cyan-400/70">[LIVE]</span>
+                      </div>
+                    ) : (
+                      <div className="font-mono text-[9px] text-green-500/40">VAULT_SCAN…</div>
+                    )}
+                    <div className="font-mono text-[9px] text-amber-400/80">
+                      LT_CLAIMED {fmtSol(lt?.value_sol, 3)} · {fmtUsd(lt?.value_usd, 2)}
+                    </div>
+                  </>
+                ) : h.is_listed && h.listing_price_sol != null ? (
                   <>
                     <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
                     <div className={`font-mono text-[9px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
@@ -210,6 +238,8 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
         onClose={() => setSel(null)}
         walletOwned={walletOwned}
         claimDesk={claimPlan?.find((p) => p.asset_id === sel?.asset_id) || null}
+        claimPrices={claimPrices}
+        lifetimeDesk={lifetimeByDesk?.[sel?.asset_id] || null}
         onClaim={(id) => {
           setSel(null);
           onDeskCommand?.(id, "claim");

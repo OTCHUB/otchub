@@ -24,6 +24,7 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   const [lifetime, setLifetime] = useState(null); // on-chain lifetime claim totals
   const [claim, setClaim] = useState(null); // { sol, usd } live vault-scan claimable
   const [scanPlan, setScanPlan] = useState(null); // per-desk vault scan from the claim tool
+  const [claimPrices, setClaimPrices] = useState(null); // spot prices for valuing per-desk claimable stock
   const [deskCommand, setDeskCommand] = useState(null); // { assetId, mode, nonce } from the holdings dialog
   const claimRef = useRef(null);
 
@@ -86,6 +87,7 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
     (async () => {
       try {
         const prices = await fetchTokenPricesUsd([...mints]);
+        setClaimPrices(prices);
         let usd = 0;
         for (const d of desks || []) {
           for (const t of d.claimable || []) {
@@ -99,6 +101,14 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
       }
     })();
   };
+
+  // Per-desk lifetime claimed earnings — same on-chain claim-history data the
+  // claim tool consumes, keyed by desk for the holdings gallery/dialog.
+  const lifetimeByDesk = React.useMemo(() => {
+    const m = {};
+    for (const d of lifetime?.by_desk || []) m[d.asset_id] = d;
+    return m;
+  }, [lifetime]);
 
   // Per-desk action from the holdings dialog: aim the claim tool at ONE desk
   // (claim its earnings / activate its accounts), then bring the tool into
@@ -229,6 +239,8 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
               floorSol={data?.nft_floor_sol}
               walletOwned
               claimPlan={scanPlan}
+              claimPrices={claimPrices}
+              lifetimeByDesk={lifetimeByDesk}
               onDeskCommand={runDeskCommand}
             />
           </div>
