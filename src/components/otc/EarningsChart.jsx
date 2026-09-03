@@ -19,38 +19,14 @@ export default function EarningsChart({ latest, history }) {
   const toUnit = (sol) => (unit === "USD" ? sol * solUsd : sol);
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 2) : fmtSol(v, 3));
 
-  // Chronological left→right (oldest at left, newest at right): the feed
-  // arrives oldest-first, so sort ascending explicitly — reversing it made
-  // the chart read backwards in time.
-  const data = raw
-    .slice()
-    .sort((a, b) => String(a.day).localeCompare(String(b.day)))
-    .map((d) => {
-      const desks = d.desks || 0;
-      const totalSol = d.total_earned_sol ?? (d.per_desk_sol || 0) * desks;
-      return {
-        day: String(d.day),
-        total: toUnit(totalSol),
-        avg: desks > 1 ? toUnit(d.per_desk_sol) : null,
-        desks,
-        pd: d.per_desk_sol || 0,
-      };
-    });
-
-  const sortedRaw = [...raw].sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")));
-  const todayPerDeskSol = sortedRaw[0]?.per_desk_sol;
-  const window = 7;
-  const trailing = sortedRaw.slice(0, window).filter((d) => (d.per_desk_sol || 0) > 0);
-  const trailingAvgSol = trailing.length
-    ? trailing.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailing.length
-    : null;
+  // Only CLOSED (completed) UTC days feed every metric and both charts: the
+  // feed's newest day is the in-progress working day, whose partial numbers
+  // would skew the 1D figures and dwarf the APR/breakeven trend scale.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const closed = raw
+    .filter((d) => String(d.day || "") < todayKey)
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const floorSol = latest?.nft_floor_sol || 0;
-  const breakevenDays = trailingAvgSol && trailingAvgSol > 0 ? floorSol / trailingAvgSol : null;
-  // 1D figures use the latest feed day (partial until that day closes).
-  const breakeven1dDays = todayPerDeskSol && todayPerDeskSol > 0 ? floorSol / todayPerDeskSol : null;
-  // APR = daily per-desk earning annualized against the desk's floor cost.
-  const apr1dPct = todayPerDeskSol && floorSol > 0 ? (todayPerDeskSol / floorSol) * 365 * 100 : null;
-  const aprAvgPct = trailingAvgSol && floorSol > 0 ? (trailingAvgSol / floorSol) * 365 * 100 : null;
 
   // Daily floor from snapshot history (last floor recorded per day) so the
   // trend uses each day's ACTUAL floor, not today's.
@@ -60,19 +36,40 @@ export default function EarningsChart({ latest, history }) {
       floorByDay[String(h.t).slice(0, 10)] = h.nft_floor_sol;
     }
   }
-  // APR + breakeven per day (bootstrap single-desk days excluded, same as the
-  // avg line) — runs up to the actual current day so the yield direction is
-  // visible.
-  const trend = data
-    .filter((d) => d.desks > 1)
-    .map((d) => {
-      const floor = floorByDay[d.day] ?? floorSol;
-      return {
-        day: d.day.slice(5),
-        apr: floor > 0 && d.pd > 0 ? (d.pd / floor) * 365 * 100 : null,
-        be: floor > 0 && d.pd > 0 ? floor / d.pd : null,
-      };
-    });
+
+  // ONE aligned dataset for BOTH charts (same rows, same order, same labels)
+  // so the earnings bars and the APR/breakeven points line up day-for-day.
+  // Bootstrap (single-desk) days keep their bar but carry no avg/APR point —
+  // their one-off payout would dwarf the trend.
+  const data = closed.map((d) => {
+    const desks = d.desks || 0;
+    const pd = d.per_desk_sol || 0;
+    const totalSol = d.total_earned_sol ?? pd * desks;
+    const floor = floorByDay[String(d.day)] ?? floorSol;
+    return {
+      day: String(d.day),
+      label: String(d.day).slice(5),
+      total: toUnit(totalSol),
+      avg: desks > 1 ? toUnit(pd) : null,
+      desks,
+      pd,
+      apr: floor > 0 && pd > 0 && desks > 1 ? (pd / floor) * 365 * 100 : null,
+      be: floor > 0 && pd > 0 && desks > 1 ? floor / pd : null,
+    };
+  });
+
+  // 1D = the LAST CLOSED day (never the in-progress working day).
+  const lastClosed = data.length ? data[data.length - 1] : null;
+  const todayPerDeskSol = lastClosed?.pd;
+  const trailing = data.slice(-7).filter((d) => d.pd > 0 && d.desks > 1);
+  const trailingAvgSol = trailing.length
+    ? trailing.reduce((a, d) => a + d.pd, 0) / trailing.length
+    : null;
+  const breakevenDays = trailingAvgSol && trailingAvgSol > 0 ? floorSol / trailingAvgSol : null;
+  const breakeven1dDays = todayPerDeskSol && todayPerDeskSol > 0 ? floorSol / todayPerDeskSol : null;
+  // APR = daily per-desk earning annualized against the desk's floor cost.
+  const apr1dPct = todayPerDeskSol && floorSol > 0 ? (todayPerDeskSol / floorSol) * 365 * 100 : null;
+  const aprAvgPct = trailingAvgSol && floorSol > 0 ? (trailingAvgSol / floorSol) * 365 * 100 : null;
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -82,7 +79,7 @@ export default function EarningsChart({ latest, history }) {
             EARNINGS :: {unit} / DAY
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
-            bars = total into desks · line = avg / desk · bootstrap excluded from avg
+            bars = total into desks · line = avg / desk · closed days only · bootstrap excluded from avg
           </div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] font-mono">
             <span className="text-emerald-400/80">
@@ -93,7 +90,7 @@ export default function EarningsChart({ latest, history }) {
             </span>
           </div>
           <div className="mt-1 text-[9px] text-green-500/40">
-            APR = per-desk daily earning annualized vs NFT floor · 1D = latest feed day (partial until it closes) · today {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}
+            APR = per-desk daily earning annualized vs NFT floor · 1D = last CLOSED day · last {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}
           </div>
         </div>
         <div className="flex gap-1">
@@ -114,7 +111,7 @@ export default function EarningsChart({ latest, history }) {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+            <XAxis dataKey="label" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
             <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
             <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
             <Tooltip
@@ -136,13 +133,13 @@ export default function EarningsChart({ latest, history }) {
         </div>
         <div className="mt-1 text-[9px] text-green-500/40">
           APR = daily per-desk earning annualized vs that day's NFT floor · BE = days to recoup
-          the floor at that day's earning rate · bootstrap days excluded
+          the floor at that day's earning rate · closed days only · bootstrap days excluded
         </div>
         <div className="mt-1 h-40 sm:h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={trend} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
+            <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-              <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+              <XAxis dataKey="label" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
               <YAxis
                 yAxisId="apr"
                 stroke="#1a6b3a"

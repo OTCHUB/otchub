@@ -20,12 +20,16 @@ export default function PerDeskTrendChart({ latest }) {
 
   // Chronological left→right (oldest at left, newest at right): the feed
   // arrives oldest-first — reversing it made the chart read backwards.
-  const data = raw
+  // Only CLOSED (completed) UTC days: the newest feed day is the in-progress
+  // working day whose partial numbers would distort the trend and the 7d avg.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const closed = raw.filter((d) => String(d.day || "") < todayKey);
+  const data = closed
     .slice()
     .sort((a, b) => String(a.day).localeCompare(String(b.day)))
     .map((d) => ({ day: String(d.day), v: toUnit(d.per_desk_sol || 0) }));
 
-  const sorted = [...raw].sort((a, b) =>
+  const sorted = [...closed].sort((a, b) =>
     String(b.day || "").localeCompare(String(a.day || ""))
   );
   const trailing = sorted.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);

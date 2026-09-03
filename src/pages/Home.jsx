@@ -93,14 +93,18 @@ export default function Home() {
   // Trailing 7-day average per-desk daily earning (SOL) — used to estimate a
   // connected wallet's daily earning from its owned (activated) desks.
   const perDeskItems = latest?.per_desk?.items || [];
-  const sortedPd = [...perDeskItems].sort((a, b) =>
+  // Estimates come from CLOSED (completed) days only — the newest feed day
+  // is today's in-progress working day with partial numbers.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const closedPd = perDeskItems.filter((d) => String(d.day || "") < todayKey);
+  const sortedPd = [...closedPd].sort((a, b) =>
     String(b.day || "").localeCompare(String(a.day || ""))
   );
   const trailingPd = sortedPd.slice(0, 7).filter((d) => (d.per_desk_sol || 0) > 0);
   const perDesk7dSol = trailingPd.length
     ? trailingPd.reduce((a, d) => a + (d.per_desk_sol || 0), 0) / trailingPd.length
     : sortedPd[0]?.per_desk_sol ?? 0;
-  // 24H window = the latest daily row; shown next to the 7D trailing average.
+  // 24H window = the latest CLOSED daily row; shown next to the 7D trailing average.
   const perDesk24hSol = sortedPd[0]?.per_desk_sol ?? 0;
 
   if (loading || !bootDone) {
