@@ -118,7 +118,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; OTC_HUB :: OTC_DESK SOLANA TOOL
+                &gt; OTC_HUB :: OTC_DESK TOOLS
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[10px] text-green-500/50">
