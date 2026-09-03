@@ -7,8 +7,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Legend,
 } from "recharts";
-import { ArrowRight } from "lucide-react";
 
 const TGE = 1_000_000_000;
 const DESK_CAP = 5000;
@@ -20,13 +20,14 @@ const RED = "#f87171";
 const fmtM = (v) => (v == null ? "—" : `${(v / 1e6).toFixed(0)}M`);
 const fmtK = (v) => (v == null ? "—" : v.toLocaleString());
 
+// Metric tiles styled like the other panels' inline stat tiles
 function MetricCard({ label, value, sub, subRed }) {
   return (
-    <div className="flex-1 border border-green-500/40 bg-black px-2.5 py-2">
-      <div className="text-[8px] uppercase tracking-[0.18em] text-green-500/60">{label}</div>
-      <div className="mt-0.5 font-mono text-lg font-bold leading-none text-green-400">{value}</div>
+    <div className="flex-1 border border-green-500/20 bg-black px-2 py-1">
+      <div className="text-[8px] uppercase tracking-widest text-green-500/50">{label}</div>
+      <div className="mt-0.5 font-mono text-[12px] font-bold leading-none text-emerald-400">{value}</div>
       {sub != null && (
-        <div className={`mt-0.5 font-mono text-[10px] ${subRed ? "text-red-400" : "text-green-500/60"}`}>{sub}</div>
+        <div className={`mt-0.5 font-mono text-[8px] ${subRed ? "text-red-400" : "text-green-500/50"}`}>{sub}</div>
       )}
     </div>
   );
@@ -111,99 +112,71 @@ export default function SupplyChart({ history, latest }) {
     : "";
 
   return (
-    <div className="border border-green-500/30 bg-black p-3 font-mono text-green-400">
-      {/* Header */}
-      <div className="flex items-start gap-2">
-        <div>
-          <h3 className="text-base font-bold leading-tight text-green-400">&gt; EVERY_DESK_EATS_SUPPLY</h3>
-          <p className="text-[10px] text-green-500/50">
-            DAILY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
-          </p>
-        </div>
+    <div className="border border-green-500/30 bg-black p-3">
+      {/* Header — same panel title style as the other charts */}
+      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+        SUPPLY :: $OTC_BURN vs DESK_MINT
       </div>
-      <div className="my-2 flex items-center gap-1">
-        <div className="h-px flex-1 bg-green-500/40" />
-        <ArrowRight className="h-3 w-3 text-green-500/60" />
+      <div className="mt-1 text-[9px] text-green-500/40">
+        DAILY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
       </div>
 
       {/* Metric cards */}
-      <div className="flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <MetricCard label="SUPPLY_NOW" value={supplyNow != null ? `${fmtM(supplyNow)} OTC` : "—"} sub={burnPct != null ? `-${burnPct}%` : null} subRed />
         <MetricCard label="TOTAL_BURNED" value={fmtM(totalBurned)} sub={deskDeposits != null ? `${fmtM(deskDeposits)} desk_deposits` : null} />
         <MetricCard label="DESKS" value={fmtK(desksNow)} sub={desksPct != null ? `${desksPct}% of ${DESK_CAP.toLocaleString()}` : null} />
       </div>
 
-      {/* Chart + legend */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <div className="h-64 flex-1 sm:h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 4, left: 0 }}>
-              <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                stroke="#1a6b3a"
-                fontSize={9}
-                tick={{ fill: "#2a8b4a" }}
-                angle={-30}
-                textAnchor="end"
-                height={48}
-                minTickGap={20}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                yAxisId="supply"
-                orientation="left"
-                domain={supplyDomain}
-                allowDataOverflow
-                stroke={SUPPLY_COLOR}
-                fontSize={9}
-                tick={{ fill: SUPPLY_COLOR }}
-                tickFormatter={(v) => fmtM(v)}
-                width={42}
-              />
-              <YAxis
-                yAxisId="desks"
-                orientation="right"
-                domain={desksDomain}
-                allowDataOverflow
-                stroke={DESKS_COLOR}
-                fontSize={9}
-                tick={{ fill: DESKS_COLOR }}
-                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K` : `${v}`)}
-                width={34}
-              />
-              <Tooltip
-                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11, color: "#4ade80" }}
-                labelStyle={{ color: "#22c55e" }}
-                formatter={(v, n) => [
-                  n === "OTC_SUPPLY" ? `${fmtM(v)} OTC` : n === "DESKS" ? `${fmtK(v)}` : v,
-                  n,
-                ]}
-              />
-              <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
-              <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Legend */}
-        <div className="w-full shrink-0 sm:w-36">
-          <div className="text-[9px] uppercase tracking-[0.18em] text-green-500/60">METRICS</div>
-          <div className="my-1 flex items-center gap-1">
-            <div className="h-px flex-1 bg-green-500/40" />
-            <ArrowRight className="h-2.5 w-2.5 text-green-500/60" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: SUPPLY_COLOR }} />
-              <span className="text-[11px] text-green-400">OTC_SUPPLY</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: DESKS_COLOR }} />
-              <span className="text-[11px] text-cyan-400">DESKS</span>
-            </div>
-          </div>
-        </div>
+      {/* Chart — same axis/legend treatment as the other charts */}
+      <div className="mt-3 h-64 sm:h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 4, left: 0 }}>
+            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+            <XAxis
+              dataKey="label"
+              stroke="#1a6b3a"
+              fontSize={10}
+              tick={{ fill: "#2a8b4a" }}
+              minTickGap={20}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              yAxisId="supply"
+              orientation="left"
+              domain={supplyDomain}
+              allowDataOverflow
+              stroke={SUPPLY_COLOR}
+              fontSize={10}
+              tick={{ fill: SUPPLY_COLOR }}
+              tickFormatter={(v) => fmtM(v)}
+              width={44}
+            />
+            <YAxis
+              yAxisId="desks"
+              orientation="right"
+              domain={desksDomain}
+              allowDataOverflow
+              stroke={DESKS_COLOR}
+              fontSize={10}
+              tick={{ fill: DESKS_COLOR }}
+              tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K` : `${v}`)}
+              width={38}
+            />
+            <Tooltip
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+              labelStyle={{ color: "#22c55e" }}
+              itemStyle={{ color: "#4ade80" }}
+              formatter={(v, n) => [
+                n === "OTC_SUPPLY" ? `${fmtM(v)} OTC` : n === "DESKS" ? `${fmtK(v)}` : v,
+                n,
+              ]}
+            />
+            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
+            <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Footer */}

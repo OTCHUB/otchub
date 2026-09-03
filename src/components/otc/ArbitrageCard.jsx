@@ -197,38 +197,45 @@ export default function ArbitrageCard({ latest, holdings }) {
 
       {/* CTAs pinned to the bottom of the panel */}
       <div className="mt-auto flex flex-wrap gap-2 pt-3">
-        <button
-          onClick={() =>
-            document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
-          className={`border px-2 py-1 font-mono text-[10px] ${
-            recKey === "buy_secondary"
-              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
-              : "border-green-500/30 text-green-500/60"
-          }`}
-        >
-          [→ BUY_SECONDARY · LISTINGS]
-        </button>
-        {recKey === "mint" ? (
+        {/* Buy secondary → straight to the best net-cost desk on Magic Eden */}
+        {snipe ? (
           <a
-            href="https://otcdesks.cash/mint"
+            href={`${ME_BASE}/${snipe.asset_id}`}
             target="_blank"
-            rel="noopener noreferrer"
-            className="border border-amber-500/60 bg-amber-500/10 px-2 py-1 font-mono text-[10px] font-bold text-amber-400 hover:bg-amber-500/20"
-            title="Mint a fresh OTC desk on the official protocol app"
+            rel="noreferrer"
+            className={`border px-2 py-1 font-mono text-[10px] ${
+              recKey === "buy_secondary"
+                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+                : "border-green-500/30 text-green-500/60"
+            }`}
+            title="Buy the best net-cost listed desk directly on Magic Eden"
           >
-            [→ MINT ↗ otcdesks.cash]
+            [→ BUY_SECONDARY ↗ ME]
           </a>
         ) : (
           <button
             onClick={() =>
-              document.getElementById("otc-swap")?.scrollIntoView({ behavior: "smooth", block: "start" })
+              document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })
             }
             className="border border-green-500/30 px-2 py-1 font-mono text-[10px] text-green-500/60"
           >
-            [→ MINT · SWAP OTC]
+            [→ BUY_SECONDARY · LISTINGS]
           </button>
         )}
+        {/* Buy token to mint → straight to the in-app swap panel */}
+        <button
+          onClick={() =>
+            document.getElementById("otc-swap")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          className={`border px-2 py-1 font-mono text-[10px] ${
+            recKey === "mint"
+              ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
+              : "border-green-500/30 text-green-500/60"
+          }`}
+          title="Buy $OTC in the swap panel, then mint a fresh desk with it"
+        >
+          [→ BUY_TOKEN · SWAP]
+        </button>
       </div>
     </div>
   );
