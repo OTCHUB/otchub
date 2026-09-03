@@ -4,9 +4,12 @@ import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
 
 export default function RoundsChart({ latest }) {
   const raw = latest?.per_desk?.items || [];
+  // Chronological left→right (oldest at left, newest at right): the feed
+  // arrives oldest-first, so sort ascending — the old reverse made the chart
+  // read backwards AND made the "today" metric read the OLDEST day.
   const data = raw
     .slice()
-    .reverse()
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)))
     .map((d) => ({ day: String(d.day), rounds: d.rounds || 0, desks: d.desks || 0 }));
 
   // Pending-pot metrics: today's round velocity, live SOL sitting in the pot,

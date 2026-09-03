@@ -19,9 +19,12 @@ export default function EarningsChart({ latest }) {
   const toUnit = (sol) => (unit === "USD" ? sol * solUsd : sol);
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 2) : fmtSol(v, 3));
 
+  // Chronological left→right (oldest at left, newest at right): the feed
+  // arrives oldest-first, so sort ascending explicitly — reversing it made
+  // the chart read backwards in time.
   const data = raw
     .slice()
-    .reverse()
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)))
     .map((d) => {
       const desks = d.desks || 0;
       const totalSol = d.total_earned_sol ?? (d.per_desk_sol || 0) * desks;
@@ -41,6 +44,11 @@ export default function EarningsChart({ latest }) {
     : null;
   const floorSol = latest?.nft_floor_sol || 0;
   const breakevenDays = trailingAvgSol && trailingAvgSol > 0 ? floorSol / trailingAvgSol : null;
+  // 1D figures use the latest feed day (partial until that day closes).
+  const breakeven1dDays = todayPerDeskSol && todayPerDeskSol > 0 ? floorSol / todayPerDeskSol : null;
+  // APR = daily per-desk earning annualized against the desk's floor cost.
+  const apr1dPct = todayPerDeskSol && floorSol > 0 ? (todayPerDeskSol / floorSol) * 365 * 100 : null;
+  const aprAvgPct = trailingAvgSol && floorSol > 0 ? (trailingAvgSol / floorSol) * 365 * 100 : null;
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -52,11 +60,16 @@ export default function EarningsChart({ latest }) {
           <div className="mt-1 text-[9px] text-green-500/40">
             bars = total into desks · line = avg / desk · bootstrap excluded from avg
           </div>
-          <div className="mt-1 text-[10px] text-emerald-400/80">
-            BREAKEVEN (7d avg): {breakevenDays != null ? `${breakevenDays.toFixed(1)} days` : "—"} @ floor {fmtSol(floorSol, 2)}
-            {todayPerDeskSol != null && trailingAvgSol != null && (
-              <span className="ml-1 text-green-500/40">· today {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}</span>
-            )}
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] font-mono">
+            <span className="text-emerald-400/80">
+              BREAKEVEN: 1D {breakeven1dDays != null ? `${breakeven1dDays.toFixed(1)}d` : "—"} · 7D_AVG {breakevenDays != null ? `${breakevenDays.toFixed(1)}d` : "—"} @ FLOOR {fmtSol(floorSol, 2)}
+            </span>
+            <span className="text-cyan-400/80">
+              APR: 1D {apr1dPct != null ? `${apr1dPct.toFixed(0)}%` : "—"} · 7D_AVG {aprAvgPct != null ? `${aprAvgPct.toFixed(0)}%` : "—"}
+            </span>
+          </div>
+          <div className="mt-1 text-[9px] text-green-500/40">
+            APR = per-desk daily earning annualized vs NFT floor · 1D = latest feed day (partial until it closes) · today {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}
           </div>
         </div>
         <div className="flex gap-1">

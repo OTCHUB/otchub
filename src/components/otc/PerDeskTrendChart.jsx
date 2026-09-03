@@ -18,9 +18,11 @@ export default function PerDeskTrendChart({ latest }) {
   const toUnit = (sol) => (unit === "USD" ? sol * solUsd : sol);
   const fmt = (v) => (unit === "USD" ? fmtUsd(v, 3) : fmtSol(v, 4));
 
+  // Chronological left→right (oldest at left, newest at right): the feed
+  // arrives oldest-first — reversing it made the chart read backwards.
   const data = raw
     .slice()
-    .reverse()
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)))
     .map((d) => ({ day: String(d.day), v: toUnit(d.per_desk_sol || 0) }));
 
   const sorted = [...raw].sort((a, b) =>
