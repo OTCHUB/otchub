@@ -1,0 +1,32 @@
+# OTC Hub
+
+> Real-time community analytics dashboard for the OTC Desks protocol (otcdesks.cash) on Solana. Tracks the $OTC token, the OTC Desk NFT collection, the desk pot, and desk vault stock distributions. Unofficial community tooling — not affiliated with, or endorsed by, otcdesks.cash.
+
+## What this app does
+
+- **$OTC token market data**: live price (USD/SOL), market cap, 24h volume and price change, liquidity, circulating supply vs TGE supply, and total burn.
+- **OTC Desk NFT market**: Magic Eden floor (including the true buyer cost: 2% taker fee + 5% creator royalty), listed count, live listings gallery, and mint-vs-secondary arbitrage with on-chain-verified vault stock.
+- **Desk pot revenue analytics**: daily SOL inflows into the protocol's pot, attributed by source — desk mint surcharge (90% of the 0.5 SOL per-mint surcharge), Magic Eden desk-sale creator royalties (5%), launchpad fee share (~10% of launcher fees), and unattributed flows — measured directly from on-chain pot transactions across the full protocol history.
+- **Protocol stats**: pot balance, protocol earned/distributed/owed, buyback treasury (SOL and $OTC), distribution rounds, per-desk daily earnings, and per-stock (13-stock rotation) distribution history.
+- **Wallet portfolio**: connect a Solana wallet (Phantom, Solflare, Backpack, etc.) to view owned OTC Desks, live on-chain vault stock, lifetime claim history, and claim accrued stock directly (atomic vault claims and protocol PULL_OWED backlog clearing, batched and simulated for reliability).
+- **Trading**: buy/sell $OTC via the Jupiter aggregator with quote simulation, slippage control, live price candles, and a recent-swaps feed.
+
+## Data sources
+
+All data is read on-chain or from public APIs: Helius RPC / DAS (Metaplex Core collection + desk ownership, vault token balances, pot transaction history), DexScreener ($OTC and SOL spot prices), Magic Eden (desk floor, listings), Jupiter (swap quotes), and the otcdesks.cash public stats feed (protocol economics). Snapshots are ingested every 5 minutes with prices refreshed more frequently.
+
+## Important notes
+
+- **This is not the official protocol app.** It is independent community tooling and is not affiliated with otcdesks.cash. Nothing here is financial advice.
+- Claim and swap actions are executed from the user's own wallet; the app never holds keys or funds.
+- All stock/accrual figures shown for listed desks are verified against live on-chain vault balances, not estimates.
+
+## Sections
+
+- [Dashboard](https://knowing-otc-pulse-flow.base44.app/): live prices, arbitrage, protocol stats, pot revenue charts, per-desk earnings, distribution history, buybacks.
+- [About](https://knowing-otc-pulse-flow.base44.app/about): what OTC Hub is, data sources, and the community-tooling disclaimer.
+
+## More info
+
+- Protocol: https://otcdesks.cash
+- App: https://knowing-otc-pulse-flow.base44.app

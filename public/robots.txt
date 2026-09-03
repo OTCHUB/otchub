@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# LLM guidance for this site
+LLMs-txt: https://knowing-otc-pulse-flow.base44.app/llms.txt
