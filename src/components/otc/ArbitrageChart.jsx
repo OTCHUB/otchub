@@ -47,10 +47,10 @@ export default function ArbitrageChart({ history }) {
 
       <div className="mt-3 h-44 sm:h-52">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${v}`} width={50} />
+            <YAxis stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
             <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Line type="monotone" dataKey="mint" name="MINT_COST" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
@@ -64,10 +64,10 @@ export default function ArbitrageChart({ history }) {
       </div>
       <div className="mt-1 h-24">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${v}`} width={50} />
+            <YAxis stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
             <ReferenceLine y={0} stroke="#4ade80" />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
             <Bar dataKey="spread" name="SPREAD">

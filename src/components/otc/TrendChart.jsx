@@ -30,7 +30,7 @@ export default function TrendChart({ history }) {
       </div>
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+          <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis
               dataKey="t"
@@ -39,7 +39,27 @@ export default function TrendChart({ history }) {
               fontSize={10}
               tick={{ fill: "#2a8b4a" }}
             />
-            <YAxis stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${v}`} width={50} />
+            <YAxis
+              yAxisId="usd"
+              stroke="#1a6b3a"
+              fontSize={10}
+              tick={{ fill: "#2a8b4a" }}
+              tickFormatter={(v) => `$${+v.toFixed(2)}`}
+              width={56}
+            />
+            {/* The token trades at ~1/100th of the NFT floor: on a shared
+                scale its line is flat against the baseline. Give it its own
+                auto-scaled right axis so both series stay readable. */}
+            <YAxis
+              yAxisId="token"
+              orientation="right"
+              domain={["auto", "auto"]}
+              stroke="#22d3ee"
+              fontSize={10}
+              tick={{ fill: "#22d3ee" }}
+              tickFormatter={(v) => `$${+v.toFixed(4)}`}
+              width={52}
+            />
             <Tooltip
               labelFormatter={(t) => new Date(t).toLocaleString()}
               formatter={(v) => fmtUsd(v)}
@@ -48,9 +68,9 @@ export default function TrendChart({ history }) {
               itemStyle={{ color: "#4ade80" }}
             />
             <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
-            <Line type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
-            <Line type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
-            <Line type="monotone" dataKey="diff" name="DIFF_USD" stroke="#22d3ee" dot={false} strokeWidth={1.5} strokeDasharray="4 3" />
+            <Line yAxisId="token" type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
+            <Line yAxisId="usd" type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
+            <Line yAxisId="usd" type="monotone" dataKey="diff" name="DIFF_USD" stroke="#22d3ee" dot={false} strokeWidth={1.5} strokeDasharray="4 3" />
           </LineChart>
         </ResponsiveContainer>
       </div>

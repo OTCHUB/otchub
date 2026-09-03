@@ -61,15 +61,15 @@ export default function PerDeskTrendChart({ latest }) {
       </div>
       <div className="mt-3 h-48 sm:h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: -18 }}>
+          <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
             <YAxis
               stroke="#1a6b3a"
               fontSize={10}
               tick={{ fill: "#2a8b4a" }}
-              tickFormatter={(v) => (unit === "USD" ? `$${v}` : `${v}`)}
-              width={50}
+              tickFormatter={(v) => (unit === "USD" ? `$${+v.toFixed(2)}` : `${+v.toFixed(4)}`)}
+              width={56}
             />
             <Tooltip
               contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}

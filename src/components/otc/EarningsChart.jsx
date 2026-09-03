@@ -112,11 +112,11 @@ export default function EarningsChart({ latest, history }) {
       </div>
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: -18 }}>
+          <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
-            <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${v}`} width={50} />
-            <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${v}`} width={40} />
+            <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
+            <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
             <Tooltip
               contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
               labelStyle={{ color: "#22c55e" }}
@@ -140,7 +140,7 @@ export default function EarningsChart({ latest, history }) {
         </div>
         <div className="mt-1 h-40 sm:h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={trend} margin={{ top: 4, right: 10, bottom: 0, left: -18 }}>
+            <ComposedChart data={trend} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
               <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
               <YAxis
@@ -148,8 +148,8 @@ export default function EarningsChart({ latest, history }) {
                 stroke="#1a6b3a"
                 fontSize={10}
                 tick={{ fill: "#2a8b4a" }}
-                tickFormatter={(v) => `${v}%`}
-                width={50}
+                tickFormatter={(v) => `${+v.toFixed(0)}%`}
+                width={56}
               />
               <YAxis
                 yAxisId="be"
@@ -157,8 +157,8 @@ export default function EarningsChart({ latest, history }) {
                 stroke="#1a6b3a"
                 fontSize={10}
                 tick={{ fill: "#2a8b4a" }}
-                tickFormatter={(v) => `${v}d`}
-                width={40}
+                tickFormatter={(v) => `${+v.toFixed(0)}d`}
+                width={48}
               />
               <Tooltip
                 contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}

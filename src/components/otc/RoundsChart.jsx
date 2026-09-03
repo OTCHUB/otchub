@@ -86,15 +86,15 @@ export default function RoundsChart({ latest }) {
       </div>
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
             <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
             <YAxis
               stroke="#1a6b3a"
               fontSize={10}
               tick={{ fill: "#2a8b4a" }}
-              tickFormatter={(v) => `${v}`}
-              width={50}
+              tickFormatter={(v) => `${+v.toFixed(0)}`}
+              width={56}
             />
             <Tooltip
               contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
