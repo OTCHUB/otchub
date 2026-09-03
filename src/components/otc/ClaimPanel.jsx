@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim, probeOwed } from "@/lib/otcClaim";
-import { getSignerForAddress } from "@/lib/walletSigner";
+import { getSignerForAddress, abortPendingSigns } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
@@ -643,7 +643,19 @@ export default function ClaimPanel({ address, holdings, onClaimed, onScan, lifet
         </div>
       )}
 
-      {overlayPhase && <TxStatusOverlay phase={overlayPhase} detail={overlayDetail} />}
+      {overlayPhase && (
+        <TxStatusOverlay
+          phase={overlayPhase}
+          detail={overlayDetail}
+          // CANCEL is only offered during the SIGNATURE phase — before that
+          // there is nothing to abort, and after it txs are already in flight.
+          onCancel={
+            overlayPhase === "sign"
+              ? () => abortPendingSigns("Cancelled by user — no tx was sent")
+              : null
+          }
+        />
+      )}
 
       {/* Log */}
       {logs.length > 0 && (

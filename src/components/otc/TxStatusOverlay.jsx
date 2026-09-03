@@ -25,7 +25,7 @@ const PHASES = {
   },
   sign: {
     label: "AWAITING SIGNATURE",
-    hint: "CHECK YOUR WALLET — approve the prompt to continue",
+    hint: "CHECK YOUR WALLET — approve the prompt to continue. No prompt appeared or stuck? [CANCEL] ends the run — nothing is sent.",
     cls: "border-amber-400/60 text-amber-300",
     dot: "bg-amber-400",
   },
@@ -55,7 +55,7 @@ const PHASES = {
   },
 };
 
-export default function TxStatusOverlay({ phase, detail }) {
+export default function TxStatusOverlay({ phase, detail, onCancel }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function TxStatusOverlay({ phase, detail }) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex justify-center px-3">
-      <div className={`w-full max-w-lg border bg-black/95 px-3 py-2 ${p.cls}`}>
+      <div className={`w-full max-w-lg border bg-black/95 px-3 py-2 ${p.cls} ${onCancel ? "pointer-events-auto" : ""}`}>
         <div className="flex items-center gap-2.5">
           <span
             className={`h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-t-transparent ${p.dot}`}
@@ -84,8 +84,18 @@ export default function TxStatusOverlay({ phase, detail }) {
                 {p.label}
                 {detail ? <span className="text-green-500/60"> :: {detail}</span> : null}
               </span>
-              <span className="shrink-0 font-mono text-[10px] text-green-500/50">
-                [{elapsed}s] <span className="animate-pulse">▋</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {onCancel && (
+                  <button
+                    onClick={onCancel}
+                    className="border border-red-500/50 px-2 py-0.5 font-mono text-[9px] text-red-400 hover:border-red-400 hover:text-red-300"
+                  >
+                    [CANCEL]
+                  </button>
+                )}
+                <span className="font-mono text-[10px] text-green-500/50">
+                  [{elapsed}s] <span className="animate-pulse">▋</span>
+                </span>
               </span>
             </div>
             <div className="mt-0.5 font-mono text-[9px] leading-snug text-green-500/60">

@@ -53,26 +53,57 @@ function serializeForSigning(tx) {
 }
 
 // Wallet sign calls can silently hang if the wallet prompt closes without
-// responding (a known quirk on some injected wallets). Race each call against a
-// generous timeout so a stalled prompt surfaces as a clear error instead of
-// hanging the whole claim run forever.
+// responding (a known quirk on some injected wallets — especially mobile
+// deep-link wallets where the prompt navigates away and never resolves).
+// Race each call against a generous timeout so a stalled prompt surfaces as a
+// clear error instead of hanging the whole claim run forever.
 const SIGN_TIMEOUT_MS = 120000;
+
+// Rejectors of every currently pending sign call — used by the CANCEL button
+// so the user can always end a stuck "AWAITING SIGNATURE" state themselves.
+const _pendingSignRejects = new Set();
+
+// Abort every in-flight wallet sign prompt (CANCEL during the signature
+// phase). Rejects the pending sign promise(s); the claim executors catch that
+// as a rejected batch and end the run cleanly. Cancelling is always safe at
+// sign time: nothing has been broadcast yet.
+export function abortPendingSigns(reason = "Cancelled — no tx was sent") {
+  const err = new Error(reason);
+  for (const rej of [..._pendingSignRejects]) {
+    try {
+      rej(err);
+    } catch {
+      /* ignore */
+    }
+  }
+  _pendingSignRejects.clear();
+}
+
 function withSignTimeout(promise, label) {
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      timer = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `${label} timed out after ${SIGN_TIMEOUT_MS / 1000}s — the wallet prompt may have closed without responding. Re-run the claim.`
-            )
-          ),
-        SIGN_TIMEOUT_MS
-      );
-    }),
-  ]).finally(() => clearTimeout(timer));
+  return new Promise((resolve, reject) => {
+    const wrappedReject = (e) => {
+      _pendingSignRejects.delete(wrappedReject);
+      reject(e);
+    };
+    _pendingSignRejects.add(wrappedReject);
+    const timer = setTimeout(
+      () =>
+        wrappedReject(
+          new Error(
+            `${label} timed out after ${SIGN_TIMEOUT_MS / 1000}s — the wallet prompt may have closed without responding. Nothing was sent; re-run the claim.`
+          )
+        ),
+      SIGN_TIMEOUT_MS
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        _pendingSignRejects.delete(wrappedReject);
+        resolve(v);
+      },
+      wrappedReject
+    );
+  });
 }
 
 async function signTransactionRaw(conn, tx) {
