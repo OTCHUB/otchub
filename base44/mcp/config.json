@@ -1,0 +1,11 @@
+{
+  "auth": "none",
+  "tools": {
+    "entity_overrides": {
+      "User": { "operations": [] },
+      "ContactMessage": { "operations": [] },
+      "DataLock": { "operations": [] },
+      "KeeperRun": { "operations": [] }
+    }
+  }
+}
