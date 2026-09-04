@@ -10,7 +10,7 @@ import HelpNote from "@/components/otc/HelpNote";
 const SEGMENTS = [
   { key: "mint", name: "MINT", fill: "#166534" },
   { key: "royalty", name: "ME_ROYALTY", fill: "#0e7490" },
-  { key: "launchpad", name: "LAUNCHPAD", fill: "#22c55e" },
+  { key: "launchpad", name: "CREATOR_FEES", fill: "#22c55e" },
   { key: "other", name: "UNATTRIB", fill: "#b45309" },
 ];
 
@@ -43,8 +43,8 @@ export default function PotSourcesChart({ latest }) {
       <HelpNote label="[?] SOURCE_LEGEND">
         pot SOL inflow, measured on-chain · MINT (0.45 SOL surcharge + 100k-OTC deposit sale
         proceeds per mint) · ME_ROYALTY (5% creator fee on desk sales → pot) · LAUNCHPAD
-        (launcher fee settlements — mostly PASS-THROUGH to launchpad holders, only ~10% stays
-        for desks) · UNATTRIB (sweeps &amp; misc)
+        (creator fees earned by coins launched via the desk launcher — mostly PASS-THROUGH to
+        launchpad holders, only ~10% stays for desks) · UNATTRIB (sweeps &amp; misc)
         {ps?.since ? ` · tracking since ${ps.since}` : ""}
       </HelpNote>
       {rows.length === 0 ? (
