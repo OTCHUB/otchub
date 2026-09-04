@@ -537,7 +537,9 @@ export async function runKeeper(base44) {
             byStock[symbol] = solUsd ? +(usd / solUsd).toFixed(6) : 0;
           }
         }
-        if (solUsd && clearedUsd > 0) {
+        // Both pool reads succeeded → record the measurement even when 0,
+        // so "measured: nothing cleared" is distinguishable from a failed read (null).
+        if (solUsd) {
           log.cleared_sol = +(clearedUsd / solUsd).toFixed(6);
           log.cleared_usd = +clearedUsd.toFixed(2);
           log.cleared_by_stock = byStock;
