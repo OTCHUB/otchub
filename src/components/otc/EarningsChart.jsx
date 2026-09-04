@@ -71,6 +71,25 @@ export default function EarningsChart({ latest, history }) {
   const apr1dPct = todayPerDeskSol && floorSol > 0 ? (todayPerDeskSol / floorSol) * 365 * 100 : null;
   const aprAvgPct = trailingAvgSol && floorSol > 0 ? (trailingAvgSol / floorSol) * 365 * 100 : null;
 
+  // Direction readout: the latest CLOSED day's per-desk earning vs the day
+  // before it (D/D) and vs the trailing 7D average — makes the trend direction
+  // readable at a glance without squinting at the chart slopes.
+  const prevClosed = data.length > 1 ? data[data.length - 2] : null;
+  const prevPd = prevClosed?.pd;
+  const dodPct =
+    todayPerDeskSol > 0 && prevPd > 0 ? ((todayPerDeskSol - prevPd) / prevPd) * 100 : null;
+  const vs7dPct =
+    todayPerDeskSol > 0 && trailingAvgSol > 0
+      ? ((todayPerDeskSol - trailingAvgSol) / trailingAvgSol) * 100
+      : null;
+  const dir = dodPct == null ? "▬" : dodPct > 2 ? "▲" : dodPct < -2 ? "▼" : "▬";
+  const dirCls =
+    dir === "▲"
+      ? "text-emerald-400 border-emerald-500/50"
+      : dir === "▼"
+      ? "text-red-400 border-red-500/50"
+      : "text-green-500/60 border-green-500/30";
+
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
@@ -128,8 +147,20 @@ export default function EarningsChart({ latest, history }) {
 
       {/* APR + breakeven trend — shows whether the yield is rising or fading */}
       <div className="mt-3 border-t border-green-500/20 pt-2">
-        <div className="text-[10px] uppercase tracking-widest text-green-500/70">
-          APR &amp; BREAKEVEN :: TREND (PER DESK / DAY)
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+            APR &amp; BREAKEVEN :: TREND (PER DESK / DAY)
+          </div>
+          <span
+            className={`border px-2 py-0.5 font-mono text-[10px] ${dirCls}`}
+            title="Direction of the per-desk daily earning rate: D/D = latest closed day vs the day before · vs 7D = latest closed day vs the trailing 7-day average"
+          >
+            RATE_DIR {dir}{" "}
+            {dodPct != null ? `${dodPct >= 0 ? "+" : ""}${dodPct.toFixed(1)}% D/D` : "—"}
+            {vs7dPct != null
+              ? ` · ${vs7dPct >= 0 ? "+" : ""}${vs7dPct.toFixed(1)}% vs 7D`
+              : ""}
+          </span>
         </div>
         <div className="mt-1 text-[9px] text-green-500/40">
           APR = daily per-desk earning annualized vs that day's NFT floor · BE = days to recoup
