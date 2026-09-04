@@ -8,7 +8,9 @@
 // with an admin email alert, and a KeeperRun log record per attempt.
 
 import { secrets } from "base44:runtime";
-import { heliusRpc, fetchProtocolStats } from "./otcSources.ts";
+import { heliusRpc } from "./otcSources.ts";
+import { STOCKS } from "./otcIdl.ts";
+import { getSpotPrices } from "./spotPrices.ts";
 import { acquireLock } from "./dataLock.ts";
 import {
   Keypair,
@@ -169,6 +171,32 @@ function packCrankTxs(ixs, feePayer, blockhash, microLamports) {
   return txs;
 }
 
+// Pool stock balances (the config's 13 stock ATAs). Their deltas over a run
+// measure EXACTLY what the distributes pushed from the pool into desk vaults:
+// one batched read of 13 accounts, before and after the sweep. A missing/null
+// account (ticker not launched) is skipped for the metric, and an RPC failure
+// on the before-read disables the metric for the run rather than overcounting.
+async function readPoolAmounts(tpMap) {
+  const cfg = configPda();
+  const addrs = [];
+  const mints = [];
+  for (const s of LINEUP) {
+    const mintPk = new PublicKey(s.mint);
+    const tpPk = new PublicKey(tpMap[s.mint] || TOKEN_2022_PROGRAM_ID.toBase58());
+    addrs.push(stockAta(cfg, mintPk, tpPk).toBase58());
+    mints.push(s.mint);
+  }
+  const r = await heliusRpc("getMultipleAccounts", [addrs, { encoding: "jsonParsed" }]);
+  const value = r?.value || [];
+  const out = {};
+  for (let i = 0; i < mints.length; i++) {
+    const acc = value[i];
+    const amtStr = acc?.data?.parsed?.info?.tokenAmount?.amount;
+    out[mints[i]] = acc && amtStr != null ? Number(amtStr) : null;
+  }
+  return out;
+}
+
 async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let cursor = 0;
@@ -305,9 +333,10 @@ export async function keeperStatus(base44) {
       a.txs_failed += r.txs_failed || 0;
       a.fees_sol += r.fees_sol || 0;
       a.cleared_sol += r.cleared_sol || 0;
+      a.cleared_usd += r.cleared_usd || 0;
       return a;
     },
-    { ok_runs: 0, desks: 0, txs_sent: 0, txs_failed: 0, fees_sol: 0, cleared_sol: 0 }
+    { ok_runs: 0, desks: 0, txs_sent: 0, txs_failed: 0, fees_sol: 0, cleared_sol: 0, cleared_usd: 0 }
   );
   let sol_price_usd = null;
   try {
@@ -340,6 +369,7 @@ export async function keeperStatus(base44) {
       fees_sol: r.fees_sol,
       backlog_sol_before: r.backlog_sol_before,
       cleared_sol: r.cleared_sol,
+      cleared_by_stock: r.cleared_by_stock || null,
     })),
   };
 }
@@ -362,8 +392,9 @@ export async function runKeeper(base44) {
     txs_failed: 0,
     fees_sol: 0,
     backlog_sol_before: null,
-    backlog_sol_after: null,
     cleared_sol: null,
+    cleared_usd: null,
+    cleared_by_stock: null,
     keeper_balance_sol: null,
     error: null,
   };
@@ -409,6 +440,12 @@ export async function runKeeper(base44) {
     log.desks = chunk;
 
     const tpMap = await resolveTokenPrograms();
+    let poolBefore = null;
+    try {
+      poolBefore = await readPoolAmounts(tpMap);
+    } catch {
+      poolBefore = null; // metric disabled this run — never overcount
+    }
     const ixs = [];
     for (const s of LINEUP) {
       for (const assetId of chosen) {
@@ -476,19 +513,38 @@ export async function runKeeper(base44) {
       }
     }
 
-    // Impact metric: re-read the live owed backlog after the txs land. Fresh
-    // pot inflow during the run inflates the after-value, so (before - after)
-    // is a conservative lower bound of what this run actually cleared.
-    try {
-      const stats = await fetchProtocolStats();
-      const owedAfter = stats?.owed != null ? stats.owed / 1e9 : null;
-      log.backlog_sol_after = owedAfter;
-      log.cleared_sol =
-        owedAfter != null && log.backlog_sol_before != null
-          ? Math.max(0, +(log.backlog_sol_before - owedAfter).toFixed(4))
-          : null;
-    } catch {
-      /* impact metric is best-effort */
+    // Impact metric: pool-stock deltas over the run window = tokens CRKR
+    // pushed from the protocol pool into desk vaults, valued at current spot
+    // prices. Stock mints without a live price are excluded (conservative).
+    if (poolBefore) {
+      try {
+        const poolAfter = await readPoolAmounts(tpMap);
+        const meta = Object.fromEntries(STOCKS.map((s) => [s.mint, s]));
+        const spot = await getSpotPrices(base44);
+        const solUsd = spot?.sol_price_usd ?? null;
+        let clearedUsd = 0;
+        const byStock = {};
+        for (const s of LINEUP) {
+          const b = poolBefore[s.mint];
+          const a = poolAfter?.[s.mint] ?? null;
+          if (b == null || a == null || a >= b) continue;
+          const dec = meta[s.mint]?.decimals ?? 6;
+          const dUi = (b - a) / Math.pow(10, dec);
+          const usd = dUi * (spot?.prices?.[s.mint] || 0);
+          const symbol = meta[s.mint]?.symbol || s.mint.slice(0, 4);
+          if (usd > 0) {
+            clearedUsd += usd;
+            byStock[symbol] = solUsd ? +(usd / solUsd).toFixed(6) : 0;
+          }
+        }
+        if (solUsd && clearedUsd > 0) {
+          log.cleared_sol = +(clearedUsd / solUsd).toFixed(6);
+          log.cleared_usd = +clearedUsd.toFixed(2);
+          log.cleared_by_stock = byStock;
+        }
+      } catch {
+        /* impact metric is best-effort */
+      }
     }
 
     await writeConfig(base44, { ...cfg, cursor: (cfg.cursor + chunk) % desks.length });

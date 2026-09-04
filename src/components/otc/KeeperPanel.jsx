@@ -161,8 +161,9 @@ export default function KeeperPanel() {
             </div>
           </div>
           <div className="border-t border-green-500/10 px-2 py-1 text-[9px] text-green-500/40">
-            OWED_CLEARED = SOL pushed out of the owed backlog into desk vaults by CRKR distribute txs
-            (conservative lower bound — pot inflow between the before/after reads is excluded).
+            OWED_CLEARED = SOL value of stock tokens CRKR pushed from the protocol pool into desk
+            vaults, measured on-chain from pool deltas and valued at live spot prices (unpriced
+            stocks excluded — conservative).
           </div>
         </div>
       )}
@@ -202,7 +203,19 @@ export default function KeeperPanel() {
               <span className="font-mono text-green-500/50">
                 BACKLOG {r.backlog_sol_before != null ? fmtSol(r.backlog_sol_before, 2) : "—"}
                 {r.cleared_sol != null && r.cleared_sol > 0 && (
-                  <span className="text-emerald-400"> · CLR {fmtSol(r.cleared_sol, 3)}</span>
+                  <span
+                    className="text-emerald-400"
+                    title={
+                      r.cleared_by_stock
+                        ? Object.entries(r.cleared_by_stock)
+                            .map(([sym, sol]) => `${sym} ${fmtSol(sol, 4)}`)
+                            .join(" · ")
+                        : ""
+                    }
+                  >
+                    {" · CLR "}
+                    {fmtSol(r.cleared_sol, 3)}
+                  </span>
                 )}
               </span>
             </div>
