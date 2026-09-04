@@ -218,6 +218,14 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Listings: secondary-market desk inventory, above the trade hub so
+            arbitrage jumps land right next to the swap they feed into */}
+        <div className="mt-3">
+          <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
+            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
+          </CollapsibleCard>
+        </div>
+
         {/* Trade hub: two-way token swap + NFT desk trade routes */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
@@ -275,13 +283,6 @@ export default function Home() {
         <div className="mt-3">
           <CollapsibleCard title="DESKS :: DISTRIBUTION">
             <DesksTables latest={latest} />
-          </CollapsibleCard>
-        </div>
-
-        {/* Holdings */}
-        <div className="mt-3">
-          <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
-            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
           </CollapsibleCard>
         </div>
 

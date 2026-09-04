@@ -88,7 +88,13 @@ export default function ArbitrageCard({ latest, holdings }) {
 
       {/* The point, in big type: which side is cheaper right now */}
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
-        <div className="border border-amber-500/30 bg-amber-500/5 p-2 text-center">
+        <div
+          onClick={() =>
+            document.getElementById("otc-swap")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          title="Buy $OTC in the swap panel, then mint a fresh desk with it"
+          className="cursor-pointer border border-amber-500/30 bg-amber-500/5 p-2 text-center hover:bg-amber-500/10"
+        >
           <div className="text-[9px] uppercase tracking-widest text-amber-500/70">
             MINT_FRESH
           </div>
@@ -101,7 +107,11 @@ export default function ArbitrageCard({ latest, holdings }) {
         </div>
         <div className="flex items-center px-1 text-[10px] text-green-500/50">VS</div>
         <div
-          className={`p-2 text-center ${
+          onClick={() =>
+            document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          title="Browse listed desks in the listings panel and snipe the best net cost"
+          className={`cursor-pointer p-2 text-center hover:bg-emerald-500/10 ${
             secCheaper
               ? "border border-emerald-500/30 bg-emerald-500/5"
               : "border border-cyan-500/30 bg-cyan-500/5"
