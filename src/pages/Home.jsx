@@ -20,6 +20,7 @@ import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
+import KeeperPanel from "@/components/otc/KeeperPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import { timeAgo } from "@/lib/format";
@@ -273,6 +274,14 @@ export default function Home() {
           </CollapsibleCard>
           <CollapsibleCard title="BUYBACKS">
             <BuybacksPanel latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Keeper: automated permissionless distribute crank so the owed backlog
+            never sits stuck waiting for someone to run the manual crank */}
+        <div className="mt-3">
+          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE">
+            <KeeperPanel />
           </CollapsibleCard>
         </div>
 

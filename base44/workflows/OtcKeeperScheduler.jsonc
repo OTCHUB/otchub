@@ -1,0 +1,47 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/30 * * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "OTC Keeper Scheduler",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "otc_keeper_scheduler",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "keeper_run": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "otcKeeper",
+            "args": {
+              "run": true
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Run distribute keeper",
+            "description": "Auto-crank owed distributions into desk vaults"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Runs the keeper every 30 minutes: signs and sends permissionless distribute(index) transactions from the funded keeper wallet so the owed backlog flows into desk vaults automatically."
+}

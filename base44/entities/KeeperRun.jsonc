@@ -1,0 +1,57 @@
+{
+  "name": "KeeperRun",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string"
+    },
+    "keeper_pubkey": {
+      "type": "string"
+    },
+    "desks": {
+      "type": "integer"
+    },
+    "ixs": {
+      "type": "integer"
+    },
+    "txs_sent": {
+      "type": "integer"
+    },
+    "txs_failed": {
+      "type": "integer"
+    },
+    "fees_sol": {
+      "type": "number"
+    },
+    "backlog_sol_before": {
+      "type": "number"
+    },
+    "keeper_balance_sol": {
+      "type": "number"
+    },
+    "error": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": null,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
