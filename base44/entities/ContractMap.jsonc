@@ -1,0 +1,54 @@
+{
+  "name": "ContractMap",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "PROGRAM",
+        "ACCOUNT",
+        "STOCK_MINT",
+        "PDA_SCHEME",
+        "INSTRUCTION",
+        "DATA_FLOW"
+      ]
+    },
+    "address": {
+      "type": "string"
+    },
+    "slot": {
+      "type": "integer"
+    },
+    "description": {
+      "type": "string"
+    },
+    "data_flow": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "label",
+    "kind"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": null,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

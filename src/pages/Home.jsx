@@ -21,6 +21,7 @@ import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
 import KeeperPanel from "@/components/otc/KeeperPanel";
+import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import { timeAgo } from "@/lib/format";
@@ -297,6 +298,13 @@ export default function Home() {
         <div className="mt-3">
           <CollapsibleCard title="DESKS :: DISTRIBUTION">
             <DesksTables latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* On-chain map: every contract/account/mint/source the app is built on */}
+        <div className="mt-3">
+          <CollapsibleCard title="CONTRACTS :: ON-CHAIN MAP" defaultOpen={false}>
+            <ContractsPanel />
           </CollapsibleCard>
         </div>
 
