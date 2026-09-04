@@ -32,7 +32,7 @@ const LINEUP = [
   { slot: 2, mint: "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh" },
   { slot: 3, mint: "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg" },
   { slot: 4, mint: "XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1" },
-  { slot: 5, mint: "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcyTcTqpH8" },
+  { slot: 5, mint: "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8" }, // SPCXx — verified on-chain (pool ATA mint)
   { slot: 6, mint: "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw" },
   { slot: 7, mint: "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP" },
   { slot: 8, mint: "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua" },
