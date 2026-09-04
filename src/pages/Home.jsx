@@ -192,7 +192,7 @@ export default function Home() {
         </div>
 
         {/* All 8 headline metrics in one dense ticker strip */}
-        <MetricsStrip latest={latest} />
+        <MetricsStrip latest={latest} history={data?.history} />
 
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
