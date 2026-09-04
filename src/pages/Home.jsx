@@ -146,13 +146,22 @@ export default function Home() {
               >
                 [OTC_APP ↗]
               </a>
+              <a
+                href="https://otcdesks.observer/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+                title="Community OTC_DESK visualization tool — desk charts and holder stats"
+              >
+                [OBSERVER ↗]
+              </a>
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="inline-flex items-center gap-1.5 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+                className="inline-flex items-center border border-green-500/50 px-2 py-1.5 text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+                title="Force a fresh data snapshot (admin)"
               >
-                <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
-                [REFRESH]
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               </button>
             </div>
           </div>
