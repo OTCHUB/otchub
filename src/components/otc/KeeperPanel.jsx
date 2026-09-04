@@ -160,8 +160,10 @@ export default function KeeperPanel() {
         A dedicated fee-only wallet signs permissionless distribute(index) txs on a schedule so
         owed desk earnings never sit stuck in the pot. It holds no user funds — only its own fee
         float. Every run is simulated first (failing txs cost nothing), fees are capped per run,
-        and a rotating desk cursor gives the whole collection coverage over time. Vault ticker
-        accounts not yet open fail sim and are skipped harmlessly.
+        and a rotating desk cursor gives the whole collection coverage over time. The sim also
+        probes what the distributes would actually move — runs that would deliver nothing are
+        skipped for free (NOTHING_DUE). Vault ticker accounts not yet open fail sim and are
+        skipped harmlessly.
       </HelpNote>
 
       {error && (

@@ -176,23 +176,24 @@ function packCrankTxs(ixs, feePayer, blockhash, microLamports) {
 // one batched read of 13 accounts, before and after the sweep. A missing/null
 // account (ticker not launched) is skipped for the metric, and an RPC failure
 // on the before-read disables the metric for the run rather than overcounting.
-async function readPoolAmounts(tpMap) {
+function poolAccounts(tpMap) {
   const cfg = configPda();
-  const addrs = [];
-  const mints = [];
-  for (const s of LINEUP) {
+  return LINEUP.map((s) => {
     const mintPk = new PublicKey(s.mint);
     const tpPk = new PublicKey(tpMap[s.mint] || TOKEN_2022_PROGRAM_ID.toBase58());
-    addrs.push(stockAta(cfg, mintPk, tpPk).toBase58());
-    mints.push(s.mint);
-  }
-  const r = await heliusRpc("getMultipleAccounts", [addrs, { encoding: "jsonParsed" }]);
+    return { mint: s.mint, addr: stockAta(cfg, mintPk, tpPk).toBase58() };
+  });
+}
+
+async function readPoolAmounts(tpMap) {
+  const pools = poolAccounts(tpMap);
+  const r = await heliusRpc("getMultipleAccounts", [pools.map((p) => p.addr), { encoding: "jsonParsed" }]);
   const value = r?.value || [];
   const out = {};
-  for (let i = 0; i < mints.length; i++) {
+  for (let i = 0; i < pools.length; i++) {
     const acc = value[i];
     const amtStr = acc?.data?.parsed?.info?.tokenAmount?.amount;
-    out[mints[i]] = acc && amtStr != null ? Number(amtStr) : null;
+    out[pools[i].mint] = acc && amtStr != null ? Number(amtStr) : null;
   }
   return out;
 }
@@ -212,17 +213,39 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-async function simOne(tx) {
+// u64 token amount at SPL account offset 64, decoded from base64 account data.
+function b64TokenAmount(b64) {
+  try {
+    const bin = atob(b64);
+    if (bin.length < 72) return null;
+    const bytes = new Uint8Array(72);
+    for (let i = 0; i < 72; i++) bytes[i] = bin.charCodeAt(i);
+    return Number(new DataView(bytes.buffer).getBigUint64(64, true));
+  } catch {
+    return null;
+  }
+}
+
+// Simulate one tx. probeAddrs optionally asks the RPC to return the simulated
+// POST-execution data of those accounts (never committed, always free) — the
+// keeper uses this to read whether its distributes would actually move pool
+// tokens before spending a single lamport on fees.
+async function simOne(tx, probeAddrs = null) {
   try {
     const b64 = tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64");
-    const r = await heliusRpc("simulateTransaction", [
-      b64,
-      { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed", encoding: "base64" },
-    ]);
+    const config = { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed", encoding: "base64" };
+    if (probeAddrs && probeAddrs.length) {
+      config.accounts = { encoding: "base64", addresses: probeAddrs };
+    }
+    const r = await heliusRpc("simulateTransaction", [b64, config]);
     const v = r?.value || {};
-    return { ok: !v.err, err: v.err ? JSON.stringify(v.err) : null };
+    const poolPost =
+      probeAddrs && Array.isArray(v.accounts)
+        ? v.accounts.map((a) => (typeof a === "string" ? b64TokenAmount(a) : null))
+        : null;
+    return { ok: !v.err, err: v.err ? JSON.stringify(v.err) : null, poolPost };
   } catch (e) {
-    return { ok: false, err: e?.message || "simulation failed" };
+    return { ok: false, err: e?.message || "simulation failed", poolPost: null };
   }
 }
 
@@ -482,12 +505,49 @@ export async function runKeeper(base44) {
     if (!feeEntries.length) throw new Error("fee cap left no txs to send");
 
     // Simulate first — failing txs are dropped with no fee spent (vault ticker
-    // accounts not yet open fail sim and are skipped harmlessly).
-    const sims = await mapLimit(feeEntries, 5, async (t) => simOne(t.tx));
-    const passing = feeEntries.filter((_, i) => sims[i].ok);
+    // accounts not yet open fail sim and are skipped harmlessly). Each sim
+    // also returns the post-run POOL balances (free) so the probe gate below
+    // knows whether the tx would actually move pool tokens.
+    const pools = poolAccounts(tpMap);
+    const probeAddrs = pools.map((p) => p.addr);
+    const sims = await mapLimit(feeEntries, 5, async (t) => simOne(t.tx, probeAddrs));
+    const passing = [];
+    let probed = 0;
+    let due = !poolBefore; // no before-read → can't prove nothing is due → send
+    for (let i = 0; i < feeEntries.length; i++) {
+      const s = sims[i];
+      if (!s.ok) continue;
+      passing.push(feeEntries[i]);
+      if (Array.isArray(s.poolPost) && s.poolPost.length === pools.length) {
+        probed++;
+        if (!due && poolBefore) {
+          for (let j = 0; j < pools.length; j++) {
+            const post = s.poolPost[j];
+            const before = poolBefore[pools[j].mint];
+            if (post != null && before != null && post < before) {
+              due = true;
+              break;
+            }
+          }
+        }
+      }
+    }
     log.txs_failed += feeEntries.length - passing.length;
     if (!passing.length) {
       log.status = "all_sims_failed";
+      await writeConfig(base44, { ...cfg, cursor: (cfg.cursor + chunk) % desks.length });
+      await recordRun(base44, log);
+      return log;
+    }
+    // Probe gate: every passing tx simulated cleanly WITH pool reads and NONE
+    // would move pool tokens → the desks in this chunk are already current on
+    // every released round; sending would burn fees for guaranteed no-ops.
+    // Skip the send entirely (zero fees). Cursor still advances so coverage
+    // keeps rotating; real backlog (a new round released or a desk activated)
+    // is swept within one cadence tick. An unreadable probe stays permissive —
+    // the run proceeds exactly as before rather than skipping a real sweep.
+    if (!due && probed === passing.length) {
+      log.status = "nothing_due";
       await writeConfig(base44, { ...cfg, cursor: (cfg.cursor + chunk) % desks.length });
       await recordRun(base44, log);
       return log;
