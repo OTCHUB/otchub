@@ -14,6 +14,7 @@ import SupplyChart from "@/components/otc/SupplyChart";
 import BuybacksPanel from "@/components/otc/BuybacksPanel";
 import DesksTables from "@/components/otc/DesksTables";
 import HoldingsGallery from "@/components/otc/HoldingsGallery";
+import ListingsDepthChart from "@/components/otc/ListingsDepthChart";
 import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
@@ -231,7 +232,10 @@ export default function Home() {
             arbitrage jumps land right next to the swap they feed into */}
         <div className="mt-3">
           <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
-            <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
+            <ListingsDepthChart holdings={data?.holdings} />
+            <div className="mt-3">
+              <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
+            </div>
           </CollapsibleCard>
         </div>
 
