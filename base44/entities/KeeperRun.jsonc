@@ -26,6 +26,12 @@
     "backlog_sol_before": {
       "type": "number"
     },
+    "backlog_sol_after": {
+      "type": "number"
+    },
+    "cleared_sol": {
+      "type": "number"
+    },
     "keeper_balance_sol": {
       "type": "number"
     },

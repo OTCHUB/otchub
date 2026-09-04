@@ -8,7 +8,7 @@
 // with an admin email alert, and a KeeperRun log record per attempt.
 
 import { secrets } from "base44:runtime";
-import { heliusRpc } from "./otcSources.ts";
+import { heliusRpc, fetchProtocolStats } from "./otcSources.ts";
 import { acquireLock } from "./dataLock.ts";
 import {
   Keypair,
@@ -294,7 +294,28 @@ export async function keeperStatus(base44) {
   } catch {
     /* secret missing or invalid — the panel shows NOT_SET */
   }
-  const runs = await base44.asServiceRole.entities.KeeperRun.list("-created_date", 8);
+  // Lifetime CRKR impact: aggregate every logged run (public read — note the
+  // keeper secret never leaves this module; only the public pubkey is exposed).
+  const all = (await base44.asServiceRole.entities.KeeperRun.list("-created_date", 2000)) || [];
+  const totals = all.reduce(
+    (a, r) => {
+      if (r.status === "ok") a.ok_runs++;
+      a.desks += r.desks || 0;
+      a.txs_sent += r.txs_sent || 0;
+      a.txs_failed += r.txs_failed || 0;
+      a.fees_sol += r.fees_sol || 0;
+      a.cleared_sol += r.cleared_sol || 0;
+      return a;
+    },
+    { ok_runs: 0, desks: 0, txs_sent: 0, txs_failed: 0, fees_sol: 0, cleared_sol: 0 }
+  );
+  let sol_price_usd = null;
+  try {
+    const snap = await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1);
+    sol_price_usd = snap?.[0]?.sol_price_usd ?? null;
+  } catch {
+    /* USD context is best-effort */
+  }
   return {
     enabled: cfg.enabled,
     depth: cfg.depth,
@@ -303,7 +324,13 @@ export async function keeperStatus(base44) {
     minBalanceSol: cfg.minBalanceSol,
     keeper_pubkey,
     keeper_balance_sol,
-    runs: (runs || []).map((r) => ({
+    sol_price_usd,
+    totals: {
+      runs: all.length,
+      ...totals,
+      since: all.length ? all[all.length - 1].created_date : null,
+    },
+    runs: all.slice(0, 8).map((r) => ({
       id: r.id,
       created_date: r.created_date,
       status: r.status,
@@ -312,6 +339,7 @@ export async function keeperStatus(base44) {
       txs_failed: r.txs_failed,
       fees_sol: r.fees_sol,
       backlog_sol_before: r.backlog_sol_before,
+      cleared_sol: r.cleared_sol,
     })),
   };
 }
@@ -334,6 +362,8 @@ export async function runKeeper(base44) {
     txs_failed: 0,
     fees_sol: 0,
     backlog_sol_before: null,
+    backlog_sol_after: null,
+    cleared_sol: null,
     keeper_balance_sol: null,
     error: null,
   };
@@ -444,6 +474,21 @@ export async function runKeeper(base44) {
       } catch {
         /* status read failed — the sends themselves were accepted */
       }
+    }
+
+    // Impact metric: re-read the live owed backlog after the txs land. Fresh
+    // pot inflow during the run inflates the after-value, so (before - after)
+    // is a conservative lower bound of what this run actually cleared.
+    try {
+      const stats = await fetchProtocolStats();
+      const owedAfter = stats?.owed != null ? stats.owed / 1e9 : null;
+      log.backlog_sol_after = owedAfter;
+      log.cleared_sol =
+        owedAfter != null && log.backlog_sol_before != null
+          ? Math.max(0, +(log.backlog_sol_before - owedAfter).toFixed(4))
+          : null;
+    } catch {
+      /* impact metric is best-effort */
     }
 
     await writeConfig(base44, { ...cfg, cursor: (cfg.cursor + chunk) % desks.length });

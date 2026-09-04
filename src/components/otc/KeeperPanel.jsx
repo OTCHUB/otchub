@@ -80,17 +80,17 @@ export default function KeeperPanel() {
         </span>
         {data?.keeper_pubkey ? (
           <span className="font-mono text-[10px] text-green-500/70" title={data.keeper_pubkey}>
-            KEEPER {short(data.keeper_pubkey)}
+            CRKR {short(data.keeper_pubkey)}
           </span>
         ) : (
           <span className="font-mono text-[10px] text-amber-400/80">
-            KEEPER_SECRET NOT SET
+            CRKR_SECRET NOT SET
           </span>
         )}
         {data?.keeper_balance_sol != null && (
           <span className={`font-mono text-[10px] ${lowBalance ? "text-red-400" : "text-green-500/70"}`}>
-            FLOAT {fmtSol(data.keeper_balance_sol, 3)}
-            {lowBalance && " :: LOW_FUNDS — TOP UP THE KEEPER WALLET"}
+            CRKR_BAL {fmtSol(data.keeper_balance_sol, 3)}
+            {lowBalance && " :: LOW_FUNDS — TOP UP THE CRKR WALLET"}
           </span>
         )}
         <button
@@ -111,6 +111,61 @@ export default function KeeperPanel() {
         CADENCE 30m · DEPTH {data?.depth ?? "—"} round(s)/slot · ≤{data?.maxTxs ?? "—"} TX/RUN ·
         MIN_FLOAT {fmtSol(data?.minBalanceSol ?? 0, 2)} · pushes owed pot earnings into desk vaults
       </div>
+
+      {data?.totals && (
+        <div className="mt-2 border border-green-500/20 bg-black">
+          <div className="border-b border-green-500/20 px-2 py-1 text-[9px] uppercase tracking-widest text-green-500/50">
+            CRKR_IMPACT :: HOW MUCH THE KEEPER HELPED THE PROTOCOL (LIFETIME)
+          </div>
+          <div className="grid grid-cols-2 gap-1 p-1 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="border border-green-500/20 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-green-500/50">RUNS</div>
+              <div className="text-[11px] font-bold text-green-300">
+                {data.totals.runs}
+                <span className="ml-1 text-[8px] font-normal text-green-500/50">
+                  OK {data.totals.ok_runs}
+                </span>
+              </div>
+            </div>
+            <div className="border border-green-500/20 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-green-500/50">DESKS_SERVED</div>
+              <div className="text-[11px] font-bold text-green-300">{data.totals.desks}</div>
+            </div>
+            <div className="border border-green-500/20 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-green-500/50">TXS_LANDED</div>
+              <div className="text-[11px] font-bold text-green-300">
+                <span className="text-emerald-400">{data.totals.txs_sent}</span>
+                <span className="text-[8px] font-normal text-red-400">/{data.totals.txs_failed}</span>
+              </div>
+            </div>
+            <div className="border border-green-500/20 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-green-500/50">FEES_SPENT</div>
+              <div className="text-[11px] font-bold text-cyan-400">{fmtSol(data.totals.fees_sol, 4)}</div>
+            </div>
+            <div className="border border-emerald-500/40 bg-emerald-500/5 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-emerald-500/70">OWED_CLEARED</div>
+              <div className="text-[11px] font-bold text-emerald-400">
+                {fmtSol(data.totals.cleared_sol, 3)}
+                {data?.sol_price_usd != null && data.totals.cleared_sol > 0 && (
+                  <span className="ml-1 text-[8px] font-normal text-green-500/50">
+                    ≈ {fmtSol(data.totals.cleared_sol * data.sol_price_usd, 0)}$
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="border border-green-500/20 px-2 py-1">
+              <div className="text-[8px] uppercase tracking-widest text-green-500/50">HELPING_SINCE</div>
+              <div className="text-[11px] font-bold text-green-300">
+                {data.totals.since ? timeAgo(data.totals.since) : "—"}
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-green-500/10 px-2 py-1 text-[9px] text-green-500/40">
+            OWED_CLEARED = SOL pushed out of the owed backlog into desk vaults by CRKR distribute txs
+            (conservative lower bound — pot inflow between the before/after reads is excluded).
+          </div>
+        </div>
+      )}
 
       <HelpNote label="[?] KEEPER_LEGEND" className="mt-1">
         A dedicated fee-only wallet signs permissionless distribute(index) txs on a schedule so
@@ -146,6 +201,9 @@ export default function KeeperPanel() {
               </span>
               <span className="font-mono text-green-500/50">
                 BACKLOG {r.backlog_sol_before != null ? fmtSol(r.backlog_sol_before, 2) : "—"}
+                {r.cleared_sol != null && r.cleared_sol > 0 && (
+                  <span className="text-emerald-400"> · CLR {fmtSol(r.cleared_sol, 3)}</span>
+                )}
               </span>
             </div>
           ))
