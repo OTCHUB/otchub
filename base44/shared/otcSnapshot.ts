@@ -530,12 +530,17 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     // the intermittent "info missing" reads. In the gap, readers now see a
     // complete set (briefly duplicated), never a blank one.
     await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
-    const newIds = new Set(holdings.map((h) => h.asset_id));
-    const staleIds = (existingHoldingRows || [])
-      .filter((h) => !newIds.has(h.asset_id))
-      .map((h) => h.id);
-    if (staleIds.length) {
-      await base44.asServiceRole.entities.NftHolding.deleteMany({ id: { $in: staleIds } });
+    // Delete EVERY pre-existing row id: every desk in the new set has a fresh
+    // row, so ALL old rows are superseded — including old copies of desks
+    // that are still in the collection (same asset_id, old row). Filtering
+    // stale rows by asset_id was the bug: old copies of live desks never
+    // matched and piled up run after run. Chunked to keep the delete query
+    // bounded on big tables.
+    const oldRowIds = (existingHoldingRows || []).map((h) => h.id);
+    for (let i = 0; i < oldRowIds.length; i += 400) {
+      await base44.asServiceRole.entities.NftHolding.deleteMany({
+        id: { $in: oldRowIds.slice(i, i + 400) },
+      });
     }
   }
 
