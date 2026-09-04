@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
+import AgentConnectSection from "@/components/otc/AgentConnectSection";
 
 const KIND_ORDER = [
   "PROGRAM",
@@ -97,6 +98,7 @@ export default function ContractsPanel() {
           ))}
         </div>
       ))}
+      <AgentConnectSection />
       <HelpNote label="[?] HOW_TO_READ" className="mb-1">
         PROGRAMS are on-chain code; PROTOCOL_ACCOUNTS hold protocol state and funds (click an
         address to copy it); STOCK_MINTS are the tokenized stock tickers desks accrue (SLOT is the

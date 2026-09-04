@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import MetricsStrip from "@/components/otc/MetricsStrip";
@@ -132,13 +131,6 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to="/connect"
-                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="Hook up an AI agent to this app's live data"
-              >
-                [AGENT_CONNECT]
-              </Link>
               <a
                 href="https://x.com/i/chat/group_join/g2094534355506860481/nX3pHq1n00"
                 target="_blank"
@@ -311,7 +303,7 @@ export default function Home() {
 
         {/* On-chain map: every contract/account/mint/source the app is built on */}
         <div className="mt-3">
-          <CollapsibleCard title="CONTRACTS :: ON-CHAIN MAP" defaultOpen={false}>
+          <CollapsibleCard title="CONTRACTS :: MAP & AGENT_CONNECT" defaultOpen={false}>
             <ContractsPanel />
           </CollapsibleCard>
         </div>
