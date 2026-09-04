@@ -100,7 +100,7 @@ const stockAta = (ownerPk, mintPk, tpPk) =>
 
 async function resolveTokenPrograms() {
   const mints = LINEUP.map((s) => s.mint);
-  const r = await heliusRpc("getMultipleAccounts", [mints, { encoding: "jsonParsed" }]);
+  const r = await heliusRpc("getMultipleAccounts", [mints, { encoding: "base64" }]);
   const map = {};
   const t22 = TOKEN_2022_PROGRAM_ID.toBase58();
   const value = r?.value || [];
