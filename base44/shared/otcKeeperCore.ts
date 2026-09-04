@@ -11,7 +11,6 @@ import { secrets } from "base44:runtime";
 import { heliusRpc } from "./otcSources.ts";
 import { STOCKS } from "./otcIdl.ts";
 import { getSpotPrices } from "./spotPrices.ts";
-import { acquireLock } from "./dataLock.ts";
 import {
   Keypair,
   PublicKey,
@@ -375,13 +374,9 @@ export async function keeperStatus(base44) {
 }
 
 export async function runKeeper(base44) {
-  const lock = await acquireLock(base44, RUN_LOCK_KEY, RUN_LOCK_TTL_MS);
-  if (!lock.acquired) {
-    return { ok: true, skipped: "a keeper run is already in progress or ran moments ago" };
-  }
-  // NOTE: the lock is intentionally NOT released — its 10-minute TTL doubles
-  // as the minimum spacing between runs, so manual invocations can't spam fee
-  // spend on top of the 30-minute workflow schedule.
+  // TEST MODE: run lock disabled while we verify CRKR end-to-end. Re-enable
+  // (acquireLock + TTL spacing) before production so manual invocations can't
+  // spam fee spend on top of the 30-minute workflow schedule.
 
   const log = {
     status: "ok",
