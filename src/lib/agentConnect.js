@@ -20,6 +20,7 @@ DATA TOOLS (all read-only)
 
 TIPS
 - All *_sol fields are in SOL, *_usd in USD. Snapshots are ingested every ~5 minutes.
-- For the "current" state take the newest snapshot; for trends compare across the snapshot history.
+- Query args: query is a MongoDB-style filter object, sort is a string like "-created_date" (descending), limit 1-500.
+- For the "current" state take the newest snapshot; for trends compare across the snapshot history (page with skip for long windows).
 
 Try asking: "What's the current $OTC price and 24h change?" · "Is minting or buying secondary cheaper right now?" · "Show me the 5 cheapest listed desks." · "How much SOL did the pot earn this week?"`;

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import CopyBlock from "@/components/otc/CopyBlock";
+import McpApiExamples from "@/components/otc/McpApiExamples";
 import { MCP_URL, AGENT_PROMPT } from "@/lib/agentConnect";
 
 // Compact agent-connect block rendered inside the contracts panel: the MCP
@@ -28,6 +29,9 @@ export default function AgentConnectSection() {
           value={AGENT_PROMPT}
           note="Teaches the agent what this app is, which tools it has, and what to ask."
         />
+        <div className="pt-1">
+          <McpApiExamples />
+        </div>
       </div>
     </div>
   );
