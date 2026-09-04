@@ -443,9 +443,11 @@ export async function runKeeper(base44) {
     let poolBefore = null;
     try {
       poolBefore = await readPoolAmounts(tpMap);
-    } catch {
+    } catch (e) {
+      console.log("[keeper] poolBefore failed:", e?.message || e);
       poolBefore = null; // metric disabled this run — never overcount
     }
+    console.log("[keeper] poolBefore:", JSON.stringify(poolBefore));
     const ixs = [];
     for (const s of LINEUP) {
       for (const assetId of chosen) {
@@ -524,9 +526,12 @@ export async function runKeeper(base44) {
         const solUsd = spot?.sol_price_usd ?? null;
         let clearedUsd = 0;
         const byStock = {};
+        console.log("[keeper] poolAfter:", JSON.stringify(poolAfter));
+        console.log("[keeper] spot:", JSON.stringify({ solUsd, prices: spot?.prices }));
         for (const s of LINEUP) {
           const b = poolBefore[s.mint];
           const a = poolAfter?.[s.mint] ?? null;
+          console.log("[keeper] delta", s.mint, "b=", b, "a=", a);
           if (b == null || a == null || a >= b) continue;
           const dec = meta[s.mint]?.decimals ?? 6;
           const dUi = (b - a) / Math.pow(10, dec);
