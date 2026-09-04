@@ -209,8 +209,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // to the previous snapshot's supply on the rare DAS gap.
   let tokenSupply = dasInfo?.supply ?? null;
   if (tokenSupply == null) {
-    const ps = await latestSnapshot(base44);
-    tokenSupply = ps?.token_total_supply ?? null;
+    tokenSupply = prevSnap?.token_total_supply ?? null;
   }
 
   const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
@@ -225,13 +224,11 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
 
   const assetsOk = Array.isArray(assets);
   const assetList = assetsOk ? assets : [];
-  // Collection fetch failed (e.g. Helius DAS 500): fall back to the previous
-  // snapshot's NFT counts and KEEP the existing holdings (don't wipe the
-  // gallery on a transient outage).
-  let prevSnap = null;
-  if (!assetsOk) {
-    prevSnap = await latestSnapshot(base44);
-  }
+  // One previous-snapshot read, reused by every fallback below (supply, NFT
+  // counts, Magic Eden outage carry-forward). The collection-fetch failure
+  // case (e.g. Helius DAS 500) still falls back to its NFT counts and KEEPS
+  // the existing holdings — a transient outage never wipes the gallery.
+  const prevSnap = await latestSnapshot(base44);
   const totalSupply = assetsOk ? assetList.length : (prevSnap?.nft_total_supply ?? 0);
   const perDeskHistory = stats?.perDesk || [];
   // AUTHORITATIVE desk supply: the Helius DAS collection scan counts every
@@ -244,13 +241,26 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     : perDeskHistory.length
       ? perDeskHistory[perDeskHistory.length - 1].desks
       : (prevSnap?.desks_minted ?? totalSupply);
-  const listedCount = meStats?.listedCount ?? null;
-  const floorSol =
-    meStats?.floorPrice != null
-      ? meStats.floorPrice / LAMPORTS_PER_SOL
-      : listings.length
-      ? Math.min(...listings.map((l) => l.price || 0))
-      : null;
+  // MAGIC EDEN AVAILABILITY: the stats and listings calls can BOTH fail or
+  // come back empty when Magic Eden rate-limits a run — that must read as
+  // "ME is down", not "nothing is listed". meListingsFailed = no listings
+  // data while ME still reports desks as listed (or ME is fully down).
+  const meListingsFailed =
+    listings.length === 0 && (meStats == null || (meStats.listedCount ?? 0) > 0);
+  let listedCount = meStats?.listedCount ?? null;
+  let floorSol = meStats?.floorPrice != null ? meStats.floorPrice / LAMPORTS_PER_SOL : null;
+  if (floorSol == null && listings.length) {
+    const prices = listings.map((l) => l.price || 0).filter((p) => p > 0);
+    if (prices.length) floorSol = Math.min(...prices);
+  }
+  // ME down this run: keep the last known floor / listed count instead of
+  // writing nulls that blank the listings panel and break the spread math.
+  if (floorSol == null && prevSnap?.nft_floor_sol != null) {
+    floorSol = prevSnap.nft_floor_sol;
+  }
+  if (listedCount == null && prevSnap?.nft_listed_count != null) {
+    listedCount = prevSnap.nft_listed_count;
+  }
   const floorUsd = floorSol != null && solPriceUsd ? floorSol * solPriceUsd : null;
 
   // Mint cost: 100,000 OTC burned + 0.5 SOL surcharge
@@ -331,8 +341,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // incremental on-chain scan of the pot's SOL inflow txs (shared/potSources).
   // The days map + cursor carry forward snapshot-to-snapshot; best-effort —
   // on any failure the previous snapshot's data is kept unchanged.
-  const prevForSources = await latestSnapshot(base44);
-  let potSources = prevForSources?.pot_sources ?? null;
+  let potSources = prevSnap?.pot_sources ?? null;
   try {
     const scanned = await scanPotSources(potSources);
     if (scanned) potSources = scanned;
@@ -423,9 +432,29 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     return { mintDay: dayRows[idx].day, accrued: acc };
   };
 
+  // Existing holdings, read BEFORE the rewrite: (1) when the ME listings
+  // fetch failed this run, their listing fields carry forward so a transient
+  // ME outage doesn't flip every desk to "not listed" until the next good
+  // ingest; (2) their row ids let the persist step swap the table without
+  // an empty-gallery window.
+  let prevListingMap = null;
+  let existingHoldingRows = null;
+  if (assetsOk) {
+    existingHoldingRows =
+      (await base44.asServiceRole.entities.NftHolding.list("asset_id", 5000)) || [];
+    prevListingMap = new Map(existingHoldingRows.map((h) => [h.asset_id, h]));
+  }
+
   const holdings = assetList.map((a) => {
     const id = a.id || a.address || "";
-    const lp = priceMap.get(id);
+    let lp = priceMap.get(id);
+    // Listings fetch failed this run: keep the desk's last known listing
+    // price (the stored price includes the buyer markup — undo it) instead
+    // of nulling it. When the fetch succeeded, prevH is null → unchanged.
+    const prevH = meListingsFailed ? prevListingMap?.get(id) : null;
+    if (lp == null && prevH?.listing_price_sol != null) {
+      lp = prevH.listing_price_sol / ME_TOTAL_MARKUP;
+    }
     const name = a.content?.metadata?.name || a.name || "OTC Desk";
     const nm = name.match(/#(\d+)/);
     const { mintDay, accrued } = nm
@@ -439,7 +468,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
       accrued_value_sol: accrued,
       accrued_value_usd: accrued != null && solPriceUsd ? accrued * solPriceUsd : null,
       mint_day: mintDay,
-      is_listed: listedSet.has(id),
+      is_listed: listedSet.has(id) || (prevH?.is_listed ?? false),
       // True buyer cost = raw ME list price + 2% taker fee + 5% creator royalty
       listing_price_sol: lp != null ? lp * ME_TOTAL_MARKUP : null,
       listing_price_usd: lp != null && solPriceUsd ? lp * ME_TOTAL_MARKUP * solPriceUsd : null,
@@ -492,9 +521,22 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     }
   }
 
-  if (assetsOk) {
-    await base44.asServiceRole.entities.NftHolding.deleteMany({});
-    if (holdings.length) await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
+  if (assetsOk && holdings.length) {
+    // Swap WITHOUT the empty-table window: create the replacement rows FIRST,
+    // then delete only the rows they replace (by id — $in filter verified).
+    // The old deleteMany({}) → bulkCreate order left the gallery completely
+    // empty for the whole bulkCreate window (seconds on a big collection),
+    // so dashboard loads landing in between showed no holdings/listings —
+    // the intermittent "info missing" reads. In the gap, readers now see a
+    // complete set (briefly duplicated), never a blank one.
+    await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
+    const newIds = new Set(holdings.map((h) => h.asset_id));
+    const staleIds = (existingHoldingRows || [])
+      .filter((h) => !newIds.has(h.asset_id))
+      .map((h) => h.id);
+    if (staleIds.length) {
+      await base44.asServiceRole.entities.NftHolding.deleteMany({ id: { $in: staleIds } });
+    }
   }
 
   await releaseLock(base44, lock);

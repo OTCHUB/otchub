@@ -219,39 +219,31 @@ export async function fetchAssetsByOwner(ownerAddress, collectionAddress) {
   }
 }
 
+// Magic Eden intermittently 429/5xxs single-shot requests; retry like the
+// other market sources so a transient blip doesn't blank floor + listings.
 export async function fetchMagicEdenStats(symbol) {
-  try {
-    const res = await fetch(`https://api-mainnet.magiceden.dev/v2/collections/${symbol}/stats`);
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json;
-  } catch (e) {
-    return null;
-  }
+  return fetchJsonWithRetry(`https://api-mainnet.magiceden.dev/v2/collections/${symbol}/stats`);
 }
 
 export async function fetchMagicEdenListings(symbol, limit = 100) {
-  try {
-    const all = [];
-    let offset = 0;
-    // Paginate the entire listings set so every listed desk gets its true
-    // current Magic Eden price — not just the first page. NOTE: Magic Eden's
-    // v2 /listings endpoint rejects limit > 100 with a 400, so cap at 100.
-    while (offset < 10000) {
-      const res = await fetch(
-        `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=${offset}`
-      );
-      if (!res.ok) break;
-      const json = await res.json();
-      const page = Array.isArray(json) ? json : [];
-      all.push(...page);
-      if (page.length < limit) break;
-      offset += limit;
-    }
-    return all;
-  } catch (e) {
-    return [];
+  const all = [];
+  let offset = 0;
+  // Paginate the entire listings set so every listed desk gets its true
+  // current Magic Eden price — not just the first page. NOTE: Magic Eden's
+  // v2 /listings endpoint rejects limit > 100 with a 400, so cap at 100.
+  // Each page retries on a transient 429/5xx (fetchJsonWithRetry) — an ME
+  // hiccup mid-scan no longer truncates the listing set.
+  while (offset < 10000) {
+    const json = await fetchJsonWithRetry(
+      `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/listings?limit=${limit}&offset=${offset}`
+    );
+    if (!json) break; // page failed after retries — keep what we have
+    const page = Array.isArray(json) ? json : [];
+    all.push(...page);
+    if (page.length < limit) break;
+    offset += limit;
   }
+  return all;
 }
 
 export async function fetchProtocolStats() {
