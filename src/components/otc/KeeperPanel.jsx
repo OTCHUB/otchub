@@ -3,8 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { fmtSol, timeAgo } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
 
-const short = (s) => `${String(s).slice(0, 4)}…${String(s).slice(-4)}`;
-
 const statusCls = (s) =>
   s === "ok"
     ? "text-emerald-400"
@@ -78,19 +76,9 @@ export default function KeeperPanel() {
         >
           {enabled ? "● ARMED" : "■ PAUSED"}
         </span>
-        {data?.keeper_pubkey ? (
-          <span className="font-mono text-[10px] text-green-500/70" title={data.keeper_pubkey}>
-            CRKR {short(data.keeper_pubkey)}
-          </span>
-        ) : (
-          <span className="font-mono text-[10px] text-amber-400/80">
-            CRKR_SECRET NOT SET
-          </span>
-        )}
-        {data?.keeper_balance_sol != null && (
-          <span className={`font-mono text-[10px] ${lowBalance ? "text-red-400" : "text-green-500/70"}`}>
-            CRKR_BAL {fmtSol(data.keeper_balance_sol, 3)}
-            {lowBalance && " :: LOW_FUNDS — TOP UP THE CRKR WALLET"}
+        {lowBalance && (
+          <span className="font-mono text-[10px] text-red-400">
+            LOW_FUNDS — TOP UP THE KEEPER WALLET
           </span>
         )}
         <button

@@ -277,14 +277,6 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        {/* Keeper: automated permissionless distribute crank so the owed backlog
-            never sits stuck waiting for someone to run the manual crank */}
-        <div className="mt-3">
-          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE">
-            <KeeperPanel />
-          </CollapsibleCard>
-        </div>
-
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <CollapsibleCard title="PER_DESK_EARN">
             <PerDeskTrendChart latest={latest} />
@@ -305,6 +297,13 @@ export default function Home() {
         <div className="mt-3">
           <CollapsibleCard title="DESKS :: DISTRIBUTION">
             <DesksTables latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Keeper: housekeeping panel — automated distribute crank details, kept last */}
+        <div className="mt-3">
+          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE">
+            <KeeperPanel />
           </CollapsibleCard>
         </div>
 
