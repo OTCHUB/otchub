@@ -302,7 +302,7 @@ export default function Home() {
 
         {/* Keeper: housekeeping panel — automated distribute crank details, kept last */}
         <div className="mt-3">
-          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE">
+          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE" defaultOpen={false}>
             <KeeperPanel />
           </CollapsibleCard>
         </div>
