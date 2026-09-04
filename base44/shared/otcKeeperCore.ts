@@ -11,6 +11,7 @@ import { secrets } from "base44:runtime";
 import { heliusRpc } from "./otcSources.ts";
 import { STOCKS } from "./otcIdl.ts";
 import { getSpotPrices } from "./spotPrices.ts";
+import { acquireLock, releaseLock } from "./dataLock.ts";
 import {
   Keypair,
   PublicKey,
@@ -374,10 +375,12 @@ export async function keeperStatus(base44) {
 }
 
 export async function runKeeper(base44) {
-  // TEST MODE: run lock disabled while we verify CRKR end-to-end. Re-enable
-  // (acquireLock + TTL spacing) before production so manual invocations can't
-  // spam fee spend on top of the 30-minute workflow schedule.
+  // Run lock: no overlapping runs — the scheduled workflow and manual
+  // triggers can't double-spend fees. A crashed holder auto-expires via TTL.
+  const lock = await acquireLock(base44, RUN_LOCK_KEY, RUN_LOCK_TTL_MS);
+  if (!lock.acquired) return { status: "skipped_locked" };
 
+  try {
   const log = {
     status: "ok",
     keeper_pubkey: null,
@@ -442,7 +445,18 @@ export async function runKeeper(base44) {
       console.log("[keeper] poolBefore failed:", e?.message || e);
       poolBefore = null; // metric disabled this run — never overcount
     }
-    console.log("[keeper] poolBefore:", JSON.stringify(poolBefore));
+    // Idle gate: when every pool stock account holds zero tokens, distribute
+    // is a guaranteed no-op — skip signing/sending entirely (zero fees). The
+    // pool re-check is free and runs each cadence, so the first buyback round
+    // that loads the pool is swept within one schedule interval. Not recorded
+    // as a run, to keep the log focused on real sweeps.
+    if (poolBefore && !Object.values(poolBefore).some((v) => (v || 0) > 0)) {
+      log.status = "pool_empty";
+      log.cleared_sol = 0;
+      log.cleared_usd = 0;
+      log.cleared_by_stock = {};
+      return log;
+    }
     const ixs = [];
     for (const s of LINEUP) {
       for (const assetId of chosen) {
@@ -521,12 +535,9 @@ export async function runKeeper(base44) {
         const solUsd = spot?.sol_price_usd ?? null;
         let clearedUsd = 0;
         const byStock = {};
-        console.log("[keeper] poolAfter:", JSON.stringify(poolAfter));
-        console.log("[keeper] spot:", JSON.stringify({ solUsd, prices: spot?.prices }));
         for (const s of LINEUP) {
           const b = poolBefore[s.mint];
           const a = poolAfter?.[s.mint] ?? null;
-          console.log("[keeper] delta", s.mint, "b=", b, "a=", a);
           if (b == null || a == null || a >= b) continue;
           const dec = meta[s.mint]?.decimals ?? 6;
           const dUi = (b - a) / Math.pow(10, dec);
@@ -558,5 +569,9 @@ export async function runKeeper(base44) {
     log.error = e?.message || String(e);
     await recordRun(base44, log);
     return log;
+  }
+  } finally {
+    // Always release the run lock, including the early returns above.
+    await releaseLock(base44, lock);
   }
 }
