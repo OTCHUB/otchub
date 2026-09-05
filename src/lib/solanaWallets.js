@@ -127,10 +127,16 @@ export async function connectWallet(entry) {
     setConnectedWallet(entry, account, pk);
     return pk;
   }
-  // injected
+  // injected — NOTE: Solflare's connect() resolves VOID; the key must be read
+  // off the provider after the handshake (Phantom resolves { publicKey }).
+  // Read both shapes so Solflare/Backpack/etc. all work.
   const res = await entry.provider.connect();
   const pk =
-    res?.publicKey?.toString?.() || (typeof res?.publicKey === "string" ? res.publicKey : null) || null;
+    res?.publicKey?.toString?.() ||
+    (typeof res?.publicKey === "string" ? res.publicKey : null) ||
+    entry.provider.publicKey?.toString?.() ||          // Solflare path
+    (typeof entry.provider.publicKey === "string" ? entry.provider.publicKey : null) ||
+    null;
   if (pk) setConnectedWallet(entry, null, pk);
   return pk;
 }

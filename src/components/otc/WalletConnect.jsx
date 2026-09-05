@@ -4,10 +4,16 @@ import HelpNote from "@/components/otc/HelpNote";
 
 export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(null);   // e.g. AWAITING_SOLFLARE_APPROVAL
   const [error, setError] = useState(null);
   const [picker, setPicker] = useState(null); // list when multiple wallets found
   const [manual, setManual] = useState("");
   const [wallets, setWallets] = useState(() => detectWallets());
+  // Solflare universal link: opens THIS page inside Solflare's in-app browser,
+  // where window.solflare is injected and connect works natively.
+  const solflareDeepLink = `https://solflare.com/ul/v1/browse/${encodeURIComponent(
+    typeof window !== "undefined" ? window.location.href : "https://otchub.dev"
+  )}`;
 
   // Standard wallets (e.g. Jupiter Mobile) register asynchronously after the
   // app fires `wallet-standard:app-ready`. Re-detect whenever one registers.
@@ -36,7 +42,7 @@ export default function WalletConnect({ onConnected }) {
       setWallets(list);
       if (!list.length) {
         setError(
-          "No Solana wallet detected yet. If using Jupiter Mobile, open this app inside the Jupiter in-app browser, or paste your address below."
+          "No Solana wallet detected yet. On mobile, open this page inside Solflare (link below) or Jupiter's in-app browser — or paste your address."
         );
         return;
       }
@@ -56,12 +62,16 @@ export default function WalletConnect({ onConnected }) {
     setPicker(null);
     setBusy(true);
     setError(null);
+    setStatus(`AWAITING_${wallet.name.toUpperCase().replace(/\s+/g, "_")}_APPROVAL`);
     try {
       const pk = await connectWallet(wallet);
-      if (!pk) throw new Error("No public key returned");
+      if (!pk) throw new Error(`${wallet.name} returned no public key`);
+      setStatus(null);
       onConnected?.(pk);
     } catch (e) {
-      setError(e?.message || `${wallet.name} connect failed`);
+      setStatus(null);
+      const msg = e?.message || `${wallet.name} connect failed`;
+      setError(/reject|declin|denied|4001/i.test(msg) ? `${wallet.name}: request rejected — approve the prompt in your wallet to continue.` : msg);
     } finally {
       setBusy(false);
     }
@@ -92,6 +102,23 @@ export default function WalletConnect({ onConnected }) {
           {wallets.length > 0 && ` · ${wallets.length} DETECTED`}
         </span>
       </div>
+
+      {status && (
+        <div className="mt-2 text-[11px] text-green-400 animate-pulse">&gt; {status}</div>
+      )}
+
+      {wallets.length === 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-green-500/50">
+          <span>MOBILE?</span>
+          <a
+            href={solflareDeepLink}
+            className="border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+          >
+            [OPEN_IN_SOLFLARE ↗]
+          </a>
+          <span className="text-green-500/40">opens this page in the Solflare in-app browser</span>
+        </div>
+      )}
 
       <HelpNote label="[?] WALLET_SAFETY :: WHY_SIGNING_WARNS">
         Wallet warnings here are NORMAL for a community tool — Phantom flags any app or program that
