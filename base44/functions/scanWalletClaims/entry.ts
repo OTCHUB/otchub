@@ -56,7 +56,7 @@ export default async function (req) {
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
 
     if (!force && !cacheOnly) {
-      const m = memo.get(wallet);
+      const m = memo.get(cacheKey);
       if (m && Date.now() - m.at < MEMO_TTL_MS) return Response.json(m.json);
     }
 
@@ -83,10 +83,22 @@ export default async function (req) {
       }));
     }
 
+    /* Cache/lock/memo key: when the caller supplies the desk list, key by the
+       SET — chunked callers (the arbitrage panel scans the listed desks in
+       ~12-desk batches) share one wallet string, and keying by wallet alone
+       would let one chunk's cache row serve another chunk's subset. Bonus:
+       a real wallet whose desk set changed now rescans instead of serving
+       the stale previous set for the rest of the TTL. */
+    const setHash = assetsIn?.length
+      ? desks.map((d) => d.asset_id).sort().join(",")
+          .split("").reduce((h, c) => ((h * 33) ^ c.charCodeAt(0)) >>> 0, 5381).toString(36)
+      : "";
+    const cacheKey = setHash ? `${wallet}:${setHash}` : wallet;
+
     // Cache lookup — race-proof: concurrent creators can leave duplicate rows
     // for the same wallet; keep the most recently updated and prune the rest
     // so every read/write targets a single row.
-    const cachedRows = (await base44.asServiceRole.entities.ClaimCache.filter({ wallet })) || [];
+    const cachedRows = (await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey })) || [];
     cachedRows.sort((a, b) => new Date(b.updated_date || 0) - new Date(a.updated_date || 0));
     if (cachedRows.length > 1) {
       await Promise.all(
@@ -100,7 +112,7 @@ export default async function (req) {
       cache?.desks?._v === CACHE_VERSION;
 
     if (!force && cache && fresh) {
-      return memoized(wallet, {
+      return memoized(cacheKey, {
         ok: true,
         cached: true,
         desks: cache.desks?.items || [],
@@ -127,7 +139,7 @@ export default async function (req) {
     // would reset nothing and invite re-firing already-claimed desks.
     let lock = null;
     for (let attempt = 0; attempt < 2 && !lock?.acquired; attempt++) {
-      lock = await acquireLock(base44, `wscan_${wallet}`, 90 * 1000);
+      lock = await acquireLock(base44, `wscan_${cacheKey}`, 90 * 1000);
       if (!lock.acquired && attempt === 0) await new Promise((r) => setTimeout(r, 3000));
     }
     if (!lock.acquired) {
@@ -141,7 +153,7 @@ export default async function (req) {
     }
     try {
     if (!desks.length) {
-      await saveCache(base44, cache, wallet, []);
+      await saveCache(base44, cache, cacheKey, []);
       return Response.json({ ok: true, fresh: true, desks: [], wallet, desks_count: 0 });
     }
 
@@ -160,8 +172,8 @@ export default async function (req) {
       };
     });
 
-    await saveCache(base44, cache, wallet, out);
-    return memoized(wallet, { ok: true, fresh: true, desks: out, wallet, desks_count: desks.length });
+    await saveCache(base44, cache, cacheKey, out);
+    return memoized(cacheKey, { ok: true, fresh: true, desks: out, wallet, desks_count: desks.length });
     } finally {
       await releaseLock(base44, lock);
     }

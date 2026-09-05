@@ -24,7 +24,7 @@ export default function ArbitrageCard({ latest, holdings }) {
   const listedAll = (holdings || []).filter(
     (h) => h.is_listed && h.listing_price_sol != null
   );
-  const { realHold, scanning: liveScanning, error: scanError, rescan } = useLiveVaultHoldings(listedAll);
+  const { realHold, scanning: liveScanning, error: scanError, partial: scanPartial, rescan } = useLiveVaultHoldings(listedAll);
   // Live on-chain vault balances ONLY — never the snapshot's accrued estimate.
   // The estimate is theoretical: a desk whose owner already claimed still
   // carries it but holds ZERO real stock, and netting a stale estimate against
@@ -79,7 +79,7 @@ export default function ArbitrageCard({ latest, holdings }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          ARBITRAGE :: MINT vs SECONDARY{liveScanning ? " · SCANNING…" : scanError ? " · SCAN_DOWN" : ""}
+          ARBITRAGE :: MINT vs SECONDARY{liveScanning ? " · SCANNING…" : scanError ? " · SCAN_DOWN" : scanPartial ? " · PARTIAL" : ""}
         </span>
         <span className={`border px-2 py-0.5 font-mono text-[10px] ${rec.cls}`}>
           {rec.label}
@@ -210,6 +210,18 @@ export default function ArbitrageCard({ latest, holdings }) {
           <div className="px-2 py-2 text-center text-[10px] text-green-500/50">
             {liveScanning
               ? "SCANNING :: READING VAULT BALANCES…"
+              : scanPartial
+              ? (
+                <span className="text-amber-400/70">
+                  PARTIAL_SCAN — some listed desks unscanned; verified desks only
+                  <button
+                    onClick={rescan}
+                    className="ml-2 border border-amber-500/40 px-1.5 py-0.5 text-amber-300 hover:bg-amber-500/10"
+                  >
+                    [ RETRY ]
+                  </button>
+                </span>
+              )
               : "NO_LIVE_LISTINGS — no stocked desks for sale right now"}
           </div>
         )}
