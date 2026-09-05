@@ -74,6 +74,17 @@ export default function Home() {
     return () => clearInterval(id);
   }, [load]);
 
+  // Deep links (e.g. /#otc-arbitrage from RU_FOMO's get-access CTA): SPAs
+  // render after the browser's native fragment scroll, so re-scroll once the
+  // target section has mounted.
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const t = setTimeout(() => {
+      document.querySelector(window.location.hash)?.scrollIntoView({ block: "start" });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, []);
+
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -202,7 +213,7 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
           <div className="h-full lg:col-span-2">
-            <CollapsibleCard title="ARBITRAGE">
+            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage">
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>
           </div>

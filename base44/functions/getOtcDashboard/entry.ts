@@ -1,9 +1,48 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { ADDRESSES, fetchDasTokenInfo } from "../../shared/otcSources.ts";
 
+/* QUOTA FIX: this handler used to read up to 3,500 entity rows (1,000
+   OtcSnapshot + 2,500 NftHolding) on EVERY page load — under traffic that
+   exhausted the app's Base44 entity read quota and the whole dashboard 500'd
+   ("App entity read traffic volume limit exceeded") — blank NFT floor,
+   NET_SECONDARY, LISTED. The payload is identical for every visitor, so:
+     - 60s in-isolate cache collapses bursts to ~1 read-set per minute
+     - single-flight dedupes concurrent refreshes behind one rebuild
+     - stale-while-revalidate serves the last good payload for up to 30 min
+       when a refresh fails (quota/DB hiccup) instead of erroring the page
+     - CDN hint lets the edge cache across isolates between cold starts */
+const FRESH_MS = 60_000;
+const STALE_MS = 30 * 60_000;
+let mem = { at: 0, body: null };
+let inflight = null;
+
+const jsonOut = (body, cacheState) =>
+  Response.json(body, {
+    headers: {
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+      "X-Dash-Cache": cacheState,
+    },
+  });
+
 export default async function (req) {
-  try {
+  const now = Date.now();
+  if (mem.body && now - mem.at < FRESH_MS) return jsonOut(mem.body, "hit");
+  if (!inflight) {
     const base44 = createClientFromRequest(req);
+    inflight = buildDashboard(base44)
+      .then((body) => { mem = { at: Date.now(), body }; return body; })
+      .finally(() => { inflight = null; });
+  }
+  try {
+    return jsonOut(await inflight, "miss");
+  } catch (e) {
+    if (mem.body && now - mem.at < STALE_MS) return jsonOut({ ...mem.body, stale: true }, "stale");
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+async function buildDashboard(base44) {
+  {
     // Public read-only analytics — no auth required; service role reads shared data.
 
     const [snapshots, holdings] = await Promise.all([
@@ -131,14 +170,12 @@ export default async function (req) {
       latest.token_tge_supply = OTC_TGE_SUPPLY;
     }
 
-    return Response.json({
+    return {
       addresses: ADDRESSES,
       latest,
       history,
       holdings: holdings || [],
       snapshot_count: list.length,
-    });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    };
   }
 }

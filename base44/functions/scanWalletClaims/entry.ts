@@ -25,6 +25,16 @@ import { readVaultStock } from "../../shared/vaultBalances.ts";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_VERSION = 2; // bump to invalidate stale caches (e.g. fixed PDA derivation)
 
+/* In-isolate response memo on top of the entity cache: the listed-desks
+   sentinel wallet ("__listed_holdings__", arbitrage panel) is hit by EVERY
+   concurrent visitor, and under entity-quota pressure even the
+   ClaimCache.filter read can 500 the whole scan (blanking the floor panel
+   site-wide). A 60s memo absorbs the burst. force=true bypasses it — the
+   post-claim rescan must see fresh chain state. */
+const MEMO_TTL_MS = 60_000;
+const memo = new Map(); // wallet -> { at, json }
+const memoized = (wallet, json) => { memo.set(wallet, { at: Date.now(), json }); return Response.json(json); };
+
 
 
 async function saveCache(base44, existing, wallet, desks) {
@@ -44,6 +54,11 @@ export default async function (req) {
     const force = body.force === true;
     const cacheOnly = body.cacheOnly === true;
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
+
+    if (!force && !cacheOnly) {
+      const m = memo.get(wallet);
+      if (m && Date.now() - m.at < MEMO_TTL_MS) return Response.json(m.json);
+    }
 
     // The caller already knows which desks the wallet owns (from the portfolio
     // fetch). Accept that list directly so the scan covers exactly the NFTs
@@ -85,7 +100,7 @@ export default async function (req) {
       cache?.desks?._v === CACHE_VERSION;
 
     if (!force && cache && fresh) {
-      return Response.json({
+      return memoized(wallet, {
         ok: true,
         cached: true,
         desks: cache.desks?.items || [],
@@ -146,7 +161,7 @@ export default async function (req) {
     });
 
     await saveCache(base44, cache, wallet, out);
-    return Response.json({ ok: true, fresh: true, desks: out, wallet, desks_count: desks.length });
+    return memoized(wallet, { ok: true, fresh: true, desks: out, wallet, desks_count: desks.length });
     } finally {
       await releaseLock(base44, lock);
     }

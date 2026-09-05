@@ -17,6 +17,7 @@ const LISTED_CACHE_WALLET = "__listed_holdings__";
 export function useLiveVaultHoldings(assets) {
   const [realHold, setRealHold] = useState({}); // asset_id -> { hasStock, holdingUsd, holdingSol, loaded }
   const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState(false);
   // Semantic key: rescan only when the desk set changes, not on re-render.
   const key = (assets || []).map((a) => a.asset_id).join(",");
 
@@ -25,6 +26,7 @@ export function useLiveVaultHoldings(assets) {
       const list = assets || [];
       if (!list.length) return;
       setScanning(true);
+      setError(false);
       try {
         const payload = list.map((h) => ({
           asset_id: h.asset_id,
@@ -36,6 +38,7 @@ export function useLiveVaultHoldings(assets) {
           force,
           assets: payload,
         });
+        if (res?.data?.error) throw new Error(res.data.error);
         const desks = res?.data?.desks || [];
         const mints = new Set([SOL_MINT]);
         for (const d of desks) for (const t of d.tickers || []) mints.add(t.mint);
@@ -60,7 +63,11 @@ export function useLiveVaultHoldings(assets) {
         }
         setRealHold(map);
       } catch {
-        /* ignore — fall back to estimate */
+        /* keep last-good realHold (stale-while-revalidate); a FIRST-load
+           failure previously left the map empty, which the arbitrage panel
+           rendered as a misleading NO_LIVE_LISTINGS — surface error instead */
+        setError(true);
+        if (!force) setTimeout(() => scan(true), 8000);   // one auto-retry; after that the UI offers RETRY
       } finally {
         setScanning(false);
       }
@@ -74,5 +81,5 @@ export function useLiveVaultHoldings(assets) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return { realHold, scanning, rescan: () => scan(true) };
+  return { realHold, scanning, error, rescan: () => scan(true) };
 }
