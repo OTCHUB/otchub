@@ -2,6 +2,14 @@ import React, { useState, useEffect } from "react";
 import { detectWallets, connectWallet, subscribeStandardWallets } from "@/lib/solanaWallets";
 import HelpNote from "@/components/otc/HelpNote";
 
+// official brand marks, vendored in /public/wallets (no hotlinks)
+const BRAND_ICON = {
+  phantom: "/wallets/phantom.svg",
+  solflare: "/wallets/solflare.ico",
+  backpack: "/wallets/backpack.ico",
+  jupiter: "/wallets/jupiter.ico",
+};
+
 export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);   // e.g. AWAITING_SOLFLARE_APPROVAL
@@ -162,8 +170,8 @@ export default function WalletConnect({ onConnected }) {
                 className={`flex w-full items-center gap-2.5 border border-green-500/30 px-2.5 py-2 text-left text-[12px] text-green-400 hover:bg-green-500/10 disabled:opacity-50 ${connectingId === p.id ? "animate-pulse bg-green-500/10" : ""}`}
               >
                 <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center border border-green-500/35 bg-black text-[11px] font-bold text-green-400 overflow-hidden">
-                  {p.wallet?.icon
-                    ? <img src={p.wallet.icon} alt="" className="h-full w-full object-cover" style={{ filter: "grayscale(1) brightness(1.15)" }} />
+                  {(p.wallet?.icon || BRAND_ICON[p.id])
+                    ? <img src={p.wallet?.icon || BRAND_ICON[p.id]} alt="" className="h-full w-full object-contain p-[2px]" />
                     : (p.name || "?")[0].toUpperCase()}
                 </span>
                 <span className="flex-1">{p.name.toUpperCase()}</span>
