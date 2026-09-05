@@ -592,6 +592,15 @@ export async function executeClaimChunked(
       onLog({ type: "err", msg: `GROUP ${groupNo} :: all sims failed — skipping.` });
       continue;
     }
+    // Re-base the blockhash right before the wallet prompt: sims plus a slow
+    // multi-tx approval (big multi-desk groups) can burn most of the ~60s
+    // blockhash window, making every tx fail on send after signing.
+    try {
+      const bh2 = await relay("blockhash");
+      for (const t of passing) t.recentBlockhash = bh2.blockhash;
+    } catch {
+      /* keep the original blockhash */
+    }
     onLog({ type: "info", msg: `GROUP ${groupNo} :: SIGN :: 1 prompt for ${passing.length} tx(s)...` });
     onProgress?.({ group: groupNo, totalGroups, phase: "sign", desks: [], signaturesLeft: totalGroups - groupNo + 1 });
     let signed;
@@ -1173,6 +1182,14 @@ export async function executePairedClaim(
     if (!passing.length) {
       onLog({ type: "err", msg: `GROUP ${groupNo} :: all sims failed — skipping.` });
       continue;
+    }
+    // Re-base the blockhash right before the wallet prompt (see note in
+    // executeClaimChunked) — multi-desk groups sign many txs per prompt.
+    try {
+      const bh2 = await relay("blockhash");
+      for (const t of passing) t.recentBlockhash = bh2.blockhash;
+    } catch {
+      /* keep the original blockhash */
     }
     onLog({
       type: "info",
