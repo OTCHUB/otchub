@@ -101,7 +101,8 @@ export default async function (req) {
 
     // Cache lookup — race-proof: concurrent creators can leave duplicate rows
     // for the same wallet; keep the most recently updated and prune the rest
-    // so every read/write targets a single row.
+    // so every read/write targets a single row. getLifetimeClaims uses a
+    // distinct `${wallet}__lifetime` key, so this filter never touches it.
     const cachedRows = (await base44.asServiceRole.entities.ClaimCache.filter({ wallet: cacheKey })) || [];
     cachedRows.sort((a, b) => new Date(b.updated_date || 0) - new Date(a.updated_date || 0));
     if (cachedRows.length > 1) {
