@@ -55,11 +55,6 @@ export default async function (req) {
     const cacheOnly = body.cacheOnly === true;
     if (!wallet) return Response.json({ error: "wallet required" }, { status: 400 });
 
-    if (!force && !cacheOnly) {
-      const m = memo.get(cacheKey);
-      if (m && Date.now() - m.at < MEMO_TTL_MS) return Response.json(m.json);
-    }
-
     // The caller already knows which desks the wallet owns (from the portfolio
     // fetch). Accept that list directly so the scan covers exactly the NFTs
     // shown in the panel — falling back to NftHolding-by-owner only when the
@@ -94,6 +89,15 @@ export default async function (req) {
           .split("").reduce((h, c) => ((h * 33) ^ c.charCodeAt(0)) >>> 0, 5381).toString(36)
       : "";
     const cacheKey = setHash ? `${wallet}:${setHash}` : wallet;
+
+    // In-memory memo (short-circuits before any entity read). Must sit AFTER
+    // cacheKey is computed — it was previously checked before the key existed,
+    // so every non-forced scan (the auto-scan on wallet connect) crashed with a
+    // TDZ error while the manual force=true [SCAN_DESKS] button worked fine.
+    if (!force && !cacheOnly) {
+      const m = memo.get(cacheKey);
+      if (m && Date.now() - m.at < MEMO_TTL_MS) return Response.json(m.json);
+    }
 
     // Cache lookup — race-proof: concurrent creators can leave duplicate rows
     // for the same wallet; keep the most recently updated and prune the rest
