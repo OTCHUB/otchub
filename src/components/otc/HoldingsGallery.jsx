@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { SOL_MINT } from "@/lib/stockPrices";
@@ -12,9 +12,25 @@ const ME_BASE = "https://magiceden.io/item-details";
 export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned, claimPlan, claimPrices, lifetimeByDesk, onDeskCommand }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
   const solUsdSpot = claimPrices?.[SOL_MINT] ?? null;
-  // Wallet variant: exactly 3 rows of cards per page on a fixed 3-column
-  // grid (9 cards); the collection-wide view keeps its original layout.
-  const PAGE_SIZE = walletOwned ? 9 : 12;
+  // Wallet variant: 3 rows of cards per page, but the grid densifies on wider
+  // screens (3 cols mobile → 5 at md → 8 at xl) so desktop cards don't render
+  // huge; page size follows the live column count to stay ~3 full rows.
+  // The collection-wide view keeps its original layout.
+  const [cols, setCols] = useState(3);
+  useEffect(() => {
+    if (!walletOwned) return;
+    const md = window.matchMedia("(min-width: 768px)");
+    const xl = window.matchMedia("(min-width: 1280px)");
+    const update = () => setCols(xl.matches ? 8 : md.matches ? 5 : 3);
+    update();
+    md.addEventListener("change", update);
+    xl.addEventListener("change", update);
+    return () => {
+      md.removeEventListener("change", update);
+      xl.removeEventListener("change", update);
+    };
+  }, [walletOwned]);
+  const PAGE_SIZE = walletOwned ? cols * 3 : 12;
   const [sel, setSel] = useState(null);
   const [pageNo, setPageNo] = useState(0);
   const [query, setQuery] = useState("");
@@ -150,7 +166,9 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
 
       <div
         className={`mt-3 grid gap-2 ${
-          walletOwned ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5"
+          walletOwned
+            ? "grid-cols-3 md:grid-cols-5 xl:grid-cols-8"
+            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5"
         }`}
       >
         {list.map((h) => {
