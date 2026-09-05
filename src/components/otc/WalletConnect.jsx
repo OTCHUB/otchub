@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { detectWallets, connectWallet, subscribeStandardWallets } from "@/lib/solanaWallets";
+import HelpNote from "@/components/otc/HelpNote";
 
 export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,17 @@ export default function WalletConnect({ onConnected }) {
           {wallets.length > 0 && ` · ${wallets.length} DETECTED`}
         </span>
       </div>
+
+      <HelpNote label="[?] WALLET_SAFETY :: WHY_SIGNING_WARNS">
+        Wallet warnings here are NORMAL for a community tool — Phantom flags any app or program that
+        is not on its own verified list. Connecting is READ-ONLY: the app sees your public balances,
+        never your keys. Claim transactions only touch the official otcdesks.cash desk program
+        (AjMx…dHQW — cross-check it on the sign screen against the CONTRACTS panel) and always
+        deliver stock to YOUR OWN wallet; every transaction is simulated first, so you are never
+        asked to sign one that would fail. Swaps route through Jupiter — an "unknown token" warning
+        only means $OTC is not on Phantom's verified-token list. When in doubt, verify the program
+        ID on the wallet prompt at solscan.io before approving.
+      </HelpNote>
 
       {picker && (
         <div className="mt-3 flex flex-wrap gap-2 border border-green-500/30 p-2">

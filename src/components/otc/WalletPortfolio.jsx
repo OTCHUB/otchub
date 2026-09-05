@@ -126,6 +126,11 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   const floorSol = data?.nft_floor_sol ?? null;
   const nftValueSol = floorSol != null ? desks * floorSol : null;
   const nftValueUsd = nftValueSol != null && solUsd ? nftValueSol * solUsd : null;
+  // FOMO_ALPHA gate requirement (fomo.otchub.dev extension): granted while
+  // the wallet holds >= 1 desk OR >= 100,000 $OTC, revoked when balances drop
+  // below it — re-evaluated on every portfolio refresh, same rule the public
+  // fomoGate API checks live for the fomo site.
+  const fomoAccess = (data?.desks_owned || 0) >= 1 || (data?.otc_balance || 0) >= 100000;
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
@@ -205,6 +210,31 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
               </div>
               <div className="text-[9px] text-green-500/50">{fmtNum(desks)} DESKS</div>
             </div>
+          </div>
+          {/* FOMO_ALPHA access gate — live requirement check for the
+              fomo.otchub.dev extension; shows granted/locked based on the
+              wallet's current desk count and $OTC balance. */}
+          <div
+            className={`mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border px-2 py-1 font-mono text-[9px] ${
+              fomoAccess ? "border-emerald-500/40 bg-emerald-500/5" : "border-green-500/20"
+            }`}
+          >
+            <span className={fomoAccess ? "font-bold text-emerald-400" : "text-green-500/50"}>
+              FOMO_ALPHA :: {fomoAccess ? "ACCESS_GRANTED" : "LOCKED"}
+            </span>
+            <span className="text-green-500/40">
+              REQ 1 DESK OR 100,000 $OTC · HOLDING {fmtNum(data.desks_owned)} DESKS · {fmtNum(data.otc_balance)} $OTC
+            </span>
+            {fomoAccess && (
+              <a
+                href="https://fomo.otchub.dev"
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-400 hover:text-emerald-300"
+              >
+                [OPEN_FOMO ↗]
+              </a>
+            )}
           </div>
           {/* Lifetime earnings per stock (ticker) — amount + live SOL/USD */}
           {lifetime?.by_stock?.length > 0 && (
