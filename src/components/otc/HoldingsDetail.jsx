@@ -27,15 +27,30 @@ export default function HoldingsDetail({
   );
   const cSol = claimPrices?.[SOL_MINT] ? cUsd / claimPrices[SOL_MINT] : null;
 
+  const solUsd = claimPrices?.[SOL_MINT];
+  // Real per-symbol breakdown from the desk's live vault scan — sums exactly
+  // to CLAIMABLE. Only when no scan is available do we fall back to an
+  // estimate (protocol-wide per-desk distribution shares applied to this
+  // desk's total), which is clearly labeled as such.
+  const liveBreakdown = (claimDesk?.tickers || [])
+    .filter((t) => t.amount > 0 && t.exists !== false)
+    .map((t) => {
+      const usd = (t.amount / 10 ** t.decimals) * (claimPrices?.[t.mint] || 0);
+      return { symbol: t.symbol, usd, sol: solUsd ? usd / solUsd : 0, live: true };
+    })
+    .filter((t) => t.usd > 0 || t.sol > 0)
+    .sort((a, b) => b.usd - a.usd);
   const totalPerDesk = (byStock || []).reduce((a, s) => a + (s.per_desk_sol || 0), 0) || 1;
-  const breakdown = (byStock || [])
+  const estBreakdown = (byStock || [])
     .map((s) => ({
       symbol: s.symbol,
       sol: ((s.per_desk_sol || 0) / totalPerDesk) * (h.accrued_value_sol || 0),
       usd: ((s.per_desk_sol || 0) / totalPerDesk) * (h.accrued_value_usd || 0),
+      live: false,
     }))
     .filter((s) => s.sol > 0)
     .sort((a, b) => b.sol - a.sol);
+  const breakdown = liveBreakdown.length ? liveBreakdown : estBreakdown;
   return (
     <Dialog open={!!h} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md border border-green-500/40 bg-black font-mono text-green-400">
@@ -99,7 +114,11 @@ export default function HoldingsDetail({
             <div className="break-all text-green-500/40">ID: {h.asset_id}</div>
             {breakdown.length > 0 && (
               <div className="pt-1">
-                <div className="text-[9px] uppercase tracking-widest text-green-500/50">STOCK_HOLDING BY SYMBOL</div>
+                <div className="text-[9px] uppercase tracking-widest text-green-500/50">
+                  {breakdown[0]?.live
+                    ? "VAULT_STOCK BY SYMBOL :: LIVE (SUMS TO CLAIMABLE)"
+                    : "STOCK_HOLDING BY SYMBOL :: EST (PROTOCOL-AVG SPLIT)"}
+                </div>
                 <div className="mt-1 max-h-28 space-y-0.5 overflow-auto pr-1">
                   {breakdown.map((b) => (
                     <div key={b.symbol} className="flex justify-between text-[10px]">
