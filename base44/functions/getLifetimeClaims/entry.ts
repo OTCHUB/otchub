@@ -114,15 +114,41 @@ async function resolveTokenPrograms() {
 // This hard-guarantees that only genuine on-chain claims are counted —
 // stock tokens the user bought themselves (Jupiter swaps, plain transfers
 // in) never route through the OTC program and can never be tallied here.
+// Minimal base58 decoder. The Helius parsed-tx API returns instruction data
+// base58-encoded (it used to return base64), so BOTH encodings are accepted —
+// decoding only one silently matched zero claims and froze lifetime totals.
+function base58Decode(s) {
+  const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let n = 0n;
+  for (const c of s) {
+    const idx = ALPHABET.indexOf(c);
+    if (idx < 0) throw new Error(`bad base58 char: ${c}`);
+    n = n * 58n + BigInt(idx);
+  }
+  const bytes = [];
+  while (n > 0n) {
+    bytes.push(Number(n & 0xffn));
+    n >>= 8n;
+  }
+  for (let i = 0; i < s.length && s[i] === "1"; i++) bytes.push(0);
+  return Buffer.from(bytes.reverse());
+}
+
 function isClaimInstruction(ix) {
   if (!ix.data) return false;
+  const matches = (bytes) =>
+    bytes.length >= 8 && INSTRUCTIONS.claim.every((b, i) => bytes[i] === b);
   try {
-    const bytes = Buffer.from(ix.data, "base64");
-    if (bytes.length < 8) return false;
-    return INSTRUCTIONS.claim.every((b, i) => bytes[i] === b);
+    if (matches(Buffer.from(ix.data, "base64"))) return true;
   } catch {
-    return false;
+    /* not base64 */
   }
+  try {
+    if (matches(base58Decode(ix.data))) return true;
+  } catch {
+    /* not base58 */
+  }
+  return false;
 }
 
 function extractClaimsFromTx(tx, wallet) {

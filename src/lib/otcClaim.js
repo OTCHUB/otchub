@@ -85,20 +85,24 @@ export async function relay(mode, payload = {}) {
 // ---- Priority fee policy ----
 // Ask Helius for the current recommended µlamports/CU for the accounts we're
 // about to write (contended desk vault / config PDAs can need more than the
-// global average), then clamp into a sane band so gas stays reasonable:
-//   floor 2,000 µ/CU — high enough to beat zero-fee spam when the network is quiet
+// global average), then apply a 2x safety margin and clamp into a sane band.
+// Claim txs have been observed to broadcast fine but never land when the fee
+// sat at the raw estimate during congestion — the tx simply expires and the
+// RPC forgets it, which looks exactly like "sent but never confirmed". All
+// band values are tiny in SOL terms (cap = ~0.0002 SOL for a 200k-CU tx):
+//   floor 10,000 µ/CU — beats zero-fee spam even when the estimate call fails
+//   margin 2x est — comfortable headroom above the recommended level
 //   cap 1,000,000 µ/CU — a 200k-CU claim tx costs at most ~0.0002 SOL
-// This keeps claim txs from sitting PENDING forever on congested networks
-// without overpaying on quiet ones.
-const FEE_FLOOR_UL = 2_000;
+const FEE_FLOOR_UL = 10_000;
 const FEE_CAP_UL = 1_000_000;
+const FEE_MARGIN = 2;
 
 export async function currentPriorityFee(accountKeys = []) {
   try {
     const r = await relay("fee", { pubkeys: accountKeys.slice(0, 128) });
     const est = Number(r.microLamports);
     if (!Number.isFinite(est) || est <= 0) return FEE_FLOOR_UL;
-    return Math.min(FEE_CAP_UL, Math.max(FEE_FLOOR_UL, Math.round(est)));
+    return Math.min(FEE_CAP_UL, Math.max(FEE_FLOOR_UL, Math.round(est * FEE_MARGIN)));
   } catch {
     return FEE_FLOOR_UL;
   }
@@ -418,7 +422,11 @@ async function withTimeout(promise, ms, label) {
 async function ensureConfirmed(entries, onLog, onConfirm) {
   if (!entries || !entries.length) return;
   const pending = new Map(entries.map((e) => [e.sig, e.b64]));
-  const DELAYS = [4000, 6000, 8000];
+  // 5 poll cycles (~30s total) stay inside the ~60s blockhash validity window.
+  // After each cycle that still has missing txs, re-broadcast them (idempotent)
+  // — a tx that landed is rejected as duplicate, a tx still pending gets a
+  // fresh submission, which is what un-sticks low-fee txs on congestion.
+  const DELAYS = [4000, 6000, 8000, 8000, 8000];
   for (let a = 0; a < DELAYS.length; a++) {
     // surface each wait cycle so the UI can show the txs are being tracked,
     // not stuck — a silent poll loop looks exactly like a frozen app.
@@ -443,14 +451,22 @@ async function ensureConfirmed(entries, onLog, onConfirm) {
       }
     });
     if (!pending.size) return;
-  }
-  onLog({ type: "info", msg: `PEND :: ${pending.size} tx(s) unconfirmed — re-broadcasting...` });
-  for (const [sig, b64] of pending) {
-    try {
-      await withTimeout(relay("send", { tx: b64 }), 30000, "rebroadcast");
-    } catch (e) {
-      onLog({ type: "err", msg: `PEND ${sig.slice(0, 8)} RESEND_FAIL: ${e.message}` });
+    // Still missing after this cycle — re-broadcast every pending tx so it
+    // keeps being re-submitted while the blockhash window is still open.
+    onLog({ type: "info", msg: `PEND :: ${pending.size} tx(s) unconfirmed — re-broadcasting...` });
+    for (const [, b64] of pending) {
+      try {
+        await withTimeout(relay("send", { tx: b64 }), 30000, "rebroadcast");
+      } catch {
+        /* a failed re-send is retried on the next poll cycle */
+      }
     }
+  }
+  if (pending.size) {
+    onLog({
+      type: "err",
+      msg: `UNCONFIRMED :: ${pending.size} tx(s) never landed before the blockhash expired — they will NOT execute and no fee/value moved. Press [SCAN_DESKS] and claim again.`,
+    });
   }
 }
 
