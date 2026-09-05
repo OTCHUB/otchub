@@ -6,6 +6,7 @@ export default function WalletConnect({ onConnected }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);   // e.g. AWAITING_SOLFLARE_APPROVAL
   const [error, setError] = useState(null);
+  const [done, setDone] = useState(null);       // connected pk -> panel auto-collapses
   const [picker, setPicker] = useState(null); // list when multiple wallets found
   const [manual, setManual] = useState("");
   const [wallets, setWallets] = useState(() => detectWallets());
@@ -67,6 +68,7 @@ export default function WalletConnect({ onConnected }) {
       const pk = await connectWallet(wallet);
       if (!pk) throw new Error(`${wallet.name} returned no public key`);
       setStatus(null);
+      setDone(pk);                  // success -> collapse the panel, reveal the app
       onConnected?.(pk);
     } catch (e) {
       setStatus(null);
@@ -80,11 +82,28 @@ export default function WalletConnect({ onConnected }) {
   const submitManual = (e) => {
     e.preventDefault();
     const a = manual.trim();
-    if (a) onConnected?.(a);
+    if (a) { setDone(a); onConnected?.(a); }
   };
 
+  if (done) {
+    // verified -> auto-dismiss to the tape/portfolio (manual reopen available)
+    const short = `${done.slice(0, 6)}…${done.slice(-4)}`;
+    return (
+      <button
+        type="button"
+        onClick={() => setDone(null)}
+        className="flex w-full items-center justify-between border border-green-500/30 bg-black px-3 py-2 text-left transition-opacity"
+        title="reopen wallet connect"
+      >
+        <span className="text-[10px] uppercase tracking-widest text-green-500/70">WALLET_CONNECT</span>
+        <span className="text-[11px] font-bold text-green-400">[ CONNECTED ✓ {short} ]</span>
+        <span className="text-[9px] text-green-500/40">▾</span>
+      </button>
+    );
+  }
+
   return (
-    <div className="border border-green-500/30 bg-black p-3">
+    <div className="border border-green-500/30 bg-black p-3 transition-all duration-200">
       <div className="text-[10px] uppercase tracking-widest text-green-500/70">
         WALLET_CONNECT :: OTC_PORTFOLIO
       </div>
