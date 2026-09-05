@@ -158,6 +158,15 @@ export default function Home() {
               >
                 [OBSERVER ↗]
               </a>
+              <a
+                href="https://fomo.otchub.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+                title="rufomo — live FOMO trader tape, signal scores and anti-rug safety gate"
+              >
+                [FOMO_TAPE ↗]
+              </a>
               <button
                 onClick={refresh}
                 disabled={refreshing}
