@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
+import CommunityMenu from "@/components/otc/CommunityMenu";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
@@ -131,15 +132,7 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <a
-                href="https://x.com/i/chat/group_join/g2094534355506860481/nX3pHq1n00"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="Community-owned OTC holders group on X — come discuss with other desk holders"
-              >
-                [COMMUNITY ↗]
-              </a>
+              <CommunityMenu />
               <a
                 href="https://otcdesks.cash"
                 target="_blank"
