@@ -7,7 +7,7 @@ export default function WalletConnect({ onConnected }) {
   const [status, setStatus] = useState(null);   // e.g. AWAITING_SOLFLARE_APPROVAL
   const [error, setError] = useState(null);
   const [done, setDone] = useState(null);       // connected pk -> panel auto-collapses
-  const [picker, setPicker] = useState(null); // list when multiple wallets found
+  const [connectingId, setConnectingId] = useState(null);  // row-level pulse during handshake
   const [manual, setManual] = useState("");
   const [wallets, setWallets] = useState(() => detectWallets());
   // Solflare universal link: opens THIS page inside Solflare's in-app browser,
@@ -49,9 +49,8 @@ export default function WalletConnect({ onConnected }) {
       }
       if (list.length === 1) {
         await doConnect(list[0]);
-      } else {
-        setPicker(list);
       }
+      // several providers: the always-visible row list is the picker
     } catch (e) {
       setError(e?.message || "Connect failed");
     } finally {
@@ -60,7 +59,7 @@ export default function WalletConnect({ onConnected }) {
   };
 
   const doConnect = async (wallet) => {
-    setPicker(null);
+    setConnectingId(wallet.id);
     setBusy(true);
     setError(null);
     setStatus(`AWAITING_${wallet.name.toUpperCase().replace(/\s+/g, "_")}_APPROVAL`);
@@ -76,6 +75,7 @@ export default function WalletConnect({ onConnected }) {
       setError(/reject|declin|denied|4001/i.test(msg) ? `${wallet.name}: request rejected — approve the prompt in your wallet to continue.` : msg);
     } finally {
       setBusy(false);
+      setConnectingId(null);
     }
   };
 
@@ -150,18 +150,27 @@ export default function WalletConnect({ onConnected }) {
         ID on the wallet prompt at solscan.io before approving.
       </HelpNote>
 
-      {picker && (
-        <div className="mt-3 flex flex-wrap gap-2 border border-green-500/30 p-2">
+      {wallets.length > 0 && (
+        <div className="mt-3 border border-green-500/30 p-2">
           <span className="text-[10px] text-green-500/60">SELECT_WALLET:</span>
-          {picker.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => doConnect(p)}
-              className="border border-green-500/50 px-3 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-            >
-              [{p.name.toUpperCase()}]
-            </button>
-          ))}
+          <div className="mt-1.5 space-y-1.5">
+            {wallets.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => doConnect(p)}
+                disabled={busy}
+                className={`flex w-full items-center gap-2.5 border border-green-500/30 px-2.5 py-2 text-left text-[12px] text-green-400 hover:bg-green-500/10 disabled:opacity-50 ${connectingId === p.id ? "animate-pulse bg-green-500/10" : ""}`}
+              >
+                <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center border border-green-500/35 bg-black text-[11px] font-bold text-green-400 overflow-hidden">
+                  {p.wallet?.icon
+                    ? <img src={p.wallet.icon} alt="" className="h-full w-full object-cover" style={{ filter: "grayscale(1) brightness(1.15)" }} />
+                    : (p.name || "?")[0].toUpperCase()}
+                </span>
+                <span className="flex-1">{p.name.toUpperCase()}</span>
+                <span className="text-[9px] text-green-500/40">{connectingId === p.id ? "CONNECTING…" : "DETECTED"}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
