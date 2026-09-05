@@ -113,6 +113,25 @@ export function detectWallets() {
   return merged;
 }
 
+// Silent reconnect after a page reload: if an injected wallet is still
+// authorized for this site, its provider already exposes publicKey WITHOUT a
+// connect() call — so re-registering the signer here NEVER triggers a wallet
+// prompt. Returns the matched address, or null when no authorized wallet
+// matches (the portfolio then stays read-only until the user reconnects).
+export function silentReconnect(storedPk) {
+  if (!storedPk) return null;
+  for (const entry of detectWallets()) {
+    if (entry.kind !== "injected") continue;
+    const p = entry.provider?.publicKey;
+    const pk = p?.toString?.() || (typeof p === "string" ? p : null);
+    if (pk === storedPk) {
+      setConnectedWallet(entry, null, pk);
+      return pk;
+    }
+  }
+  return null;
+}
+
 export async function connectWallet(entry) {
   if (entry?.kind === "standard" && entry.wallet) {
     const connect = entry.wallet.features["standard:connect"]?.connect;

@@ -27,15 +27,51 @@ import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import { timeAgo } from "@/lib/format";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
+import { silentReconnect } from "@/lib/solanaWallets";
+
+// Persisted wallet: the connected address survives page reloads (restored on
+// mount) and is only cleared when the user disconnects or connects a different
+// wallet — a refresh never kicks them back to the connect screen.
+const WALLET_STORAGE_KEY = "otc_wallet_address";
 
 export default function Home() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [wallet, setWallet] = useState(null);
+  const [wallet, setWalletState] = useState(() => {
+    try {
+      return window.localStorage.getItem(WALLET_STORAGE_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
   const [bootDone, setBootDone] = useState(false);
   const [walletOpenSignal, setWalletOpenSignal] = useState(0);
+
+  // setWallet persists (or clears) the connected address; null = disconnect.
+  const setWallet = useCallback((addr) => {
+    setWalletState(addr);
+    try {
+      if (addr) window.localStorage.setItem(WALLET_STORAGE_KEY, addr);
+      else window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    } catch {
+      /* storage unavailable — session-only connection */
+    }
+  }, []);
+
+  // Reload restore: if the injected wallet is still authorized for this site,
+  // silently re-register its signer so CLAIM/SWAP work immediately (no prompt
+  // ever shown). Wallet extensions inject at slightly different times, so
+  // retry briefly; the read-only portfolio shows regardless.
+  useEffect(() => {
+    if (!wallet) return;
+    const timers = [0, 500, 1500, 3000].map((d) =>
+      setTimeout(() => silentReconnect(wallet), d)
+    );
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Jump the user straight to the wallet connect controls (e.g. from the
   // swap panel when no wallet is connected): expand the card, then scroll.
