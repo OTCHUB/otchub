@@ -59,7 +59,9 @@ export default function CommunityMenu() {
         [COMMUNITY {open ? "▴" : "▾"}]
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-72 border border-green-500/50 bg-[#0a0a0a] font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)]">
+        /* anchor left on wrapped/mobile rows (opens toward free space),
+           right on >=sm — never bleeds off either edge; width caps at viewport */
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-1.5rem)] border border-green-500/50 bg-[#0a0a0a] font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)] sm:left-auto sm:right-0">
           <div className="border-b border-green-500/20 px-3 py-1.5 text-[9px] uppercase tracking-widest text-green-500/50">
             community ::
           </div>

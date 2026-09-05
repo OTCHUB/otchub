@@ -119,7 +119,7 @@ export default function WalletConnect({ onConnected }) {
         </div>
       )}
 
-      <form onSubmit={submitManual} className="mt-3 flex gap-2">
+      <form onSubmit={submitManual} className="mt-3 flex flex-wrap gap-2">
         <input
           value={manual}
           onChange={(e) => setManual(e.target.value)}
