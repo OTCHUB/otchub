@@ -54,7 +54,7 @@ export default function CommunityMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         title="OTC community links + RU_FOMO console"
-        className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+        className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
       >
         [COMMUNITY {open ? "▴" : "▾"}]
       </button>

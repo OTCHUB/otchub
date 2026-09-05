@@ -142,13 +142,15 @@ export default function Home() {
                 {" · "}{data?.snapshot_count || 0} SNAPSHOTS
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            {/* actions row: wraps + shrinks on narrow screens so the header
+                never overflows horizontally on mobile */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <CommunityMenu />
               <a
                 href="https://otcdesks.cash"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
                 title="Official otcdesks.cash protocol app"
               >
                 [OTC_APP ↗]
@@ -157,7 +159,7 @@ export default function Home() {
                 href="https://otcdesks.observer/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
                 title="Community OTC_DESK visualization tool — desk charts and holder stats"
               >
                 [OBSERVER ↗]
@@ -166,15 +168,15 @@ export default function Home() {
                 href="https://fomo.otchub.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
-                title="rufomo — live FOMO trader tape, signal scores and anti-rug safety gate"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                title="RU_FOMO — live FOMO trader tape, signal scores and anti-rug safety gate"
               >
-                [FOMO_TAPE ↗]
+                [RU_FOMO ↗]
               </a>
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="inline-flex items-center border border-green-500/50 px-2 py-1.5 text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+                className="inline-flex items-center border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 disabled:opacity-40 sm:py-1.5"
                 title="Force a fresh data snapshot (admin)"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
