@@ -20,8 +20,17 @@ async function setup(t) {
     if (url.includes("/tokens/")) return Response.json({ pairs: [
       { baseToken: { address: "test-mint" }, dexId: "pumpswap", liquidity: { usd: 1000 }, url: "https://dexscreener.com/solana/test-pair" },
     ] });
-    assert.equal(url, "https://api.dexscreener.com/latest/dex/search?q=pump");
-    return Response.json({ pairs: [] });
+    // Search-based native sample: one URL per pump ecosystem term, each
+    // term returning its own pump pairs (dedup happens in the handler).
+    if (url.includes("/search?q=")) {
+      const q = decodeURIComponent(url.split("q=")[1]);
+      return Response.json({ pairs: [
+        { chainId: "solana", dexId: "pumpfun", baseToken: { address: `pump-${q}` }, volume: { h24: 100 } },
+        { chainId: "solana", dexId: "pumpswap", baseToken: { address: `swap-${q}` }, volume: { h24: 900 } },
+        { chainId: "ethereum", dexId: "pumpfun", baseToken: { address: `other-chain-${q}` }, volume: { h24: 5000 } },
+      ] });
+    }
+    assert.fail(`Unexpected fetch: ${url}`);
   });
   const { default: handler } = await import(`../base44/functions/getLauncherAnalytics/entry.ts?test=${++moduleId}`);
   return { handler, calls, advance: (ms) => { now += ms; }, setChange: (v) => { change = v; },
@@ -40,6 +49,9 @@ test("snapshots carry numeric price change, volume and cap in the cached payload
   assert.equal(body.ranked[0].feesEst24h, 123.45);
   assert.equal(body.ranked[0].graduated, true);
   assert.deepEqual(body.feeModel.map((s) => s.pct), [70, 10, 15, 5]);
+  // 7 search terms × 2 solana pump pairs each, deduped by mint.
+  assert.equal(body.native.n, 14);
+  assert.equal(body.native.graduatedShare, 0.5);
   const callCount = s.calls.length;
   const hit = await s.handler();
   assert.equal(hit.headers.get("X-Launcher-Cache"), "hit");
@@ -89,7 +101,7 @@ test("missing price changes stay null and DexScreener outages preserve snapshots
   assert.equal(body.ranked[0].change24h, null);
   assert.equal(body.ranked[0].graduated, null);
   assert.equal(body.ranked[0].vol24, 12345);
-  assert.equal(body.native, null);
+  assert.equal(body.native, null, "A DexScreener outage must degrade the native sample to null");
 });
 
 test("a cold upstream failure is an error rather than an empty success", async (t) => {
