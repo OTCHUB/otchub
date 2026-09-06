@@ -6,13 +6,13 @@ export const LAUNCHER_POLL_MS = 30_000;
 // One request at a time. No background-tab polling; resume immediately on focus.
 // SDK requests cannot be aborted, so late/unmounted results are ignored instead.
 export function watchLauncherLive({ invoke, onData, onError, document, window,
-  setInterval, clearInterval }) {
+  setInterval, clearInterval, params = {} }) {
   let stopped = false, pending = false;
   const refresh = async () => {
     if (stopped || pending || document.hidden) return;
     pending = true;
     try {
-      const result = await invoke("getLauncherLive", {});
+      const result = await invoke("getLauncherLive", { ...params });
       const data = result?.data;
       if (data?.error || !Array.isArray(data?.ranked) || !Number.isFinite(data.at)) {
         throw new Error("Launcher feed unavailable");
@@ -34,12 +34,15 @@ export function watchLauncherLive({ invoke, onData, onError, document, window,
   };
 }
 
-export function useLauncherLive() {
+export function useLauncherLive(params = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  // Restart the poller only when the requested feed view actually changes.
+  const key = JSON.stringify(params ?? {});
   useEffect(() => watchLauncherLive({
     invoke: (name, body) => base44.functions.invoke(name, body),
+    params: JSON.parse(key),
     onData: setData, onError: setError, document, window, setInterval, clearInterval,
-  }), []);
+  }), [key]);
   return { data, error };
 }

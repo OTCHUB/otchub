@@ -1,10 +1,23 @@
-import { ApiError, errorResponse, requestParams, requestUrl, responseHeaders } from "../../shared/apiHttp.js";
+import { ApiError, assertKeys, errorResponse, invalidParams, readJsonBounded, requestUrl, responseHeaders } from "../../shared/apiHttp.js";
 import { decodeLauncherCurve, hasConfirmedAmmPair, launcherStatus, NEAR_THRESHOLD } from "../../shared/launcherCurve.js";
 import { createLauncherRiskService, emptyLauncherRisk } from "../../shared/launcherRisk.js";
 
 const COINS_URL = "https://otcdesks.cash/api/coins";
 const DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/";
 const FRESH_MS = 30_000, MAX_AGE_MS = 120_000;
+const DEFAULT_PAGE_SIZE = 50;
+// Full-tape params. Any present param switches the response from the legacy
+// bounded roster to a server-filtered/paged view of the ENTIRE roster.
+const PAGE_KEYS = ["page", "pageSize", "sort", "status", "search", "maxAgeHours"];
+const SORT_KEYS = ["vol24", "change24h", "mcap"];
+const STATUS_KEYS = ["ALL", "GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"];
+
+// Accepts query strings (numbers arrive as text) and JSON numbers alike.
+const positiveInt = (value, min, max) => {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value >= min && value <= max ? value : null;
+  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) return positiveInt(Number(value), min, max);
+  return null;
+};
 const numeric = (v) => Number.isFinite(v) ? v : null;
 const nonnegative = (v) => Number.isFinite(v) && v >= 0 ? v : null;
 const text = (v) => typeof v === "string" ? v.trim() : "";
@@ -108,6 +121,58 @@ export function launcherCandidates(rows) {
     ...rankLauncherRows(rows, "ageH", true).slice(0, 30),
   ];
   return [...new Map(union.map((row) => [row.mint, row])).values()].slice(0, 150);
+}
+
+// Unknown query keys are ignored (platform gateways append opaque markers to
+// SDK POSTs; rejecting them broke the live feed with constant 400s). Body keys
+// must be allowlisted and every provided value is type/range checked before
+// any cache or upstream work — no unvalidated value is ever consumed, so the
+// endpoint can never become an arbitrary mint RPC proxy.
+export async function parseFeedParams(req, url) {
+  try {
+    const raw = {};
+    for (const [key, value] of url.searchParams) {
+      if (PAGE_KEYS.includes(key) && !(key in raw)) raw[key] = value;
+    }
+    if (req.method === "POST") {
+      const body = await readJsonBounded(req);
+      assertKeys(body, PAGE_KEYS);
+      Object.assign(raw, body);
+    }
+    const params = {};
+    for (const key of PAGE_KEYS) {
+      if (!(key in raw)) continue;
+      const value = raw[key];
+      if (key === "sort") {
+        if (!SORT_KEYS.includes(value)) throw invalidParams();
+        params.sort = value;
+      } else if (key === "status") {
+        if (!STATUS_KEYS.includes(value)) throw invalidParams();
+        params.status = value;
+      } else if (key === "search") {
+        if (typeof value !== "string" || value.length > 64) throw invalidParams();
+        const query = value.trim().toLowerCase();
+        if (query) params.search = query;
+      } else if (key === "pageSize") {
+        const size = positiveInt(value, 1, 100);
+        if (size === null) throw invalidParams();
+        params.pageSize = size;
+      } else if (key === "page") {
+        const page = positiveInt(value, 1, 10_000);
+        if (page === null) throw invalidParams();
+        params.page = page;
+      } else {
+        const hours = positiveInt(value, 1, 8760);
+        if (hours === null) throw invalidParams();
+        params.maxAgeHours = hours;
+      }
+    }
+    return params;
+  } catch (error) {
+    // Ops telemetry for the query/body shape actually arriving from gateways.
+    console.log(`[launcher-live] params rejected: ${req.method} ${url.href} :: ${error?.code ?? error?.status ?? error?.message}`);
+    throw error;
+  }
 }
 
 async function withDeadline(task, ms) {
@@ -238,13 +303,48 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     }
     return {
-      at, stale: false, ranked: rankLauncherRows(shipped, "vol24"), riskCoverage,
+      at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
       statusCounts, rosterTotal: rows.length,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,
     };
   }
+
+  const statusKey = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+
+  // One projection per request: the legacy bounded roster when no feed params
+  // are given, otherwise the FULL tape filtered, sorted and paged server-side.
+  const respondBody = (cache, params, stale, sourceError) => {
+    const forceStale = stale ? { ...cache.riskCoverage, forceStale: true } : cache.riskCoverage;
+    if (!Object.keys(params).length) {
+      const ranked = cache.legacyRanked.map((row) => ({ ...row }));
+      return { at: cache.at, stale, ranked, riskCoverage: attachRisks(ranked, forceStale),
+        statusCounts: cache.statusCounts, rosterTotal: cache.rosterTotal,
+        candidateCount: cache.candidateCount, statusChecked: cache.statusChecked,
+        statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
+        ...(sourceError ? { sourceError } : {}) };
+    }
+    let scoped = cache.rows;
+    if (params.maxAgeHours != null) scoped = scoped.filter((row) => row.ageH != null && row.ageH <= params.maxAgeHours);
+    if (params.search) scoped = scoped.filter((row) => `${row.symbol} ${row.name} ${row.mint}`.toLowerCase().includes(params.search));
+    // Faceted counts over the current search/timeframe scope: each tab shows
+    // how many launches it holds; ALL counts every launch in scope.
+    const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
+    for (const row of scoped) statusCounts[statusKey(row)]++;
+    if (params.status && params.status !== "ALL") scoped = scoped.filter((row) => statusKey(row) === params.status);
+    const sorted = rankLauncherRows(scoped, params.sort || "vol24");
+    const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
+    const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize));
+    // Pages past the end are clamped to the last page, never empty.
+    const page = Math.min(params.page ?? 1, pageCount);
+    const ranked = sorted.slice((page - 1) * pageSize, page * pageSize).map((row) => ({ ...row }));
+    return { at: cache.at, stale, ranked, riskCoverage: attachRisks(ranked, forceStale),
+      statusCounts, matches: scoped.length, page, pageCount, pageSize,
+      rosterTotal: cache.rosterTotal, candidateCount: cache.candidateCount,
+      statusChecked: cache.statusChecked, statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
+      ...(sourceError ? { sourceError } : {}) };
+  };
 
   return async function (req) {
     const headers = responseHeaders(["GET", "POST"]);
@@ -259,26 +359,23 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         headers.set("Allow", "GET, POST, OPTIONS");
         throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET or POST.");
       }
-      // Empty parameters only, including SDK POST {}. Never become an arbitrary
-      // mint RPC proxy; reject params even on a warm cache without upstream work.
-      await requestParams(req, requestUrl(req), []);
+      // All params validate before any cache or upstream work (parseFeedParams).
+      const params = await parseFeedParams(req, requestUrl(req));
       const cacheAge = cached ? clock() - cached.at : Infinity;
       if (cached && cacheAge >= 0 && cacheAge < FRESH_MS) {
-        const ranked = cached.ranked.map((row) => ({ ...row }));
-        return respond({ ...cached, ranked, riskCoverage: attachRisks(ranked, cached.riskCoverage) }, "hit");
+        return respond(respondBody(cached, params, false), "hit");
       }
       if (!inflight) {
         inflight = build().then((body) => { cached = body; return body; })
           .finally(() => { inflight = null; });
       }
-      try { return respond(await inflight, "miss"); }
-      catch {
+      try {
+        return respond(respondBody(await inflight, params, false), "miss");
+      } catch {
         // Recheck AFTER failure. A slow failed request must not extend the bound.
         const age = cached ? clock() - cached.at : Infinity;
         if (cached && age >= 0 && age <= MAX_AGE_MS) {
-          const ranked = cached.ranked.map((row) => ({ ...row }));
-          return respond({ ...cached, ranked, riskCoverage: attachRisks(ranked, { ...cached.riskCoverage, forceStale: true }),
-            stale: true, sourceError: "COINS_UNAVAILABLE" }, "stale");
+          return respond(respondBody(cached, params, true, "COINS_UNAVAILABLE"), "stale");
         }
         headers.set("X-Launcher-Cache", "error");
         throw new ApiError(502, "COINS_UNAVAILABLE", "Launcher coins are temporarily unavailable.");

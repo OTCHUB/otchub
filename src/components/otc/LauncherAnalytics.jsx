@@ -1,9 +1,10 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Globe, Send, Twitter } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
 import { usePumpSample } from "@/lib/usePumpSample";
+import Pager from "@/components/otc/Pager";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Live roster is independent of the five-minute cohort/comparison snapshot.
@@ -17,6 +18,9 @@ const KPIS = [
 const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg-fuchsia-400/70"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
+// Launch-age windows for the tape; ALL shows every launch, historical included.
+const TIMEFRAMES = [["1H", 1], ["24H", 24], ["7D", 168], ["30D", 720], ["ALL", null]];
+const EMPTY_COUNTS = Object.fromEntries(STATUSES.map((s) => [s, 0]));
 
 // Also validate in the client for older/cached feeds and defensive rendering.
 function metadataUrl(value) {
@@ -138,12 +142,21 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [kpi, setKpi] = useState("vol24");
-  const [status, setStatus] = useState("GRADUATED");
+  const [status, setStatus] = useState("ALL");
   const [search, setSearch] = useState("");
   const [detailMint, setDetailMint] = useState(null);
   const detailTrigger = useRef(null), panelRef = useRef(null);
   const detailId = useId();
-  const live = useLauncherLive();
+  const [timeframe, setTimeframe] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const maxAgeHours = TIMEFRAMES.find(([tf]) => tf === timeframe)?.[1] ?? null;
+  // The FULL tape (every launch, historical included) is filtered, sorted and
+  // paged server-side; the poller re-fetches whenever the view changes.
+  const live = useLauncherLive({
+    page, pageSize: 50, status, sort: kpi,
+    ...(search.trim() ? { search: search.trim().toLowerCase() } : {}),
+    ...(maxAgeHours != null ? { maxAgeHours } : {}),
+  });
   // Browser-side pump.fun market sample (large GeckoTerminal pool scan); the
   // server payload ships a small search-based fallback until this arrives.
   const pump = usePumpSample();
@@ -168,32 +181,19 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     return () => { mounted = false; clearInterval(t); };
   }, []);
 
-  const ranked = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const rows = (live.data?.ranked || []).filter((t) => (status === "ALL" || statusOf(t) === status)
-      && (!query || `${t.symbol} ${t.name} ${t.mint}`.toLowerCase().includes(query)));
-    rows.sort((a, b) => {
-      const aValue = Number.isFinite(a[kpi]) ? a[kpi] : -Infinity;
-      const bValue = Number.isFinite(b[kpi]) ? b[kpi] : -Infinity;
-      // Two unknowns are a stable tie, not -Infinity - -Infinity (NaN).
-      return aValue === bValue ? 0 : bValue - aValue;
-    });
-    return rows.slice(0, 15);
-  }, [live.data, kpi, status, search]);
-
   const c = data?.cohort, n = pump || data?.native;
   const feed = live.data;
+  // Server-filtered, sorted and paged slice of the full launch tape.
+  const ranked = feed?.ranked ?? [];
+  const counts = feed?.statusCounts ?? EMPTY_COUNTS;
+  const pageCount = feed?.pageCount ?? 1;
+  const matches = feed?.matches ?? 0;
+  // The server clamps pages past the end when filters shrink the result set.
+  useEffect(() => {
+    if (feed && Number.isFinite(feed.page) && feed.page !== page) setPage(feed.page);
+  }, [feed, page]);
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
   const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
-  // Prefer server-computed full-roster counts (the shipped ranked list is
-  // bounded to status-checked candidates); older/cached feeds fall back to
-  // counting the shipped rows.
-  const fallbackCounts = (feed?.ranked || []).reduce((out, row) => {
-    out[statusOf(row)]++; out.ALL++; return out;
-  }, Object.fromEntries(STATUSES.map((s) => [s, 0])));
-  const counts = Number.isFinite(feed?.statusCounts?.ALL)
-    ? { ...fallbackCounts, ...feed.statusCounts }
-    : fallbackCounts;
 
   return (
     <Dialog open={detailMint !== null} onOpenChange={(open) => { if (!open) setDetailMint(null); }}>
@@ -202,7 +202,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
           OTC_ANALYTICS :: LAUNCHER ECOSYSTEM
         </span>
-        <span className="text-[9px] text-green-500/40">{feed ? `${counts.ALL} launches · ${feed.stale || live.error ? "STALE" : "30s POLL"}` : "…"}</span>
+        <span className="text-[9px] text-green-500/40">{feed ? `${counts.ALL} matching · ${feed.stale || live.error ? "STALE" : "30s POLL"}` : "…"}</span>
       </div>
 
       {live.error && <div role="status" className="mt-2 text-[10px] text-amber-400">{live.error}</div>}
@@ -225,19 +225,27 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       <div role="tablist" aria-label="Launcher status" className="mt-2 flex flex-wrap gap-1">
         {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-          onClick={() => setStatus(s)} className={`border px-1.5 py-1 text-[9px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
-          {s} ({counts[s]})
+          onClick={() => { setStatus(s); setPage(1); }} className={`border px-1.5 py-1 text-[9px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          {s} ({counts[s] ?? 0})
         </button>)}
       </div>
-      <input aria-label="Search launcher tokens" value={search} onChange={(e) => setSearch(e.target.value)}
-        placeholder="Symbol, name or mint · ALL includes unchecked launches"
+      <div role="tablist" aria-label="Launch timeframe" className="mt-1 flex flex-wrap items-center gap-1">
+        <span className="text-[9px] uppercase tracking-widest text-green-500/50">SINCE</span>
+        {TIMEFRAMES.map(([tf]) => <button key={tf} type="button" role="tab" aria-selected={timeframe === tf}
+          onClick={() => { setTimeframe(tf); setPage(1); }}
+          className={`border px-1.5 py-1 text-[9px] ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          {tf}
+        </button>)}
+      </div>
+      <input aria-label="Search launcher tokens" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        placeholder="Symbol, name or mint · searches the full tape"
         className="mt-2 w-full border border-green-500/30 bg-black px-2 py-1 text-[10px] text-green-300" />
 
       {/* KPI ranking */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <span className="text-[9px] uppercase tracking-widest text-green-500/50">RANK BY</span>
         {KPIS.map((k) => (
-          <button key={k.key} type="button" onClick={() => setKpi(k.key)}
+          <button key={k.key} type="button" onClick={() => { setKpi(k.key); setPage(1); }}
             className={`border px-1.5 py-0.5 text-[9px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
             [ {k.label} ]
           </button>
@@ -280,10 +288,12 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
             </span>
           </div>
         ))}
-        {!ranked.length && <div className="px-2 py-3 text-center text-[10px] text-green-500/50">{feed ? "NO MATCHING LAUNCHES · try ALL or another filter" : live.error ? "UNAVAILABLE" : "LOADING…"}</div>}
+        {!ranked.length && <div className="px-2 py-3 text-center text-[10px] text-green-500/50">{feed ? "NO MATCHING LAUNCHES · try another status, timeframe or search" : live.error ? "UNAVAILABLE" : "LOADING…"}</div>}
       </div>
+      <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="LAUNCHES" />
       <div className="mt-1 text-[9px] text-green-500/50">
-        Top 15 matches · statuses checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} candidates
+        PAGE {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
+        statuses checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} candidates
         (top 60 volume + top 60 gainers + newest 30). Others remain UNKNOWN.
         Near graduation = ≥{feed?.nearThreshold ?? 90}% funding; curve completion alone is not AMM migration.
       </div>
