@@ -87,14 +87,28 @@ async function build() {
     } catch { /* chunk failed — those coins stay unknown */ }
   }
 
-  // native pump.fun field sample (DexScreener search — biased to ACTIVE pairs)
+  // native pump.fun field sample (DexScreener search — biased to ACTIVE pairs).
+  // A single generic query (q=pump) matches almost nothing ON SOLANA (mostly
+  // off-chain tokens with "pump" in the name), which left the sample below the
+  // n>=5 floor and the panel permanently on "sample unavailable". Query the
+  // pump ecosystem terms instead and MERGE the deduped results.
   let native = null;
   try {
-    const sj = await fetchJson(`${DEX}/search?q=pump`, 9000);
     const seen = new Set();
-    const rows = (sj.pairs || [])
-      .filter((p) => p.chainId === "solana" && (p.dexId === "pumpfun" || p.dexId === "pumpswap"))
-      .filter((p) => !seen.has(p.baseToken?.address) && seen.add(p.baseToken?.address));
+    const rows = [];
+    for (const q of ["pump.fun", "pumpfun", "pumpswap", "pump"]) {
+      if (rows.length >= 15) break; // search caps at 30 pairs per query — enough
+      let sj;
+      try { sj = await fetchJson(`${DEX}/search?q=${encodeURIComponent(q)}`, 9000); }
+      catch { continue; /* one failed query degrades the sample, not the call */ }
+      for (const p of sj.pairs || []) {
+        if (p.chainId !== "solana" || (p.dexId !== "pumpfun" && p.dexId !== "pumpswap")) continue;
+        const mint = p.baseToken?.address;
+        if (!mint || seen.has(mint)) continue;
+        seen.add(mint);
+        rows.push(p);
+      }
+    }
     if (rows.length >= 5) {
       native = {
         n: rows.length,
