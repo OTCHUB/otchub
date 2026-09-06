@@ -201,6 +201,15 @@ export default function Home() {
                 [OBSERVER ↗]
               </a>
               <a
+                href="https://all-things-otc.replit.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                title="All Things OTC — community OTC resource site"
+              >
+                [ATH_OTC ↗]
+              </a>
+              <a
                 href="https://fomo.otchub.dev"
                 target="_blank"
                 rel="noopener noreferrer"
