@@ -290,7 +290,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
             className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[10px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
             {/* line 1 — identity: rank, logo, symbol, status, age */}
             <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-              <span className="text-green-500/40">#{i + 1}</span>
+              <span className="text-green-500/40">#{(page - 1) * (feed?.pageSize ?? 50) + i + 1}</span>
               <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
                 aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
                 onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
