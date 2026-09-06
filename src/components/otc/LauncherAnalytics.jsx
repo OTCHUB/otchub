@@ -190,9 +190,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const pageCount = feed?.pageCount ?? 1;
   const matches = feed?.matches ?? 0;
   // The server clamps pages past the end when filters shrink the result set.
+  // Sync ONLY when a new feed arrives: listing `page` as a dependency made the
+  // effect run against the stale feed right after NEXT/PREV clicked, instantly
+  // reverting the page before the fresh fetch landed (NEXT looked dead).
   useEffect(() => {
-    if (feed && Number.isFinite(feed.page) && feed.page !== page) setPage(feed.page);
-  }, [feed, page]);
+    if (feed && Number.isFinite(feed.page)) {
+      setPage((current) => (feed.page !== current ? feed.page : current));
+    }
+  }, [feed]);
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
   const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
 
