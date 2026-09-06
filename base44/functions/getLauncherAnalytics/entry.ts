@@ -26,8 +26,6 @@ const FEE_MODEL = [
 const CURVE_FEE = 0.01;          // pump.fun-style bonding curve fee
 const GRAD_SAMPLE = 200;         // graduation check: top-N by 24h volume
 const RANK_POOL = 60;            // coins shipped to the client (it re-sorts)
-const GT_POOLS = "https://api.geckoterminal.com/api/v2/networks/solana/dexes";
-const NATIVE_PAGES = 5;          // pages per dex × 20 pools → up to ~200-pair sample
 
 const FRESH_MS = 5 * 60_000, STALE_MS = 30 * 60_000;
 let mem = { at: 0, body: null };
@@ -92,68 +90,34 @@ async function build() {
     } catch { /* chunk failed — those coins stay unknown */ }
   }
 
-  // native pump.fun field sample. Primary: GeckoTerminal pools — pump-fun
-  // pools are BONDING launches, pumpswap pools are GRADUATED ones; top pages
-  // by 24h volume give a large honest sample (PumpPortal's data-api is
-  // websocket-stream only and pump.fun's own frontend API is Cloudflare-
-  // blocked, so neither can serve a REST snapshot). Still biased to ACTIVE
-  // pairs — inactive launches have no volume to sort by.
-  let native = null;
-  let geoErr = "not tried";
-  try {
-    const seen = new Set();
-    const rows = [];
-    for (const dex of ["pump-fun", "pumpswap"]) {
-      for (let page = 1; page <= NATIVE_PAGES; page++) {
-        const gj = await fetchJson(`${GT_POOLS}/${dex}/pools?page=${page}&sort=h24_volume_usd_desc`, 9000);
-        const data = gj.data || [];
-        for (const p of data) {
-          const token = p.relationships?.base_token?.data?.id || p.attributes?.address || p.id;
-          if (seen.has(token)) continue;
-          seen.add(token);
-          rows.push({ dex, vol: Number(p.attributes?.volume_usd?.h24 || 0) });
-        }
-        if (data.length < 20) break; // last page — no more pools
-      }
+  // native pump.fun field sample. GeckoTerminal pools (the ideal large REST
+  // source) permanently 429 the shared function-runtime egress IP, so the
+  // BROWSER fetches that sample client-side (src/lib/usePumpSample.js — each
+  // visitor has their own rate-limit budget). Server-side value is the
+  // fallback shown until the browser sample arrives: DexScreener search over
+  // pump ecosystem terms, merged + deduped (small n, biased to active pairs).
+  const seen = new Set();
+  const rows = [];
+  for (const q of ["pumpfun", "pumpswap", "pump.fun", "frog", "maga", "dog", "moon"]) {
+    let sj;
+    try { sj = await fetchJson(`${DEX}/search?q=${encodeURIComponent(q)}`, 9000); }
+    catch { continue; }
+    for (const p of sj.pairs || []) {
+      if (p.chainId !== "solana" || (p.dexId !== "pumpfun" && p.dexId !== "pumpswap")) continue;
+      const mint = p.baseToken?.address;
+      if (!mint || seen.has(mint)) continue;
+      seen.add(mint);
+      rows.push(p);
     }
-    if (rows.length >= 5) {
-      native = {
-        n: rows.length,
-        graduatedShare: +(rows.filter((r) => r.dex === "pumpswap").length / rows.length).toFixed(3),
-        medianVol24: median(rows.map((r) => r.vol)),
-        note: "pump.fun sample via GeckoTerminal pump-fun+pumpswap pools, top by 24h volume — biased to active pairs",
-      };
-    }
-  } catch (e) { geoErr = e.message; /* fall through to the small search-based sample */ }
-  if (!native) {
-    // Fallback: DexScreener search. A single generic query (q=pump) matches
-    // almost nothing ON SOLANA (mostly off-chain tokens with "pump" in the
-    // name), so query the pump ecosystem terms and MERGE the deduped results.
-    try {
-      const seen = new Set();
-      const rows = [];
-      for (const q of ["pump.fun", "pumpfun", "pumpswap"]) {
-        let sj;
-        try { sj = await fetchJson(`${DEX}/search?q=${encodeURIComponent(q)}`, 9000); }
-        catch { continue; }
-        for (const p of sj.pairs || []) {
-          if (p.chainId !== "solana" || (p.dexId !== "pumpfun" && p.dexId !== "pumpswap")) continue;
-          const mint = p.baseToken?.address;
-          if (!mint || seen.has(mint)) continue;
-          seen.add(mint);
-          rows.push(p);
-        }
-      }
-      if (rows.length >= 5) {
-        native = {
-          n: rows.length,
-          graduatedShare: +(rows.filter((p) => p.dexId === "pumpswap").length / rows.length).toFixed(3),
-          medianVol24: median(rows.map((p) => p.volume?.h24 ?? 0)),
-          note: `pump.fun sample via DexScreener search — small sample, biased to active pairs · GEOERR: ${geoErr}`,
-        };
-      }
-    } catch { /* comparison degrades gracefully */ }
   }
+  const native = rows.length >= 5
+    ? {
+        n: rows.length,
+        graduatedShare: +(rows.filter((p) => p.dexId === "pumpswap").length / rows.length).toFixed(3),
+        medianVol24: median(rows.map((p) => p.volume?.h24 ?? 0)),
+        note: "pump.fun sample via DexScreener search — small sample, biased to active pairs",
+      }
+    : null;
 
   const ranked = [...view].sort((a, b) => b.vol24 - a.vol24).slice(0, RANK_POOL);
   return {
@@ -172,9 +136,10 @@ async function build() {
   };
 }
 
-export default async function () {
+export default async function (payload) {
+  const force = payload?.force === true;
   const now = Date.now();
-  if (mem.body && now - mem.at < FRESH_MS) return j(mem.body, "hit");
+  if (!force && mem.body && now - mem.at < FRESH_MS) return j(mem.body, "hit");
   if (!inflight) {
     inflight = build().then((body) => { mem = { at: Date.now(), body }; return body; })
       .finally(() => { inflight = null; });

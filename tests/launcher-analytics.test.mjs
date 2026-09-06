@@ -25,6 +25,7 @@ function render(rows, kpi = "change24h", options = {}) {
     "@/api/base44Client": { base44: {} },
     "@/lib/format": format,
     "@/lib/useLauncherLive": { useLauncherLive: () => ({ data: { ranked: rows, at: 1800000000000, ...options.feed }, error: options.error }) },
+    "@/lib/usePumpSample": { usePumpSample: () => null },
   };
   runInNewContext(compiled, {
     module, exports: module.exports,

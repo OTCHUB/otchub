@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
+import { usePumpSample } from "@/lib/usePumpSample";
 
 // Live roster is independent of the five-minute cohort/comparison snapshot.
 
@@ -54,6 +55,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const [status, setStatus] = useState("GRADUATED");
   const [search, setSearch] = useState("");
   const live = useLauncherLive();
+  // Browser-side pump.fun market sample (large GeckoTerminal pool scan); the
+  // server payload ships a small search-based fallback until this arrives.
+  const pump = usePumpSample();
 
   useEffect(() => { if (live.data) onSnapshot?.(live.data); }, [live.data, onSnapshot]);
 
@@ -88,7 +92,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     return rows.slice(0, 15);
   }, [live.data, kpi, status, search]);
 
-  const c = data?.cohort, n = data?.native;
+  const c = data?.cohort, n = pump || data?.native;
   const feed = live.data;
   const counts = (feed?.ranked || []).reduce((out, row) => {
     out[statusOf(row)]++; out.ALL++; return out;
@@ -200,7 +204,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <div className="border border-fuchsia-500/30 p-1.5">
           <div className="uppercase tracking-widest text-fuchsia-400/80">PUMP.FUN SAMPLE</div>
           <div className="mt-0.5 font-mono text-green-300">
-            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}` : "— sample unavailable"}
+            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source === "browser" ? " ● BROWSER_SCAN" : ""}` : "— sample unavailable"}
           </div>
         </div>
       </div>
