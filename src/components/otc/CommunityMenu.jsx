@@ -20,6 +20,13 @@ const LINKS = [
     icon: Users,
   },
   {
+    id: "telegram",
+    label: "OTC Community (Telegram)",
+    hint: "official OTC telegram group",
+    href: "https://t.me/otcdesksofficial",
+    icon: Send,
+  },
+  {
     id: "ru-fomo",
     label: "RU_FOMO Console",
     hint: "telegram bot + mini app",
