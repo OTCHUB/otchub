@@ -99,6 +99,7 @@ async function build() {
   // blocked, so neither can serve a REST snapshot). Still biased to ACTIVE
   // pairs — inactive launches have no volume to sort by.
   let native = null;
+  let geoErr = "not tried";
   try {
     const seen = new Set();
     const rows = [];
@@ -123,7 +124,7 @@ async function build() {
         note: "pump.fun sample via GeckoTerminal pump-fun+pumpswap pools, top by 24h volume — biased to active pairs",
       };
     }
-  } catch (e) { console.log("GECKO_SAMPLE_FAIL", e.message); /* fall through to the small search-based sample */ }
+  } catch (e) { geoErr = e.message; /* fall through to the small search-based sample */ }
   if (!native) {
     // Fallback: DexScreener search. A single generic query (q=pump) matches
     // almost nothing ON SOLANA (mostly off-chain tokens with "pump" in the
@@ -148,7 +149,7 @@ async function build() {
           n: rows.length,
           graduatedShare: +(rows.filter((p) => p.dexId === "pumpswap").length / rows.length).toFixed(3),
           medianVol24: median(rows.map((p) => p.volume?.h24 ?? 0)),
-          note: "pump.fun sample via DexScreener search — small sample, biased to active pairs",
+          note: `pump.fun sample via DexScreener search — small sample, biased to active pairs · GEOERR: ${geoErr}`,
         };
       }
     } catch { /* comparison degrades gracefully */ }
