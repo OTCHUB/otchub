@@ -5,11 +5,13 @@
      - api.dexscreener.com         graduation detection (bonding = pumpfun pair
                                    only; graduated = pumpswap/raydium/meteora),
                                    batched 30 mints/call on the top-200 by vol
-     - api.geckoterminal.com       native pump.fun field SAMPLE — pump-fun pools
-                                   (bonding) + pumpswap pools (graduated), top
-                                   by 24h volume (labeled: biased to active
-                                   pairs). Fallback on failure: DexScreener
-                                   search (small n).
+     - api.dexscreener.com         native pump.fun SAMPLE (server fallback) —
+                                   merged pump-ecosystem search queries, deduped
+                                   (small n, biased to active pairs). The large
+                                   GeckoTerminal pool sample is fetched in the
+                                   BROWSER (src/lib/usePumpSample.js): Gecko
+                                   Terminal permanently 429s the shared runtime
+                                   egress IP; per-visitor IPs are fine.
    Fee split is the launcher protocol model (70/10/15/5). Per-coin fees are
    ESTIMATES: 24h volume × 1% bonding-curve fee. No entity reads — the 5-min
    per-isolate cache + stale-on-error fallback reduces upstream API requests;
