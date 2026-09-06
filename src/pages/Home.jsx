@@ -192,6 +192,15 @@ export default function Home() {
                 [OTC_APP ↗]
               </a>
               <a
+                href="https://fomo.otchub.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-fuchsia-500/70 px-2 py-1 text-[10px] font-bold text-fuchsia-400 hover:bg-fuchsia-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                title="RU_FOMO — live FOMO trader tape, signal scores and anti-rug safety gate"
+              >
+                [RU_FOMO ↗]
+              </a>
+              <a
                 href="https://otcdesks.observer/"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -208,15 +217,6 @@ export default function Home() {
                 title="All Things OTC — community OTC resource site"
               >
                 [ATH_OTC ↗]
-              </a>
-              <a
-                href="https://fomo.otchub.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
-                title="RU_FOMO — live FOMO trader tape, signal scores and anti-rug safety gate"
-              >
-                [RU_FOMO ↗]
               </a>
               <button
                 onClick={refresh}
