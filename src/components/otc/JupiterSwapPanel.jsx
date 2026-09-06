@@ -389,7 +389,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       )}
 
       {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
-      <div className={`mt-2 grid ${isOtc ? "grid-cols-5" : "grid-cols-4"} gap-1`}>
+      <div className={`mt-2 grid grid-cols-2 gap-1 ${isOtc ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
         <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
@@ -532,10 +532,10 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                 value={amount}
                 onChange={(e) => changeAmount(e.target.value)}
                 disabled={busy}
-                className="w-full border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
+                className="w-full min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
                 placeholder="0.0"
               />
-              <span className="font-mono text-[10px] text-green-500/60">
+              <span className="shrink-0 font-mono text-[10px] text-green-500/60">
                 {isBuy ? "SOL" : tokenLabel}
               </span>
             </div>
@@ -545,11 +545,11 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
             {isBuy && <div className="font-mono text-[9px] text-green-500/50">SOL MAX leaves 0.01 SOL for fees/rent; actual requirements may be higher.</div>}
             {inputError && <div className="font-mono text-[10px] text-amber-400">{inputError}</div>}
 
-            <div className="mt-2 flex items-center justify-between">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-y-1">
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
                 SLIPPAGE
               </span>
-              <div className="flex gap-1">
+              <div className="flex min-w-0 flex-wrap gap-1">
                 {SLIPPAGE_OPTIONS.map((s) => (
                   <button
                     key={s.bps}
@@ -581,7 +581,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                   }}
                   disabled={busy}
                   title="Custom slippage in %"
-                  className={`w-16 border bg-black px-1.5 py-0.5 font-mono text-[9px] outline-none disabled:opacity-30 ${
+                  className={`w-16 min-w-0 flex-1 border bg-black px-1.5 py-0.5 font-mono text-[9px] outline-none disabled:opacity-30 ${
                     customSlip
                       ? "border-cyan-400/60 text-cyan-300"
                       : "border-green-500/30 text-green-500/60 focus:border-cyan-400/60"
