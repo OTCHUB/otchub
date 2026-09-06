@@ -123,7 +123,7 @@ async function build() {
         note: "pump.fun sample via GeckoTerminal pump-fun+pumpswap pools, top by 24h volume — biased to active pairs",
       };
     }
-  } catch { /* fall through to the small search-based sample */ }
+  } catch (e) { console.log("GECKO_SAMPLE_FAIL", e.message); /* fall through to the small search-based sample */ }
   if (!native) {
     // Fallback: DexScreener search. A single generic query (q=pump) matches
     // almost nothing ON SOLANA (mostly off-chain tokens with "pump" in the
