@@ -425,7 +425,10 @@ test("bounded roster ships all 150 candidates; disjoint union kept with 100/30 b
 
 test("overlapping candidate lists are deduplicated, not padded up to 150", async () => {
   const coins = Array.from({ length: 100 }, (_, i) => coin(i, { volume24h: 100 - i, change24h: 100 - i }));
-  const { body } = await setup({ state: { coins } }).read();
+  // No curve accounts, so every status stays UNKNOWN and the full-roster
+  // counts below are deterministic (the default setup maps mint(1) to a
+  // BONDING curve account).
+  const { body } = await setup({ state: { coins, accounts: new Map() } }).read();
   // Bounded shipping: only the 60 deduped candidates travel in ranked; the
   // remaining 40 roster rows are counted server-side, not shipped.
   assert.equal(body.ranked.length, 60);
@@ -433,6 +436,42 @@ test("overlapping candidate lists are deduplicated, not padded up to 150", async
   assert.equal(body.statusChecked, 60);
   assert.equal(body.statusCounts.ALL, 100);
   assert.equal(body.statusCounts.UNKNOWN, 100);
+});
+
+test("paged tape serves the full roster with server-side filter, sort and paging", async () => {
+  const coins = Array.from({ length: 120 }, (_, i) => coin(i, { volume24h: 100 - i, change24h: 100 - i }));
+  const s = setup({ state: { coins, accounts: new Map() } });
+  const first = await s.read(request("?page=1&pageSize=50&sort=vol24"));
+  assert.equal(first.response.status, 200);
+  assert.equal(first.body.matches, 120);
+  assert.equal(first.body.rosterTotal, 120);
+  assert.equal(first.body.pageCount, 3);
+  assert.equal(first.body.ranked.length, 50);
+  assert.equal(first.body.ranked[0].mint, mint(0));
+  assert.equal(first.body.statusCounts.ALL, 120);
+  assert.equal(first.body.statusCounts.UNKNOWN, 120);
+  const last = await s.read(request("?page=3&pageSize=50"));
+  assert.equal(last.body.ranked.length, 20);
+  assert.equal(last.body.ranked.at(-1).mint, mint(119));
+  // Pages past the end are clamped to the last page, never empty.
+  const clamped = await s.read(request("?page=99"));
+  assert.equal(clamped.body.page, 3);
+  assert.equal(clamped.body.ranked.length, 20);
+  // Timeframe filter: coins are 1..120h old, so a 24h window keeps the first 24.
+  const day = await s.read(request("?maxAgeHours=24&pageSize=100"));
+  assert.equal(day.body.matches, 24);
+  assert.deepEqual(day.body.ranked.map((r) => r.mint), Array.from({ length: 24 }, (_, i) => mint(i)));
+  // Search matches name/symbol/mint substrines across the whole roster.
+  const found = await s.read(request("?search=coin 5&pageSize=100"));
+  assert.equal(found.body.matches, 11);
+  // POST body params drive the same paged tape (SDK invoke path).
+  const posted = await s.read(new Request("https://example.test/getLauncherLive", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page: 2, pageSize: 10, status: "ALL", sort: "mcap" }) }));
+  assert.equal(posted.body.ranked.length, 10);
+  assert.equal(posted.body.page, 2);
+  assert.equal(posted.body.pageSize, 10);
+  assert.equal(posted.body.statusCounts.ALL, 120);
 });
 
 test("30-second cache expiry refreshes metrics, ages, ranking and status evidence", async () => {
@@ -681,9 +720,19 @@ test("public GET and SDK POST {} work; arbitrary query/body mints are rejected b
   assert.equal((await s.read(new Request("https://example.test", { method: "POST",
     headers: { "Content-Type": "application/json" }, body: "{}" }))).response.status, 200);
   const calls = s.calls.length;
-  for (const query of ["?mint=anything", "?mints=anything", "?limit=1000", "?sort=change24h"]) {
+  // Unknown query keys (gateway markers, junk) are ignored, never consumed.
+  for (const query of ["?mint=anything", "?mints=anything", "?limit=1000", "?sort=change24h", "?marker=proxy-junk"]) {
+    assert.equal((await s.read(request(query))).response.status, 200);
+  }
+  // Known keys are validated: bad values never reach the cache or probes.
+  for (const query of ["?page=0", "?pageSize=999", "?sort=bogus", "?status=BOGUS", "?maxAgeHours=0",
+    `?search=${"x".repeat(65)}`]) {
     assert.equal((await s.read(request(query))).response.status, 400);
   }
+  // An SDK POST with a gateway-appended query string still serves the feed.
+  assert.equal((await s.read(new Request("https://example.test/getLauncherLive?marker=proxy-junk", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+  }))).response.status, 200);
   for (const body of ['{"mint":"anything"}', '{"mints":["anything"]}', "[]", "null", "invalid"]) {
     const result = await s.read(new Request("https://example.test", { method: "POST",
       headers: { "Content-Type": "application/json" }, body }));

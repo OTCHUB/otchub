@@ -12,11 +12,13 @@ const compiled = ts.transpileModule(readFileSync(componentPath, "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
 }).outputText;
 
+const PagerStub = (props) => null;
+
 // Exercise real JSX, state setters and rendered props without DOM/network. Radix
 // and effects are stubbed: focus trapping/ESC/portal behavior still needs hosted QA.
 function harness(rows, kpi = "change24h", options = {}) {
   const state = new Map([["root", [{ ranked: rows, feeModel: [] }, null, kpi, options.status ?? "ALL", options.search ?? "", null]]]);
-  let active = state.get("root"), cursor = 0, props = options.props;
+  let active = state.get("root"), cursor = 0, props = options.props, lastParams = null;
   const useState = (initial) => {
     const slots = active, index = cursor++;
     if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
@@ -33,8 +35,12 @@ function harness(rows, kpi = "change24h", options = {}) {
     "@/components/ui/dialog": Object.fromEntries(["Dialog", "DialogContent", "DialogHeader", "DialogTitle", "DialogDescription"].map((name) => [name, name])),
     "@/api/base44Client": { base44: {} },
     "@/lib/format": format,
-    "@/lib/useLauncherLive": { useLauncherLive: () => ({ data: { ranked: rows, at: 1800000000000, ...options.feed }, error: options.error }) },
+    "@/lib/useLauncherLive": { useLauncherLive: (params) => {
+      lastParams = params;
+      return { data: { ranked: rows, at: 1800000000000, ...options.feed }, error: options.error };
+    } },
     "@/lib/usePumpSample": { usePumpSample: () => null },
+    "@/components/otc/Pager": { __esModule: true, default: PagerStub },
   };
   runInNewContext(compiled, {
     module, exports: module.exports, URL,
@@ -53,6 +59,7 @@ function harness(rows, kpi = "change24h", options = {}) {
       active = state.get(key); cursor = 0;
       return node.type(node.props);
     },
+    params: () => lastParams,
     logo: () => nodes(h.tree).find((node) => node.type === "button" && node.props["aria-haspopup"] === "dialog"),
     dialog: () => nodes(h.tree).find((node) => node.type === "Dialog"),
     details: () => h.component(nodes(h.tree).find((node) => node.type?.name === "TokenDetails")),
@@ -70,26 +77,45 @@ const links = (tree, host) => nodes(tree).filter((n) => n.type === "a" && n.prop
 const order = (tree) => links(tree, "dexscreener.com").map((n) => n.props.href.split("/").at(-1));
 const coin = (mint, change24h, extra = {}) => ({ mint, symbol: mint, change24h, vol24: 1200, mcap: 32000, ...extra });
 
-test("TOP_GAINERS ranks unknown changes below losses and preserves unknown ties", () => {
-  const rows = [coin("unknown", null), coin("loss", -8), coin("missing", undefined), coin("gain", 23), coin("flat", 0)];
+test("KPI buttons drive the server sort; rows render in server order, unmutated", () => {
+  const rows = [coin("unknown", null), coin("loss", -8), coin("gain", 23)];
   const before = structuredClone(rows);
-  assert.deepEqual(order(render(rows)), ["gain", "flat", "loss", "unknown", "missing"]);
-  assert.deepEqual(rows, before, "Sorting must not mutate the cached payload");
+  const h = harness(rows, "change24h");
+  assert.deepEqual(h.params(), { page: 1, pageSize: 50, status: "ALL", sort: "change24h" });
+  assert.deepEqual(order(h.tree), ["unknown", "loss", "gain"], "Server order is authoritative, not the panel");
+  assert.deepEqual(rows, before, "The panel must not mutate the feed payload");
+  nodes(h.tree).filter((n) => n.type === "button" && n.props.children?.[1] === "MARKET_CAP")[0].props.onClick();
+  h.render();
+  assert.equal(h.params().sort, "mcap");
+  assert.equal(h.params().page, 1, "Switching rank resets to page one");
 });
 
-test("all-negative and all-unknown rankings remain stable", () => {
-  assert.deepEqual(order(render([coin("low", -99), coin("unknown", null), coin("high", -1)])), ["high", "low", "unknown"]);
-  assert.deepEqual(order(render([coin("first", null), coin("second", null)])), ["first", "second"]);
+test("timeframe windows and the pager drive the paged tape", () => {
+  const rows = [coin("low", -99), coin("unknown", null), coin("high", -1)];
+  const h = harness(rows, "vol24");
+  assert.equal("maxAgeHours" in h.params(), false, "ALL timeframe ships no age window");
+  assert.doesNotMatch(text(h.tree), /NaN%|Infinity%/);
+  const byLabel = (tree, label) => nodes(tree).find((n) => n.type === "button" && n.props.role === "tab" && n.props.children === label);
+  byLabel(h.tree, "24H").props.onClick(); h.render();
+  assert.equal(h.params().maxAgeHours, 24);
+  byLabel(h.tree, "7D").props.onClick(); h.render();
+  assert.equal(h.params().maxAgeHours, 168);
+  assert.equal(h.params().page, 1);
+  const pager = nodes(h.tree).find((n) => n.type === PagerStub);
+  assert.equal(pager.props.label, "LAUNCHES");
+  pager.props.onPage(1); h.render();
+  assert.equal(h.params().page, 2, "Pager pages are 0-based upstream, 1-based in the request");
 });
 
-test("other KPIs retain descending order and the feed is capped at 15", () => {
-  for (const kpi of ["vol24", "mcap"]) {
-    const rows = [coin("empty", 100, { [kpi]: null }), coin("small", -1, { [kpi]: 5 }), coin("large", 0, { [kpi]: 9 })];
-    assert.deepEqual(order(render(rows, kpi)), ["large", "small", "empty"]);
-  }
+test("feed rows render verbatim with honest empty, stale and locked states", () => {
   const rows = Array.from({ length: 20 }, (_, i) => coin(String(i), i));
-  assert.deepEqual(order(render(rows)), Array.from({ length: 15 }, (_, i) => String(19 - i)));
+  assert.deepEqual(order(render(rows, "vol24")), rows.map((r) => r.mint), "No client-side cap: the page renders as shipped");
   assert.deepEqual(order(render([])), []);
+  assert.match(text(render([], "vol24")), /NO MATCHING LAUNCHES/);
+  assert.doesNotMatch(text(render([], "vol24")), /LOADING/);
+  assert.match(text(render(rows, "vol24", { error: "offline", feed: { stale: true } })), /STALE/);
+  const locked = render(rows, "vol24", { props: { onTrade: () => {}, tradingDisabled: true } });
+  assert.ok(nodes(locked).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]").every((n) => n.props.disabled));
 });
 
 test("Trade and token-name buttons select the exact row in-app, not a Jupiter redirect", () => {
@@ -114,15 +140,21 @@ test("Trade and token-name buttons select the exact row in-app, not a Jupiter re
 const text = (node) => Array.isArray(node) ? node.map(text).join("") : node && typeof node === "object"
   ? text(node.props?.children) : typeof node === "string" || typeof node === "number" ? String(node) : "";
 
-test("status tabs filter before ranking; unknown and completed-pending are not graduated", () => {
+test("status tabs drive the server status filter; rows keep their own status labels", () => {
   const rows = [coin("grad", -5, { status: "GRADUATED" }), coin("bond", 6, { status: "BONDING" }),
     coin("near", 9, { status: "ABOUT_TO_GRADUATE", curveComplete: true }), coin("unknown", 99)];
-  for (const [status, expected] of [["GRADUATED", "grad"], ["BONDING", "bond"], ["ABOUT_TO_GRADUATE", "near"], ["UNKNOWN", "unknown"]]) {
-    const tree = render(rows, "change24h", { status });
-    assert.deepEqual(order(tree), [expected]);
-    const tabs = nodes(tree).filter((n) => n.props?.role === "tab");
-    assert.equal(tabs.filter((n) => n.props["aria-selected"]).length, 1);
-    assert.ok(text(tabs.find((n) => n.props["aria-selected"])).startsWith(status));
+  for (const status of ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"]) {
+    const h = harness(rows, "change24h", { status });
+    assert.equal(h.params().status, status);
+    assert.deepEqual(order(h.tree), ["grad", "bond", "near", "unknown"], "Filtering happens server-side");
+    const tabs = nodes(h.tree).filter((n) => n.type === "button" && n.props.role === "tab"
+      && n.props.children?.[0] === status);
+    assert.equal(tabs.length, 1);
+    assert.equal(tabs[0].props["aria-selected"], true);
+  }
+  const all = render(rows, "change24h");
+  for (const status of ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"]) {
+    assert.match(text(all), new RegExp(`\\[${status}\\]`));
   }
 });
 
@@ -138,16 +170,13 @@ test("curve progress replaces row fees with real zero, bounded percentage or unk
   assert.match(progress[3].props["aria-valuetext"], /migration pending/);
 });
 
-test("fresh snapshots re-rank, search reaches outside top15, empty/stale states are honest", () => {
+test("search reaches the full tape server-side and honest states persist", () => {
   const rows = Array.from({ length: 30 }, (_, i) => coin(`mint${i}`, i));
-  assert.deepEqual(order(render(rows, "vol24", { search: "mint29" })), ["mint29"]);
-  assert.deepEqual(order(render([coin("a", 1), coin("b", 2)])), ["b", "a"]);
+  const searched = harness(rows, "vol24", { search: "Mint29 " });
+  assert.equal(searched.params().search, "mint29", "Search is trimmed and lowercased server-side");
+  assert.deepEqual(order(searched.tree), rows.map((r) => r.mint), "Search filtering happens server-side");
+  assert.deepEqual(order(render([coin("a", 1), coin("b", 2)])), ["a", "b"]);
   assert.deepEqual(order(render([coin("a", 3), coin("b", 2)])), ["a", "b"]);
-  assert.match(text(render([], "vol24")), /NO MATCHING LAUNCHES/);
-  assert.doesNotMatch(text(render([], "vol24")), /LOADING/);
-  assert.match(text(render(rows, "vol24", { error: "offline", feed: { stale: true } })), /STALE/);
-  const locked = render(rows, "vol24", { props: { onTrade: () => {}, tradingDisabled: true } });
-  assert.ok(nodes(locked).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]").every((n) => n.props.disabled));
 });
 
 test("market cap and volume use fmtUsd and price change is signed", () => {
@@ -158,10 +187,9 @@ test("market cap and volume use fmtUsd and price change is signed", () => {
   assert.ok(text.includes("-1.3"));
 });
 
-test("malformed momentum stays unknown in rankings and row rendering", () => {
+test("malformed momentum stays unknown in row rendering", () => {
   const rows = [coin("nan", NaN), coin("infinity", Infinity), coin("string", "30"), coin("loss", -2)];
   const tree = render(rows);
-  assert.deepEqual(order(tree), ["loss", "nan", "infinity", "string"]);
   assert.doesNotMatch(text(tree), /NaN%|Infinity%|30\.0%/);
   assert.match(text(tree), /-2\.0%/);
 });
@@ -268,8 +296,9 @@ test("open details follow fresh rows by mint across ranking/filter changes, and 
   const target = { isConnected: true, focus() { assert.fail("Detached logo focused"); } };
   openDetails(h, target);
   nodes(h.tree).find((n) => n.type === "input").props.onChange({ target: { value: SOL } });
+  assert.equal(h.params().search, SOL.toLowerCase());
   h.render([rows[1], { ...rows[0], vol24: 9000, curveProgress: 91.25, status: "ABOUT_TO_GRADUATE" }]);
-  assert.deepEqual(order(h.tree), [SOL]);
+  assert.deepEqual(order(h.tree), [SOL, OTC], "Filtering is server-side; the shipped page renders verbatim");
   assert.match(text(h.details()), /ABOUT_TO_GRADUATE.*\$9,000\.00/);
   const curve = nodes(h.details()).find((n) => n.type?.name === "CurveProgress");
   assert.equal(nodes(curve.type(curve.props)).find((n) => n.props?.role === "progressbar").props["aria-valuenow"], 91.25);

@@ -10,15 +10,16 @@ const compiled = ts.transpileModule(readFileSync(new URL("../src/lib/useLauncher
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const tick = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
 
-function setup() {
+function setup(options = {}) {
   const module = { exports: {} };
   runInNewContext(compiled, { module, exports: module.exports, require: () => ({}) });
   const document = new EventTarget(), window = new EventTarget();
   document.hidden = false;
   const requests = [], data = [], errors = [], timers = new Map();
   const stop = module.exports.watchLauncherLive({
+    params: options.params,
     invoke: (name, args) => {
-      assert.equal(name, "getLauncherLive"); assert.equal(Object.keys(args).length, 0);
+      assert.equal(name, "getLauncherLive"); assert.deepEqual(args, options.params ?? {});
       const pending = deferred(); requests.push(pending); return pending.promise;
     },
     onData: (value) => data.push(value), onError: (value) => errors.push(value), document, window,
@@ -51,6 +52,16 @@ test("hidden tabs pause requests, focus resumes, cleanup ignores late responses"
   s.stop(); s.requests[1].resolve(response(200)); await tick();
   assert.equal(s.data.length, 1); assert.equal(s.timers.size, 0);
   s.focus(); s.hidden(false); assert.equal(s.requests.length, 2);
+});
+
+test("feed params ride along on every poll", async () => {
+  const s = setup({ params: { page: 2, pageSize: 50, status: "BONDING", sort: "vol24", maxAgeHours: 24 } });
+  assert.equal(s.requests.length, 1);
+  s.requests[0].resolve(response(100)); await tick();
+  s.poll();
+  s.requests[1].resolve(response(200, [{ mint: "paged" }])); await tick();
+  assert.deepEqual(s.data.map((d) => d.at), [100, 200]);
+  s.stop();
 });
 
 test("failed or malformed refresh preserves last snapshot with a stale warning and recovers", async () => {
