@@ -389,13 +389,20 @@ test("ranking is immutable, stable, null-last even for all losses and extreme fi
     .map((r) => r.k), [Number.MAX_VALUE, -Number.MAX_VALUE]);
 });
 
-test("full roster survives old top-60 limits; disjoint union is 150 with 100/30 batches and bounded concurrency", async () => {
+test("bounded roster ships all 150 candidates; disjoint union kept with 100/30 batches and bounded concurrency", async () => {
   const coins = fullRoster().map((row) => ({ ...row, image: "", rewardCycle: 0 }));
   const info = { imageUrl: "https://example.test/dex.png", socials: [{ type: "twitter", url: "https://x.com/dex" }] };
   const s = setup({ state: { coins, accounts: new Map(coins.map((c) => [derive(c.mint), account()])),
     dex: { pairs: coins.map((c) => pair(c.mint, { info })) } } });
   const { body } = await s.read();
-  assert.equal(body.ranked.length, 220);
+  // Bounded shipping: ranked carries the 150 status-checked candidates (the
+  // fixture's uniform mcap adds no top-mcap rows); exact full-roster counts
+  // travel in statusCounts instead of the row list.
+  assert.equal(body.ranked.length, 150);
+  assert.equal(body.rosterTotal, 220);
+  assert.equal(body.statusCounts.ALL, 220);
+  assert.equal(body.statusCounts.GRADUATED, 150);
+  assert.equal(body.statusCounts.UNKNOWN, 70);
   assert.equal(body.candidateCount, 150);
   assert.equal(body.statusChecked, 150);
   assert.equal(body.statusError, null);
@@ -410,20 +417,22 @@ test("full roster survives old top-60 limits; disjoint union is 150 with 100/30 
   assert.ok(s.maxActive() <= 3);
   for (const i of [65, 125]) assert.equal(body.ranked.find((r) => r.mint === mint(i)).status, "GRADUATED");
   for (const i of [150, 199, 219]) {
-    const row = body.ranked.find((r) => r.mint === mint(i));
-    assert.equal(row.status, "UNKNOWN");
-    assert.equal(row.logoUrl, "");
-    assert.deepEqual(row.socials, { twitter: "", telegram: "", website: "" });
-    for (const key of ["curveProgress", "curveComplete", "statusAt"]) assert.equal(row[key], null);
+    // Non-candidate roster rows are no longer shipped; they remain counted
+    // server-side in statusCounts.UNKNOWN instead of inflating the payload.
+    assert.equal(body.ranked.find((r) => r.mint === mint(i)), undefined);
   }
 });
 
 test("overlapping candidate lists are deduplicated, not padded up to 150", async () => {
   const coins = Array.from({ length: 100 }, (_, i) => coin(i, { volume24h: 100 - i, change24h: 100 - i }));
   const { body } = await setup({ state: { coins } }).read();
-  assert.equal(body.ranked.length, 100);
+  // Bounded shipping: only the 60 deduped candidates travel in ranked; the
+  // remaining 40 roster rows are counted server-side, not shipped.
+  assert.equal(body.ranked.length, 60);
   assert.equal(body.candidateCount, 60);
   assert.equal(body.statusChecked, 60);
+  assert.equal(body.statusCounts.ALL, 100);
+  assert.equal(body.statusCounts.UNKNOWN, 100);
 });
 
 test("30-second cache expiry refreshes metrics, ages, ranking and status evidence", async () => {
@@ -615,9 +624,14 @@ test("one failing batch does not discard other candidate results", async () => {
     return Response.json({ pairs: [] });
   };
   const { body } = await s.read();
-  assert.equal(body.ranked.length, 220);
+  // All 150 candidates ship (checked or not); unchecked non-candidates are
+  // counted server-side in statusCounts instead of inflating the payload.
+  assert.equal(body.ranked.length, 150);
   assert.equal(body.statusChecked, 120);
   assert.equal(body.ranked.filter((r) => r.status === "BONDING").length, 50);
+  assert.equal(body.statusCounts.ALL, 220);
+  assert.equal(body.statusCounts.BONDING, 50);
+  assert.equal(body.statusCounts.UNKNOWN, 170);
   assert.deepEqual(body.statusError, ["CURVE_RPC_UNAVAILABLE", "DEXSCREENER_UNAVAILABLE"]);
 });
 

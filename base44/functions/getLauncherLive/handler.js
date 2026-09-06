@@ -224,8 +224,22 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       else if (c.curve) c.row.statusAt = c.curveAt;
       else c.row.statusAt = c.curveAt === null ? c.dexAt : Math.max(c.curveAt, c.dexAt ?? c.curveAt);
     }
+    // The full roster is ~3000 launches (~3.5MB JSON) — far too large for a
+    // 30s poll (client delivery failures). Ship a bounded roster: every
+    // status-checked candidate plus top-mcap rows (MARKET_CAP rank mode), and
+    // exact full-roster status counts so the client's tabs stay true counts.
+    const shipped = candidates.map((c) => c.row);
+    for (const row of rankLauncherRows(rows, "mcap").slice(0, 60)) {
+      if (!shipped.includes(row)) shipped.push(row);
+    }
+    const statusCounts = { ALL: rows.length };
+    for (const row of rows) {
+      const s = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+      statusCounts[s] = (statusCounts[s] || 0) + 1;
+    }
     return {
-      at, stale: false, ranked: rankLauncherRows(rows, "vol24"), riskCoverage,
+      at, stale: false, ranked: rankLauncherRows(shipped, "vol24"), riskCoverage,
+      statusCounts, rosterTotal: rows.length,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,

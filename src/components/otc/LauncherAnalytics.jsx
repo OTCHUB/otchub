@@ -185,9 +185,15 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const feed = live.data;
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
   const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
-  const counts = (feed?.ranked || []).reduce((out, row) => {
+  // Prefer server-computed full-roster counts (the shipped ranked list is
+  // bounded to status-checked candidates); older/cached feeds fall back to
+  // counting the shipped rows.
+  const fallbackCounts = (feed?.ranked || []).reduce((out, row) => {
     out[statusOf(row)]++; out.ALL++; return out;
   }, Object.fromEntries(STATUSES.map((s) => [s, 0])));
+  const counts = Number.isFinite(feed?.statusCounts?.ALL)
+    ? { ...fallbackCounts, ...feed.statusCounts }
+    : fallbackCounts;
 
   return (
     <Dialog open={detailMint !== null} onOpenChange={(open) => { if (!open) setDetailMint(null); }}>
