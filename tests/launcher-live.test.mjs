@@ -474,6 +474,16 @@ test("paged tape serves the full roster with server-side filter, sort and paging
   assert.equal(posted.body.statusCounts.ALL, 120);
 });
 
+test("curve progress is a server sort key: highest progress first, unknowns last", async () => {
+  const coins = Array.from({ length: 3 }, (_, i) => coin(i, { volume24h: 100 - i }));
+  const s = setup({ state: { coins, accounts: new Map([
+    [derive(mint(1)), account(near)], [derive(mint(2)), account()],
+  ]) } });
+  const body = (await s.read(request("?sort=curveProgress"))).body;
+  assert.deepEqual(body.ranked.map((r) => [r.mint, r.curveProgress]),
+    [[mint(1), 90], [mint(2), 0], [mint(0), null]], "Highest progress first, unknown progress last");
+});
+
 test("30-second cache expiry refreshes metrics, ages, ranking and status evidence", async () => {
   const s = setup({ state: { coins: [coin(1, { volume24h: 10 }), coin(2, { volume24h: 5 })] } });
   const first = await s.read();

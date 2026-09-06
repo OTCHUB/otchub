@@ -36,7 +36,9 @@ function harness(rows, kpi = "change24h", options = {}) {
     "@/api/base44Client": { base44: {} },
     "@/lib/format": format,
     "@/lib/useLauncherLive": { useLauncherLive: (params) => {
-      lastParams = params;
+      // Plain host objects: the component runs in a VM sandbox whose object
+      // prototypes differ, which would fail host-side deepStrictEqual.
+      lastParams = JSON.parse(JSON.stringify(params ?? {}));
       return { data: { ranked: rows, at: 1800000000000, ...options.feed }, error: options.error };
     } },
     "@/lib/usePumpSample": { usePumpSample: () => null },
@@ -156,6 +158,22 @@ test("status tabs drive the server status filter; rows keep their own status lab
   for (const status of ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"]) {
     assert.match(text(all), new RegExp(`\\[${status}\\]`));
   }
+});
+
+test("ABOUT_TO_GRADUATE ranks by curve progress; PROGRESS is a server sort", () => {
+  const rows = [coin("slow", 1, { curveProgress: 91 }), coin("fast", 2, { curveProgress: 98.5 })];
+  const h = harness(rows, "vol24");
+  assert.equal(h.params().sort, "vol24");
+  const tab = nodes(h.tree).find((n) => n.type === "button" && n.props.role === "tab"
+    && n.props.children?.[0] === "ABOUT_TO_GRADUATE");
+  tab.props.onClick(); h.render();
+  assert.equal(h.params().status, "ABOUT_TO_GRADUATE");
+  assert.equal(h.params().sort, "curveProgress", "Near-graduation view sorts by progress");
+  const progressBtn = nodes(h.tree).find((n) => n.type === "button" && n.props.children?.[1] === "PROGRESS");
+  assert.ok(progressBtn, "PROGRESS rank button exists");
+  progressBtn.props.onClick(); h.render();
+  assert.equal(h.params().sort, "curveProgress");
+  assert.equal(h.params().page, 1, "Switching rank resets to page one");
 });
 
 test("curve progress replaces row fees with real zero, bounded percentage or unknown", () => {
@@ -296,6 +314,7 @@ test("open details follow fresh rows by mint across ranking/filter changes, and 
   const target = { isConnected: true, focus() { assert.fail("Detached logo focused"); } };
   openDetails(h, target);
   nodes(h.tree).find((n) => n.type === "input").props.onChange({ target: { value: SOL } });
+  h.render();
   assert.equal(h.params().search, SOL.toLowerCase());
   h.render([rows[1], { ...rows[0], vol24: 9000, curveProgress: 91.25, status: "ABOUT_TO_GRADUATE" }]);
   assert.deepEqual(order(h.tree), [SOL, OTC], "Filtering is server-side; the shipped page renders verbatim");

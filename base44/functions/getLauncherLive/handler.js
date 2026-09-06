@@ -9,7 +9,7 @@ const DEFAULT_PAGE_SIZE = 50;
 // Full-tape params. Any present param switches the response from the legacy
 // bounded roster to a server-filtered/paged view of the ENTIRE roster.
 const PAGE_KEYS = ["page", "pageSize", "sort", "status", "search", "maxAgeHours"];
-const SORT_KEYS = ["vol24", "change24h", "mcap"];
+const SORT_KEYS = ["vol24", "change24h", "mcap", "curveProgress"];
 const STATUS_KEYS = ["ALL", "GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"];
 
 // Accepts query strings (numbers arrive as text) and JSON numbers alike.

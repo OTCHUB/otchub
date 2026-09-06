@@ -14,6 +14,7 @@ const KPIS = [
   { key: "vol24", label: "VOLUME_24H" },
   { key: "change24h", label: "TOP_GAINERS" },
   { key: "mcap", label: "MARKET_CAP" },
+  { key: "curveProgress", label: "PROGRESS" },
 ];
 const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg-fuchsia-400/70"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
@@ -195,6 +196,31 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
   const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
 
+  // Blink + flip: when a fresh poll reorders the tape, moved rows flash once
+  // (green slide up / red slide down). Movement is measured on the visible
+  // page; entries that just appeared count as moved up. Cached feeds (same
+  // timestamp) never flash, so filter/tab/page flips stay calm.
+  const prevOrderRef = useRef({ at: null, order: {} });
+  const [flash, setFlash] = useState({});
+  useEffect(() => {
+    if (!feed || !Array.isArray(feed.ranked)) return;
+    const order = {};
+    feed.ranked.forEach((row, index) => { order[row.mint] = index; });
+    const prev = prevOrderRef.current;
+    prevOrderRef.current = { at: feed.at, order };
+    if (prev.at == null || prev.at === feed.at) return;
+    const moved = {};
+    for (const [mint, index] of Object.entries(order)) {
+      if (!(mint in prev.order) || prev.order[mint] > index) moved[mint] = "up";
+      else if (prev.order[mint] < index) moved[mint] = "down";
+    }
+    if (Object.keys(moved).length) {
+      setFlash(moved);
+      const timer = setTimeout(() => setFlash({}), 1600);
+      return () => clearTimeout(timer);
+    }
+  }, [feed]);
+
   return (
     <Dialog open={detailMint !== null} onOpenChange={(open) => { if (!open) setDetailMint(null); }}>
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col border border-green-500/30 bg-black p-3">
@@ -225,7 +251,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       <div role="tablist" aria-label="Launcher status" className="mt-2 flex flex-wrap gap-1">
         {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-          onClick={() => { setStatus(s); setPage(1); }} className={`border px-1.5 py-1 text-[9px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-1 text-[9px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
           {s} ({counts[s] ?? 0})
         </button>)}
       </div>
@@ -255,21 +281,26 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       {/* launch feed */}
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-80 lg:max-h-none">
         {ranked.map((t, i) => (
-          <div key={t.mint} data-selected={selectedMint === t.mint} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-2 py-1 text-[10px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""}`}>
-            <span className="text-green-500/40">#{i + 1}</span>
-            <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
-              aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
-              onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
-              <TokenAsset token={t} />
-            </button>
-            <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-              className="max-w-full break-all text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
-              ${t.symbol || t.mint.slice(0, 6)}
-            </button>
-            <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
-            <span className="text-green-500/50">{fmtAge(t.ageH)}</span>
-            <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-green-500/70">
+          <div key={t.mint} data-selected={selectedMint === t.mint}
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[10px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            {/* line 1 — identity: rank, logo, symbol, status, age */}
+            <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              <span className="text-green-500/40">#{i + 1}</span>
+              <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
+                aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
+                onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
+                <TokenAsset token={t} />
+              </button>
+              <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
+                className="max-w-full break-all text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
+                ${t.symbol || t.mint.slice(0, 6)}
+              </button>
+              <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
+              <span className="ml-auto shrink-0 text-green-500/50">{fmtAge(t.ageH)}</span>
+            </span>
+            {/* line 2 — market metrics: momentum, market cap, volume */}
+            <span className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-green-500/70 sm:ml-auto sm:w-auto">
               {Number.isFinite(t.change24h) && (
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>
                   {momentum(t.change24h)}
@@ -277,14 +308,19 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               )}
               <span>mc {fmtUsd(t.mcap)}</span>
               <span>vol {fmtUsd(t.vol24)}</span>
+            </span>
+            {/* line 3 — curve progress + row actions */}
+            <span className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
               <CurveProgress token={t} />
-              <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-                 className="border border-emerald-500/50 px-1 font-mono text-[9px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
-                 title={`Trade $${t.symbol} here via Jupiter (route availability varies)`}>
-                [⇄ TRADE]
-              </button>
-              <a href={`https://dexscreener.com/solana/${encodeURIComponent(t.mint)}`} target="_blank" rel="noreferrer" title="View market on DexScreener">[DEX ↗]</a>
-              <CopyCa mint={t.mint} />
+              <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-green-500/70 sm:ml-2 sm:flex-nowrap">
+                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
+                   className="border border-emerald-500/50 px-1 font-mono text-[9px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                   title={`Trade $${t.symbol} here via Jupiter (route availability varies)`}>
+                  [⇄ TRADE]
+                </button>
+                <a href={`https://dexscreener.com/solana/${encodeURIComponent(t.mint)}`} target="_blank" rel="noreferrer" title="View market on DexScreener">[DEX ↗]</a>
+                <CopyCa mint={t.mint} />
+              </span>
             </span>
           </div>
         ))}
