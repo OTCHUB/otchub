@@ -19,7 +19,9 @@ function setup(options = {}) {
   const stop = module.exports.watchLauncherLive({
     params: options.params,
     invoke: (name, args) => {
-      assert.equal(name, "getLauncherLive"); assert.deepEqual(args, options.params ?? {});
+      assert.equal(name, "getLauncherLive");
+      // Compare across the VM/host realm boundary by value, not prototype.
+      assert.equal(JSON.stringify(args), JSON.stringify(options.params ?? {}));
       const pending = deferred(); requests.push(pending); return pending.promise;
     },
     onData: (value) => data.push(value), onError: (value) => errors.push(value), document, window,

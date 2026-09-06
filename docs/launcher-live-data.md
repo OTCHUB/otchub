@@ -2,9 +2,14 @@
 
 `getLauncherLive` is a separate public, read-only Base44 function. It does not
 change `getLauncherAnalytics`, public metrics, entities, frontend code, or trades.
-GET accepts no query parameters. SDK invocation uses POST with `{}` (an empty
-body also works). Unknown parameters, including `mint`, `mints`, `sort`, and
-`limit`, return 400; unsupported methods return 405; OPTIONS returns 204.
+GET/POST accept optional full-tape feed params: `page` (1–10000, clamped to
+the last page), `pageSize` (1–100), `sort` (`vol24` | `change24h` | `mcap` |
+`curveProgress`), `status` (`ALL` | `GRADUATED` | `BONDING` | `ABOUT_TO_GRADUATE`
+| `UNKNOWN`), `search` (≤64 chars) and `maxAgeHours` (1–8760). With no params
+the legacy bounded roster is served. Other unknown parameters, including `mint`,
+`mints` and `limit`, return 400; unsupported methods return 405; OPTIONS returns 204.
+`curveProgress` sorts by bonding-curve funding progress (known statuses only);
+rows without a checked progress sort last.
 
 ## Response contract
 
