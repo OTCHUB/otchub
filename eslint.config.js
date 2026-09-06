@@ -5,6 +5,8 @@ import pluginReactHooks from "eslint-plugin-react-hooks";
 import pluginUnusedImports from "eslint-plugin-unused-imports";
 
 export default [
+  // Hook-rule directives also appear in src/lib, outside the UI file patterns.
+  { plugins: { "react-hooks": pluginReactHooks } },
   {
     files: [
       "src/components/**/*.{js,mjs,cjs,jsx}",
@@ -31,7 +33,6 @@ export default [
     },
     plugins: {
       react: pluginReact,
-      "react-hooks": pluginReactHooks,
       "unused-imports": pluginUnusedImports,
     },
     rules: {

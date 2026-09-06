@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
+import LauncherAnalytics from "@/components/otc/LauncherAnalytics";
 import ProtocolPanel from "@/components/otc/ProtocolPanel";
 import ArbitrageChart from "@/components/otc/ArbitrageChart";
 import EarningsChart from "@/components/otc/EarningsChart";
@@ -266,6 +267,15 @@ export default function Home() {
           </div>
           <CollapsibleCard title="PROTOCOL">
             <ProtocolPanel latest={latest} />
+          </CollapsibleCard>
+        </div>
+
+        {/* Launcher analytics: the OTC coin-launch ecosystem (launch feed,
+            graduation status, KPI ranking, fee-model split) vs a native
+            pump.fun sample */}
+        <div className="mt-3">
+          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" right={null} openSignal={0}>
+            <LauncherAnalytics />
           </CollapsibleCard>
         </div>
 
