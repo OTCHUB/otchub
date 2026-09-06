@@ -81,6 +81,16 @@ Jupiter has a route; liquidity, token extensions and route coverage can prevent
 execution. Balances cover the standard ATA only. No bot or live trade is started
 by these UI changes; each swap requires the user's wallet approval.
 
+Click a token logo (or its placeholder) to inspect its original image, available
+Twitter/Telegram/website links, live-feed stats and source-reported **Stonk payout**
+settings. This opens a separate mobile-friendly dialog; it does not change the
+swap token, and stays usable while swap selection is locked. Details follow the
+latest row by mint even when rankings change. Missing assets/rewards are labeled
+unavailable. Payout mints, baskets and raw `rewardCycle` come from the launch feed;
+cycle units, allocation weights, eligibility and payment timing are not verified.
+Socials can fall back to existing DEX probes (at most 150 candidate tokens), never
+to unrelated quote-token metadata. No additional per-token requests are made.
+
 See [live-feed semantics, progress calculation and coverage](docs/launcher-live-data.md).
 Publish `getLauncherLive` with the frontend through the existing Base44 dashboard
 workflow. It reuses the existing server-side Helius configuration. Follow with

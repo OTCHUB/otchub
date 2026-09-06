@@ -7,6 +7,8 @@ const FRESH_MS = 30_000, MAX_AGE_MS = 120_000;
 const numeric = (v) => Number.isFinite(v) ? v : null;
 const nonnegative = (v) => Number.isFinite(v) && v >= 0 ? v : null;
 const text = (v) => typeof v === "string" ? v.trim() : "";
+const SOCIAL_KEYS = ["twitter", "telegram", "website"];
+const reportedMint = (v) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text(v)) ? text(v) : null;
 
 // Stable, finite-only, null-last comparison, including all-negative momentum.
 export function rankLauncherRows(rows, key, ascending = false) {
@@ -31,11 +33,49 @@ function sourceTime(value, at) {
   return ms <= at ? ms : null;
 }
 
-function imageUrl(value) {
+function httpUrl(value) {
   try {
     const url = new URL(text(value));
     return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
   } catch { return ""; }
+}
+
+function sourceSocials(coin) {
+  const nested = coin.socials && typeof coin.socials === "object" && !Array.isArray(coin.socials) ? coin.socials : {};
+  return Object.fromEntries(SOCIAL_KEYS.map((key) => [key, httpUrl(nested[key]) || httpUrl(coin[key])]));
+}
+
+function payoutInfo(coin) {
+  const rewardMint = reportedMint(coin.rewardMint), rewardSymbol = text(coin.rewardSymbol) || null;
+  const rewardCycle = Number.isSafeInteger(coin.rewardCycle) && coin.rewardCycle >= 0 ? coin.rewardCycle : null;
+  const rewardBasket = [...new Set((Array.isArray(coin.rewardBasket) ? coin.rewardBasket : [])
+    .map(reportedMint).filter(Boolean))];
+  // These are source-reported settings, not verified distributions or a schedule.
+  return rewardMint !== null || rewardSymbol !== null || rewardCycle !== null || rewardBasket.length
+    ? { rewardMint, rewardSymbol, rewardCycle, rewardBasket } : null;
+}
+
+function dexMetadata(pair) {
+  const info = pair.info, links = Array.isArray(info?.socials) ? info.socials : [];
+  const websites = Array.isArray(info?.websites) ? info.websites : [];
+  const firstUrl = (entries) => entries.map((entry) => httpUrl(entry?.url)).filter(Boolean).sort()[0] || "";
+  const socials = Object.fromEntries(SOCIAL_KEYS.map((key) => [key, firstUrl(key === "website"
+    ? websites : links.filter((entry) => text(entry?.type).toLowerCase() === key))]));
+  const logoUrl = httpUrl(info?.imageUrl);
+  // A total, locale-independent tie break makes fallback independent of API order,
+  // including duplicate/missing pair addresses and duplicate social entries.
+  const key = JSON.stringify([text(pair.pairAddress), logoUrl, ...SOCIAL_KEYS.map((name) => socials[name])]);
+  return { liquidity: numeric(pair.liquidity?.usd), key, logoUrl, socials };
+}
+
+function fillDexMetadata(row, pairs) {
+  // DEX info belongs to the BASE token, unlike the base-or-quote status check.
+  const matching = pairs.filter((pair) => pair?.chainId === "solana" && pair.baseToken?.address === row.mint)
+    .map(dexMetadata).sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  for (const metadata of rankLauncherRows(matching, "liquidity")) {
+    row.logoUrl ||= metadata.logoUrl;
+    for (const key of SOCIAL_KEYS) row.socials[key] ||= metadata.socials[key];
+  }
 }
 
 function rosterRows(raw, at) {
@@ -46,9 +86,10 @@ function rosterRows(raw, at) {
     const mint = text(coin?.mint);
     if (!mint || seen.has(mint)) continue;
     seen.add(mint);
-    const snapshot = coin?.snapshot;
+    const snapshot = coin?.snapshot, image = httpUrl(coin.image);
     rows.push({
-      mint, symbol: text(coin.symbol), name: text(coin.name), image: imageUrl(coin.image),
+      mint, symbol: text(coin.symbol), name: text(coin.name), image,
+      logoUrl: image, socials: sourceSocials(coin), payoutInfo: payoutInfo(coin),
       vol24: nonnegative(snapshot?.volume24h), mcap: nonnegative(snapshot?.marketCap),
       liquidity: nonnegative(snapshot?.liquidity), change24h: numeric(snapshot?.change24h),
       ageH: ageHours(coin.createdAt, at), metricsAt: sourceTime(snapshot?.at, at),
@@ -148,6 +189,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
           for (const c of chunk) {
             c.graduated = hasConfirmedAmmPair(c.row.mint, data.pairs || []);
             c.dexAt = checkedAt;
+            fillDexMetadata(c.row, data.pairs || []);
           }
         } catch { errors.add("DEXSCREENER_UNAVAILABLE"); }
       });

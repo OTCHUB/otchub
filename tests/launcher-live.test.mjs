@@ -177,7 +177,7 @@ test("row contract preserves finite zeros/losses and sanitizes unknown metrics a
   ] } });
   const { body } = await s.read();
   assert.deepEqual(body.ranked.map((r) => r.mint), [mint(1), mint(2), mint(3), mint(4)]);
-  assert.deepEqual(Object.keys(body.ranked[0]).sort(), ["mint", "symbol", "name", "image", "vol24", "mcap", "liquidity",
+  assert.deepEqual(Object.keys(body.ranked[0]).sort(), ["mint", "symbol", "name", "image", "logoUrl", "socials", "payoutInfo", "vol24", "mcap", "liquidity",
     "change24h", "ageH", "metricsAt", "curveProgress", "status", "curveComplete", "statusAt"].sort());
   assert.deepEqual([body.ranked[0].vol24, body.ranked[0].mcap, body.ranked[0].liquidity, body.ranked[0].change24h], [0, 0, 0, 0]);
   assert.equal(body.ranked[1].symbol, "");
@@ -193,6 +193,165 @@ test("row contract preserves finite zeros/losses and sanitizes unknown metrics a
   for (const key of ["mcap", "liquidity"]) assert.equal(body.ranked[1][key], null);
   assert.equal(body.ranked[2].change24h, null);
   assert.equal(body.ranked[3].change24h, null);
+});
+
+test("source image alias and nested/flat socials have safe per-field precedence and empty defaults", async () => {
+  const s = setup({ state: { coins: [
+    coin(1, {}, { image: " https://example.test/source.png ",
+      socials: { twitter: " https://x.com/nested ", telegram: "javascript:alert(1)" },
+      twitter: "https://x.com/flat", telegram: "https://t.me/flat", website: "http://example.test" }),
+    coin(2, {}, { image: null, socials: [], twitter: "https://x.com/flat-only" }),
+    coin(3, {}, { image: null }),
+  ], dex: { pairs: [pair(mint(1), { info: { imageUrl: "https://example.test/dex.png",
+    socials: [{ type: "twitter", url: "https://x.com/dex" }, { type: "telegram", url: "https://t.me/dex" }],
+    websites: [{ url: "https://dex.test" }] } })] } } });
+  const { body } = await s.read(), [nested, flat, empty] = body.ranked;
+  assert.equal(nested.image, "https://example.test/source.png");
+  assert.equal(nested.logoUrl, nested.image);
+  assert.deepEqual(nested.socials, { twitter: "https://x.com/nested", telegram: "https://t.me/flat", website: "http://example.test/" });
+  assert.deepEqual(flat.socials, { twitter: "https://x.com/flat-only", telegram: "", website: "" });
+  assert.equal(flat.logoUrl, "");
+  assert.equal(empty.image, "");
+  assert.equal(empty.logoUrl, "");
+  assert.deepEqual(empty.socials, { twitter: "", telegram: "", website: "" });
+  assert.ok(body.ranked.every((row) => row.payoutInfo === null));
+});
+
+test("unsafe and malformed source URLs are empty, not links or batch errors", async () => {
+  const invalid = [undefined, null, false, 42, {}, [], "", "not a URL", "/relative", "//example.test",
+    "javascript:alert(1)", "data:image/png;base64,AA==", "blob:https://example.test/id", "ftp://example.test/a",
+    "https://user@example.test", "http://user:pass@example.test", "https://"];
+  const coins = invalid.map((value, i) => coin(i + 1, {}, {
+    image: value, socials: { twitter: value, telegram: value, website: value },
+    twitter: value, telegram: value, website: value,
+  }));
+  const { response, body } = await setup({ state: { coins } }).read();
+  assert.equal(response.status, 200);
+  assert.equal(body.statusError, null);
+  assert.equal(body.statusChecked, coins.length);
+  for (const row of body.ranked) {
+    assert.equal(row.image, "");
+    assert.equal(row.logoUrl, "");
+    assert.deepEqual(row.socials, { twitter: "", telegram: "", website: "" });
+  }
+});
+
+test("payout settings map source fields independently, retain cycle zero, and deduplicate mint-shaped baskets", async () => {
+  const basket = [mint(10), ` ${mint(11)} `, mint(10), null, {}, { mint: mint(12) }, 12, "",
+    "0".repeat(32), "1".repeat(31), "z".repeat(45), "O".repeat(32), "I".repeat(32), "l".repeat(32),
+    "1".repeat(32), "z".repeat(44)];
+  const coins = [
+    coin(1, {}, { rewardMint: ` ${mint(10)} `, rewardSymbol: " USDC ", rewardCycle: 0, rewardBasket: basket }),
+    coin(2, {}, { rewardCycle: 0 }),
+    coin(3, {}, { rewardCycle: Number.MAX_SAFE_INTEGER }),
+    coin(4, {}, { rewardSymbol: " REPORTED ", rewardMint: "invalid" }),
+    coin(5, {}, { rewardMint: mint(12) }),
+    coin(6, {}, { rewardBasket: [mint(13)] }),
+  ];
+  const { body } = await setup({ state: { coins } }).read();
+  assert.deepEqual(body.ranked.map((row) => row.payoutInfo), [
+    { rewardMint: mint(10), rewardSymbol: "USDC", rewardCycle: 0,
+      rewardBasket: [mint(10), mint(11), "1".repeat(32), "z".repeat(44)] },
+    { rewardMint: null, rewardSymbol: null, rewardCycle: 0, rewardBasket: [] },
+    { rewardMint: null, rewardSymbol: null, rewardCycle: Number.MAX_SAFE_INTEGER, rewardBasket: [] },
+    { rewardMint: null, rewardSymbol: "REPORTED", rewardCycle: null, rewardBasket: [] },
+    { rewardMint: mint(12), rewardSymbol: null, rewardCycle: null, rewardBasket: [] },
+    { rewardMint: null, rewardSymbol: null, rewardCycle: null, rewardBasket: [mint(13)] },
+  ]);
+});
+
+test("missing and malformed payout metadata remains unknown without coercion or status errors", async () => {
+  const invalidCycles = [undefined, null, false, true, "0", "60", -1, 0.5, NaN, Infinity, -Infinity,
+    Number.MAX_SAFE_INTEGER + 1, [], {}];
+  const invalidBaskets = [undefined, null, {}, mint(10), [null, 1, {}, { mint: mint(10) }, "bad"]];
+  const coins = invalidCycles.map((rewardCycle, i) => coin(i + 1, {}, {
+    rewardMint: i % 2 ? {} : "not-a-mint", rewardSymbol: i % 2 ? false : " ", rewardCycle,
+    rewardBasket: invalidBaskets[i % invalidBaskets.length],
+  }));
+  coins.push(coin(100, {}, { rewardMint: null, rewardSymbol: null, rewardBasket: [] }));
+  const s = setup({ state: { coins, dex: { pairs: [pair(mint(1), {
+    baseToken: { address: mint(1), symbol: "DO_NOT_INFER" }, info: { rewardSymbol: "NOT_A_SOURCE" },
+  })] } } });
+  const { response, body } = await s.read();
+  assert.equal(response.status, 200);
+  assert.ok(body.ranked.every((row) => row.payoutInfo === null));
+  assert.equal(body.statusError, null);
+  assert.equal(body.statusChecked, coins.length);
+  assert.equal(body.ranked[0].status, "GRADUATED");
+});
+
+test("DEX metadata requires exact Solana BASE matching; quote matching still establishes graduation", async () => {
+  const info = { imageUrl: "https://example.test/dex.png", socials: [{ type: "twitter", url: "https://x.com/base" }],
+    websites: [{ url: "https://base.test" }] };
+  const s = setup({ state: { coins: [coin(1, {}, { image: "" }), coin(2, {}, { image: "" })],
+    dex: { pairs: [
+      pair(mint(2), { quoteToken: { address: mint(1) }, info }),
+      pair(mint(1), { chainId: "ethereum", info }), pair(mint(1), { chainId: undefined, info }),
+      pair(`${mint(1)}suffix`, { info }), pair(` ${mint(1)} `, { info }),
+    ] } } });
+  const { body } = await s.read(), [quote, base] = body.ranked;
+  assert.equal(quote.status, "GRADUATED");
+  assert.equal(quote.logoUrl, "");
+  assert.deepEqual(quote.socials, { twitter: "", telegram: "", website: "" });
+  assert.equal(base.logoUrl, info.imageUrl);
+  assert.equal(base.image, "", "DEX fallback does not change the legacy source image");
+  assert.deepEqual(base.socials, { twitter: "https://x.com/base", telegram: "", website: "https://base.test/" });
+  assert.equal(body.statusError, null);
+});
+
+test("DEX fallback is descending finite-liquidity, per-field, and deterministic across pair order and ties", async () => {
+  const info = (label) => ({ imageUrl: `https://example.test/${label}.png`,
+    socials: [{ type: "twitter", url: `https://x.com/${label}` }] });
+  const preferred = { ...info("high"), socials: [{ type: "twitter", url: "https://x.com/a-high" },
+    { type: "twitter", url: "https://x.com/z-high" }, { type: "telegram", url: "javascript:alert(1)" }] };
+  const pairs = [
+    pair(mint(1), { liquidity: { usd: 100 }, info: { ...info("low"),
+      socials: [{ type: "telegram", url: "https://t.me/low" }], websites: [{ url: "https://low.test" }] } }),
+    pair(mint(1), { pairAddress: "B".repeat(32), liquidity: { usd: 500 }, info: info("other-tie") }),
+    pair(mint(1), { pairAddress: "A".repeat(32), liquidity: { usd: 500 }, info: preferred }),
+    pair(mint(1), { pairAddress: "A".repeat(32), liquidity: { usd: 500 }, info: {
+      ...info("high"), socials: [{ type: "twitter", url: "https://x.com/z-tie" }] } }),
+    pair(mint(1), { liquidity: { usd: 1000 }, info: { imageUrl: "data:image/png,bad", socials: {} } }),
+    ...[Infinity, NaN, "9999", undefined, -Infinity].map((usd) => pair(mint(1), { liquidity: { usd }, info: info("invalid") })),
+    pair(mint(2), { liquidity: { usd: 0 }, dexId: "pumpfun", info: info("zero") }),
+    pair(mint(2), { liquidity: { usd: -1 }, info: info("negative") }),
+    pair(mint(2), { liquidity: { usd: Infinity }, info: info("infinite") }),
+  ];
+  let original;
+  for (const ordered of [pairs, [...pairs].reverse(), [...pairs.slice(5), ...pairs.slice(0, 5)]]) {
+    const s = setup({ state: { coins: [coin(1, {}, { image: "" }), coin(2, {}, { image: "" })], dex: { pairs: ordered } } });
+    const { body } = await s.read();
+    assert.equal(body.statusError, null);
+    assert.equal(body.ranked[0].logoUrl, "https://example.test/high.png");
+    assert.deepEqual(body.ranked[0].socials, { twitter: "https://x.com/a-high", telegram: "https://t.me/low", website: "https://low.test/" });
+    assert.equal(body.ranked[1].logoUrl, "https://example.test/zero.png");
+    assert.equal(body.ranked[1].status, "UNKNOWN", "Metadata is not graduation evidence");
+    assert.equal(body.ranked[0].payoutInfo, null);
+    assert.equal(s.calls.length, 3, "Only the existing coins/RPC/DEX requests are used");
+    if (original) assert.deepEqual(body, original);
+    original = body;
+  }
+});
+
+test("malformed DEX metadata cannot poison status or neighboring rows in a successful batch", async () => {
+  const malformed = [undefined, null, false, 12, "bad", [], {}, { imageUrl: {}, socials: {}, websites: "bad" },
+    { imageUrl: "https://user:pass@example.test", socials: [null, false, {}, { type: {}, url: {} },
+      { type: "twitter", url: "javascript:alert(1)" }, { type: "telegram", url: "ftp://example.test" }],
+      websites: [null, {}, { url: "//example.test" }] }];
+  const s = setup({ state: { coins: [coin(1, {}, { image: "" }), coin(2, {}, { image: "" })], dex: { pairs: [
+    null, 42, "bad", false, {}, ...malformed.map((info) => pair(mint(1), { info })),
+    pair(mint(2), { info: { imageUrl: "https://example.test/valid.png", socials: [null,
+      { type: "telegram", url: "https://t.me/valid" }, { type: "discord", url: "https://discord.test" }],
+      websites: [{ url: "javascript:alert(1)" }, { url: "https://valid.test" }] } }),
+  ] } } });
+  const { body } = await s.read();
+  assert.equal(body.statusError, null);
+  assert.equal(body.statusChecked, 2);
+  assert.deepEqual(body.ranked.map((row) => row.status), ["GRADUATED", "GRADUATED"]);
+  assert.equal(body.ranked[0].logoUrl, "");
+  assert.deepEqual(body.ranked[0].socials, { twitter: "", telegram: "", website: "" });
+  assert.equal(body.ranked[1].logoUrl, "https://example.test/valid.png");
+  assert.deepEqual(body.ranked[1].socials, { twitter: "", telegram: "https://t.me/valid", website: "https://valid.test/" });
 });
 
 test("metric timestamps preserve actual source freshness in seconds or milliseconds", async () => {
@@ -216,9 +375,10 @@ test("ranking is immutable, stable, null-last even for all losses and extreme fi
 });
 
 test("full roster survives old top-60 limits; disjoint union is 150 with 100/30 batches and bounded concurrency", async () => {
-  const coins = fullRoster();
+  const coins = fullRoster().map((row) => ({ ...row, image: "", rewardCycle: 0 }));
+  const info = { imageUrl: "https://example.test/dex.png", socials: [{ type: "twitter", url: "https://x.com/dex" }] };
   const s = setup({ state: { coins, accounts: new Map(coins.map((c) => [derive(c.mint), account()])),
-    dex: { pairs: coins.map((c) => pair(c.mint)) } } });
+    dex: { pairs: coins.map((c) => pair(c.mint, { info })) } } });
   const { body } = await s.read();
   assert.equal(body.ranked.length, 220);
   assert.equal(body.candidateCount, 150);
@@ -228,11 +388,17 @@ test("full roster survives old top-60 limits; disjoint union is 150 with 100/30 
   assert.equal(launcherCandidates(body.ranked).length, 150);
   assert.deepEqual(s.calls.filter((c) => c.type === "rpc").map((c) => c.params[0].length), [100, 50]);
   assert.deepEqual(s.calls.filter((c) => c.type === "dex").map((c) => c.url.slice(DEX.length).split(",").length), [30, 30, 30, 30, 30]);
+  assert.equal(s.calls.length, 8, "Metadata adds no requests to the one coins, two RPC and five DEX batches");
+  assert.equal(body.ranked.filter((r) => r.logoUrl === info.imageUrl).length, 150);
+  assert.equal(body.ranked.filter((r) => r.socials.twitter === "https://x.com/dex").length, 150);
+  assert.ok(body.ranked.every((r) => r.payoutInfo.rewardCycle === 0), "Source payout coverage is not candidate-limited");
   assert.ok(s.maxActive() <= 3);
   for (const i of [65, 125]) assert.equal(body.ranked.find((r) => r.mint === mint(i)).status, "GRADUATED");
   for (const i of [150, 199, 219]) {
     const row = body.ranked.find((r) => r.mint === mint(i));
     assert.equal(row.status, "UNKNOWN");
+    assert.equal(row.logoUrl, "");
+    assert.deepEqual(row.socials, { twitter: "", telegram: "", website: "" });
     for (const key of ["curveProgress", "curveComplete", "statusAt"]) assert.equal(row[key], null);
   }
 });
@@ -267,6 +433,39 @@ test("30-second cache expiry refreshes metrics, ages, ranking and status evidenc
   assert.equal(fresh.body.ranked[0].statusAt, NOW + 30_000);
   assert.ok(fresh.body.ranked[0].ageH > first.body.ranked[1].ageH);
   assert.equal(s.calls.filter((c) => c.type === "coins").length, 2);
+});
+
+test("metadata is retained on cache hits/stale responses and rebuilt without carrying missing data forward", async () => {
+  const s = setup({ state: { coins: [coin(1, {}, { image: "", rewardCycle: 0 })], dex: { pairs: [pair(mint(1), {
+    info: { imageUrl: "https://example.test/cached.png", socials: [{ type: "twitter", url: "https://x.com/cached" }] },
+  })] } } });
+  const first = await s.read(), calls = s.calls.length;
+  assert.equal(first.body.ranked[0].payoutInfo.rewardCycle, 0);
+  assert.equal(first.body.ranked[0].logoUrl, "https://example.test/cached.png");
+  s.state.coins = [coin(1, {}, { image: "" })];
+  s.state.dex = { pairs: [] };
+  s.advance(29_999);
+  const hit = await s.read();
+  assert.equal(hit.response.headers.get("X-Launcher-Cache"), "hit");
+  assert.deepEqual(hit.body, first.body);
+  assert.equal(s.calls.length, calls);
+  s.advance(1);
+  s.state.failCoins = true;
+  const stale = await s.read();
+  assert.equal(stale.response.headers.get("X-Launcher-Cache"), "stale");
+  assert.equal(stale.body.at, first.body.at);
+  assert.deepEqual(stale.body.ranked, first.body.ranked);
+  assert.equal(s.calls.length, calls + 1, "A failed roster does not trigger metadata probes");
+  s.state.failCoins = false;
+  s.state.failDex = true;
+  const fresh = await s.read(), row = fresh.body.ranked[0];
+  assert.equal(fresh.response.headers.get("X-Launcher-Cache"), "miss");
+  assert.equal(fresh.body.stale, false);
+  assert.equal(row.logoUrl, "");
+  assert.deepEqual(row.socials, { twitter: "", telegram: "", website: "" });
+  assert.equal(row.payoutInfo, null);
+  assert.equal(row.status, "BONDING");
+  assert.deepEqual(fresh.body.statusError, ["DEXSCREENER_UNAVAILABLE"]);
 });
 
 test("cold and expired concurrent requests singleflight the entire rebuild", async () => {

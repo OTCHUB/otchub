@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Globe, Send, Twitter } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
 import { usePumpSample } from "@/lib/usePumpSample";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Live roster is independent of the five-minute cohort/comparison snapshot.
 
@@ -15,6 +17,90 @@ const KPIS = [
 const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg-fuchsia-400/70"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
+
+// Also validate in the client for older/cached feeds and defensive rendering.
+function metadataUrl(value) {
+  if (typeof value !== "string") return "";
+  try {
+    const url = new URL(value.trim());
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
+  } catch { return ""; }
+}
+const logoOf = (token) => metadataUrl(token.logoUrl) || metadataUrl(token.image);
+const momentum = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` : "—";
+
+function TokenAsset({ token, large = false }) {
+  const [failedUrl, setFailedUrl] = useState("");
+  const src = logoOf(token), label = token.name || token.symbol || token.mint;
+  return (
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-green-500/30 bg-green-500/10 ${large ? "h-56 w-56 max-w-full text-3xl" : "h-8 w-8 text-[10px]"}`}>
+      {src && src !== failedUrl ? <img src={src} alt={`${label} ${large ? "token image" : "logo"}`}
+        width={large ? 224 : 32} height={large ? 224 : 32} loading={large ? "eager" : "lazy"}
+        decoding="async" referrerPolicy="no-referrer" onError={() => setFailedUrl(src)}
+        className={`h-full w-full ${large ? "object-contain" : "object-cover"}`} />
+        : <span role="img" aria-label={`${label} image unavailable`}>{(token.symbol || "?").slice(0, 2)}</span>}
+    </span>
+  );
+}
+
+function TokenDetails({ token }) {
+  const socials = [{ key: "twitter", label: "Twitter / X", Icon: Twitter }, { key: "telegram", label: "Telegram", Icon: Send },
+    { key: "website", label: "Website", Icon: Globe }]
+    .map(({ key, label, Icon }) => ({ label, Icon, url: metadataUrl(token.socials?.[key]) })).filter((link) => link.url);
+  const payout = token.payoutInfo;
+  const basket = Array.isArray(payout?.rewardBasket) ? payout.rewardBasket : [];
+  const logo = logoOf(token);
+  return <>
+    <DialogHeader className="pr-6 text-left">
+      <DialogTitle className="break-words text-green-300">{token.name || token.symbol || "Launcher token"} · ${token.symbol || "?"}</DialogTitle>
+      <DialogDescription className="text-green-500/70">Token details · [{statusOf(token)}] · source snapshots may lag</DialogDescription>
+    </DialogHeader>
+    <div className="grid min-w-0 gap-4 sm:grid-cols-[224px_minmax(0,1fr)]">
+      <div className="flex min-w-0 flex-col items-center gap-2">
+        <TokenAsset key={token.mint} token={token} large />
+        {logo && <a href={logo} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-300 underline">Open original image ↗</a>}
+      </div>
+      <div className="min-w-0 space-y-3">
+        <div className="break-all font-mono text-[11px] text-green-500/70">{token.mint} <CopyCa mint={token.mint} /></div>
+        <div className="flex flex-wrap gap-2" aria-label="Token social links">
+          {socials.map(({ label, Icon, url }) => <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+            aria-label={label} className="inline-flex min-h-11 items-center gap-1.5 border border-green-500/30 px-3 text-xs text-cyan-300 hover:bg-green-500/10">
+            <Icon size={16} aria-hidden="true" />{label}
+          </a>)}
+          {!socials.length && <span className="text-xs text-green-500/60">Social links unavailable.</span>}
+        </div>
+        <dl className="grid grid-cols-2 gap-2 text-xs">
+          {[["24h Volume", fmtUsd(token.vol24)], ["24h Momentum", momentum(token.change24h)],
+            ["Market Cap", fmtUsd(token.mcap)], ["Liquidity", fmtUsd(token.liquidity)]].map(([label, value]) =>
+            <div key={label} className="min-w-0 border border-green-500/20 p-2">
+              <dt className="text-green-500/60">{label}</dt><dd className="break-words font-mono text-green-300">{value}</dd>
+            </div>)}
+        </dl>
+        <div className="border border-green-500/20 p-2"><CurveProgress token={token} />
+          <p className="mt-1 text-[10px] text-green-500/60">Reserve-derived funding progress, not market cap.</p></div>
+        <p className="text-[10px] text-green-500/60">Market snapshot: {token.metricsAt ? new Date(token.metricsAt).toLocaleString() : "unavailable"}
+          <br />Status evidence: {token.statusAt ? new Date(token.statusAt).toLocaleString() : "unavailable"}</p>
+      </div>
+    </div>
+    <section aria-label="Stonk payout" className="min-w-0 space-y-2 border border-amber-400/30 bg-amber-400/5 p-3 text-xs">
+      <h3 className="font-bold uppercase tracking-widest text-amber-300">Stonk payout</h3>
+      {payout ? <>
+        <p className="break-words text-green-300">Reported primary reward: {payout.rewardSymbol ? `$${payout.rewardSymbol}` : "symbol unavailable"}</p>
+        {payout.rewardMint && <a href={`https://solscan.io/token/${encodeURIComponent(payout.rewardMint)}`} target="_blank" rel="noopener noreferrer"
+          className="block break-all font-mono text-cyan-300 underline">{payout.rewardMint} ↗</a>}
+        {!!basket.length && <div><p className="text-green-300">Reported reward basket ({basket.length} tokens)</p>
+          <ul className="mt-1 space-y-1">{basket.map((mint, i) => <li key={mint} className="break-all font-mono">
+            <span className="text-green-500/60">{i + 1}. </span><a href={`https://solscan.io/token/${encodeURIComponent(mint)}`}
+              target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">{mint} ↗</a>
+          </li>)}</ul>
+        </div>}
+        <p className="text-green-500/70">Reported rewardCycle: {Number.isSafeInteger(payout.rewardCycle) && payout.rewardCycle >= 0 ? payout.rewardCycle : "unavailable"} · units/meaning unverified</p>
+      </> : <p className="text-green-500/70">Payout metadata unavailable; this does not mean no rewards.</p>}
+      <p className="text-[11px] text-amber-200/70">Allocation, eligibility and payout timing are not provided by this feed. These are source-reported settings, not verified distributions or guaranteed returns.</p>
+    </section>
+    <p className="text-[10px] text-green-500/60">Assets and links are third-party metadata, not endorsements. Verify payout mints and launch terms before trading.</p>
+  </>;
+}
 
 function CopyCa({ mint }) {
   const [ok, setOk] = useState(false);
@@ -54,6 +140,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const [kpi, setKpi] = useState("vol24");
   const [status, setStatus] = useState("GRADUATED");
   const [search, setSearch] = useState("");
+  const [detailMint, setDetailMint] = useState(null);
+  const detailTrigger = useRef(null), panelRef = useRef(null);
+  const detailId = useId();
   const live = useLauncherLive();
   // Browser-side pump.fun market sample (large GeckoTerminal pool scan); the
   // server payload ships a small search-based fallback until this arrives.
@@ -62,7 +151,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   useEffect(() => { if (live.data) onSnapshot?.(live.data); }, [live.data, onSnapshot]);
 
   useEffect(() => {
-    let live = true;
+    let mounted = true;
     let pending = false;
     const load = async () => {
       if (pending || document.hidden) return;
@@ -70,13 +159,13 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       try {
         const res = await base44.functions.invoke("getLauncherAnalytics");
         if (res?.data?.error) throw new Error(res.data.error);
-        if (live) { setData(res.data); setErr(null); }
-      } catch (e) { if (live) setErr(e.message || "fetch failed"); }
+        if (mounted) { setData(res.data); setErr(null); }
+      } catch (e) { if (mounted) setErr(e.message || "fetch failed"); }
       finally { pending = false; }
     };
     load();
     const t = setInterval(load, 60_000);
-    return () => { live = false; clearInterval(t); };
+    return () => { mounted = false; clearInterval(t); };
   }, []);
 
   const ranked = useMemo(() => {
@@ -94,12 +183,15 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
   const c = data?.cohort, n = pump || data?.native;
   const feed = live.data;
+  // Keep the modal attached to a mint, not a stale row or current ranking/filter.
+  const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
   const counts = (feed?.ranked || []).reduce((out, row) => {
     out[statusOf(row)]++; out.ALL++; return out;
   }, Object.fromEntries(STATUSES.map((s) => [s, 0])));
 
   return (
-    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+    <Dialog open={detailMint !== null} onOpenChange={(open) => { if (!open) setDetailMint(null); }}>
+    <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
           OTC_ANALYTICS :: LAUNCHER ECOSYSTEM
@@ -151,16 +243,22 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         {ranked.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-2 py-1 text-[10px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""}`}>
             <span className="text-green-500/40">#{i + 1}</span>
+            <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
+              aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
+              onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
+              <TokenAsset token={t} />
+            </button>
             <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-              className="font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
+              className="max-w-full break-all text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
               ${t.symbol || t.mint.slice(0, 6)}
             </button>
             <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
             <span className="text-green-500/50">{fmtAge(t.ageH)}</span>
             <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-green-500/70">
-              {t.change24h != null && (
+              {Number.isFinite(t.change24h) && (
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>
-                  {t.change24h >= 0 ? "+" : ""}{t.change24h.toFixed(1)}%
+                  {momentum(t.change24h)}
                 </span>
               )}
               <span>mc {fmtUsd(t.mcap)}</span>
@@ -214,5 +312,19 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL
       </div>
     </div>
+    <DialogContent id={detailId} className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto border-green-500/40 bg-black p-4 text-green-300 sm:p-6"
+      onCloseAutoFocus={(e) => {
+        e.preventDefault();
+        // A refresh/filter may have removed the original logo from the list.
+        const target = detailTrigger.current?.isConnected ? detailTrigger.current : panelRef.current;
+        target?.focus();
+      }}>
+      {detailToken ? <TokenDetails token={detailToken} /> : <DialogHeader>
+        <DialogTitle>Token unavailable</DialogTitle>
+        <DialogDescription>This token is no longer in the latest launcher feed. Close this view to continue.</DialogDescription>
+      </DialogHeader>}
+      {(feed?.stale || live.error) && <p role="status" className="text-xs text-amber-300">STALE · showing the last available token snapshot.</p>}
+    </DialogContent>
+    </Dialog>
   );
 }
