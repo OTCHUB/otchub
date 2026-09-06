@@ -209,6 +209,10 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         </div>
       </div>
       <div className="mt-1 text-[8px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = top-200 by 24h volume · pump.fun sample biased to active pairs</div>
+      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[8px] text-red-400/80">
+        NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN · DYOR BEFORE BUYING · HIGH VOLUME &amp; LIQUIDITY PREFERRED
+        — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL
+      </div>
     </div>
   );
 }
