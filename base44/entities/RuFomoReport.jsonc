@@ -1,0 +1,16 @@
+{
+  "name": "RuFomoReport",
+  "type": "object",
+  "description": "Private append-only sanitized operator claims, not independently verified on-chain outcomes. Only authorized service-role endpoints may read/create; no endpoint updates or deletes reports.",
+  "properties": {
+    "signalId": { "type": "string", "pattern": "^RU_FOMO:[0-9]+:[1-9A-HJ-NP-Za-km-z]{32,44}$", "maxLength": 80 },
+    "mint": { "type": "string", "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$" },
+    "status": { "type": "string", "enum": ["dry_run", "rejected", "submitted", "confirmed", "failed", "unknown"] },
+    "code": { "type": "string", "enum": ["DRY_RUN", "SUBMITTED", "CONFIRMED", "CONFIG_INVALID", "DISABLED", "AUTH_REQUIRED", "RATE_LIMITED", "STALE_DATA", "SLIPPAGE_EXCEEDED", "SIMULATION_FAILED", "TRANSACTION_REJECTED", "INSUFFICIENT_SOL", "BUDGET_EXCEEDED", "EXPIRED_SIGNAL", "DUPLICATE_SIGNAL", "PROVIDER_ERROR", "RPC_ERROR", "CONFIRMATION_UNKNOWN", "INVALID_SIGNAL", "PROGRAM_NOT_ALLOWED", "REPORT_FAILED", "INTERNAL_ERROR", "TOKEN_NOT_ALLOWED", "UNSUPPORTED_POOL"] },
+    "signature": { "type": "string", "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,88}$" },
+    "at": { "type": "integer", "minimum": 0 },
+    "logKey": { "type": "string", "maxLength": 53, "pattern": "^[0-9]{16}:[0-9a-f-]{36}$" }
+  },
+  "required": ["signalId", "mint", "status", "code", "at", "logKey"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false, "write": false }
+}

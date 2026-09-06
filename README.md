@@ -53,6 +53,19 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+## Public Analytics and RU_FOMO
+
+- [API contracts and security boundaries](docs/ru-fomo-implementation-contract.md)
+- [Rollout checklist and secret placement](docs/ru-fomo-rollout.md)
+- [Operator-run SOL bot configuration and limitations](services/ru-fomo-bot/README.md)
+
+Public metrics, protected signals/reports, and the API Agent panel are implemented.
+Signals and live trading default off. The bot is a separate operator process;
+publishing the app does not start it. Never put wallet keys in Base44 or Vite.
+
+Run offline regressions with `node --test tests/*.test.mjs`, then lint and build.
+Hosted RLS and live transaction compatibility need separate operator validation.
+
 ## Docs & Support
 
 GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)

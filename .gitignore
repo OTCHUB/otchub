@@ -30,3 +30,6 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# Operator execution journal/locks/outbox must never ship to Git or Base44.
+/services/ru-fomo-bot/state/

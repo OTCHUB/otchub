@@ -1,0 +1,26 @@
+{
+  "name": "RuFomoSignal",
+  "type": "object",
+  "description": "Private issued signals. signalId is deterministic, NOT a database uniqueness constraint; duplicate rows under cross-isolate races are possible. The operator consumer journal is authoritative for execution idempotence.",
+  "properties": {
+    "signalId": { "type": "string", "pattern": "^RU_FOMO:[0-9]+:[1-9A-HJ-NP-Za-km-z]{32,44}$", "maxLength": 80 },
+    "mint": { "type": "string", "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$" },
+    "action": { "type": "string", "enum": ["buy"] },
+    "baseAsset": { "type": "string", "enum": ["SOL"] },
+    "createdAt": { "type": "integer", "minimum": 0 },
+    "expiresAt": { "type": "integer", "minimum": 0 },
+    "reason": { "type": "string", "enum": ["volume_and_momentum"] },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "volume24hUsd": { "type": "number", "minimum": 0 },
+        "marketCapUsd": { "type": ["number", "null"], "minimum": 0 },
+        "change24hPct": { "type": "number", "minimum": -100 },
+        "liquidityUsd": { "type": "number", "minimum": 0 }
+      },
+      "required": ["volume24hUsd", "marketCapUsd", "change24hPct", "liquidityUsd"]
+    }
+  },
+  "required": ["signalId", "mint", "action", "baseAsset", "createdAt", "expiresAt", "reason", "metrics"],
+  "rls": { "create": false, "read": false, "update": false, "delete": false, "write": false }
+}
