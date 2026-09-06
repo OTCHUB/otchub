@@ -474,6 +474,47 @@ test("paged tape serves the full roster with server-side filter, sort and paging
   assert.equal(posted.body.statusCounts.ALL, 120);
 });
 
+test("every status category pages at the 50-entry default when its count exceeds one page", async () => {
+  const bonding = Array.from({ length: 55 }, (_, i) => coin(100 + i, { volume24h: 6000 - i, change24h: -1 }));
+  const graduated = Array.from({ length: 55 }, (_, i) => coin(200 + i, { volume24h: 1, change24h: 100 - i }));
+  const near = Array.from({ length: 30 }, (_, i) => coin(300 + i, { volume24h: 1, change24h: -2 },
+    { createdAt: NOW / 1000 - 1800 }));
+  const filler = Array.from({ length: 100 }, (_, i) => coin(400 + i, { volume24h: 50 - i / 10, change24h: -3 }));
+  const coins = [...bonding, ...graduated, ...near, ...filler];
+  const accounts = new Map();
+  for (const c of bonding) accounts.set(derive(c.mint), account());
+  for (const c of graduated) accounts.set(derive(c.mint), account());
+  for (const c of near) accounts.set(derive(c.mint), account({ complete: true }));
+  const s = setup({ state: { coins, accounts, dex: { pairs: graduated.map((c) => pair(c.mint)) } } });
+  const read = async (query) => (await s.read(request(query))).body;
+  const keyOf = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+  // GRADUATED/BONDING/UNKNOWN exceed 50 entries (multi-page); ABOUT_TO_GRADUATE
+  // fits a single page (no pager, over-range pages clamp).
+  const categories = { GRADUATED: 55, BONDING: 55, UNKNOWN: 100, ABOUT_TO_GRADUATE: 30, ALL: 240 };
+  for (const [status, total] of Object.entries(categories)) {
+    const first = await read(`?status=${status}`);
+    assert.equal(first.pageSize, 50, `${status}: default page size is 50`);
+    assert.equal(first.matches, total);
+    assert.equal(first.statusCounts[status], total, `${status}: faceted tab count is scope-wide`);
+    assert.equal(first.statusCounts.GRADUATED, 55, `${status}: other tab counts stay visible`);
+    assert.equal(first.pageCount, Math.ceil(total / 50));
+    assert.equal(first.ranked.length, Math.min(50, total));
+    assert.ok(first.ranked.every((r) => status === "ALL" || keyOf(r) === status));
+    if (total > 50) {
+      const second = await read(`?status=${status}&page=2`);
+      assert.equal(second.page, 2);
+      assert.equal(second.ranked.length, Math.min(50, total - 50));
+      const pageOne = new Set(first.ranked.map((r) => r.mint));
+      assert.ok(second.ranked.every((r) => !pageOne.has(r.mint) && (status === "ALL" || keyOf(r) === status)),
+        `${status}: page 2 continues the same category without repeating page 1`);
+    } else {
+      const clamped = await read(`?status=${status}&page=9`);
+      assert.equal(clamped.page, 1);
+      assert.equal(clamped.ranked.length, total);
+    }
+  }
+});
+
 test("curve progress is a server sort key: highest progress first, unknowns last", async () => {
   const coins = Array.from({ length: 3 }, (_, i) => coin(i, { volume24h: 100 - i }));
   const s = setup({ state: { coins, accounts: new Map([
