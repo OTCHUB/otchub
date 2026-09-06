@@ -113,23 +113,78 @@ export function detectWallets() {
   return merged;
 }
 
-// Silent reconnect after a page reload: if an injected wallet is still
-// authorized for this site, its provider already exposes publicKey WITHOUT a
-// connect() call — so re-registering the signer here NEVER triggers a wallet
-// prompt. Returns the matched address, or null when no authorized wallet
-// matches (the portfolio then stays read-only until the user reconnects).
-export function silentReconnect(storedPk) {
-  if (!storedPk) return null;
-  for (const entry of detectWallets()) {
-    if (entry.kind !== "injected") continue;
-    const p = entry.provider?.publicKey;
-    const pk = p?.toString?.() || (typeof p === "string" ? p : null);
-    if (pk === storedPk) {
-      setConnectedWallet(entry, null, pk);
-      return pk;
+// Silent reconnect after a page reload — TWO prompt-free paths:
+//  1. The provider already exposes publicKey for this site: register it with
+//     NO connect() call at all.
+//  2. connect({ onlyIfTrusted: true }) — the wallets' documented eager-connect
+//     path: resolves SILENTLY when this site is still authorized, rejects
+//     (no popup ever) when it isn't. Wallet Standard's connect() is likewise
+//     silent for already-authorized accounts.
+// CRITICAL: most injected wallets (Phantom, Solflare, Backpack) expose
+// publicKey ONLY after connect() — on a fresh page load it is null even for
+// authorized sites, so path 1 alone never matched. That left the app with no
+// signer after every refresh and claims/swaps failed until the user
+// manually disconnected and reconnected.
+// Returns the matched address, or null when no authorized wallet matches
+// (the portfolio then stays read-only until the user reconnects).
+let _busyPk = null; // one in-flight restore per stored key: retry timers must not race connect()
+export async function silentReconnect(storedPk) {
+  if (!storedPk || _busyPk === storedPk) return null;
+  _busyPk = storedPk;
+  try {
+    const entries = detectWallets();
+
+    // 1. publicKey already exposed — register without any connect() call.
+    for (const entry of entries) {
+      if (entry.kind !== "injected") continue;
+      const p = entry.provider?.publicKey;
+      const pk = p?.toString?.() || (typeof p === "string" ? p : null);
+      if (pk === storedPk) {
+        setConnectedWallet(entry, null, pk);
+        return pk;
+      }
     }
+
+    // 2. Trusted connect — silent for authorized sites, rejection (never a
+    //    prompt) otherwise. Try each detected wallet until one matches the
+    //    stored address.
+    for (const entry of entries) {
+      try {
+        if (entry.kind === "standard" && entry.wallet) {
+          const connect = entry.wallet.features["standard:connect"]?.connect;
+          if (!connect) continue;
+          const out = await connect();
+          const account = out?.accounts?.[0] || entry.wallet.accounts?.[0];
+          const pk =
+            account?.address ||
+            account?.publicKey?.toString?.() ||
+            (typeof account?.publicKey === "string" ? account.publicKey : null);
+          if (pk === storedPk) {
+            setConnectedWallet(entry, account, pk);
+            return pk;
+          }
+          continue;
+        }
+        if (entry.kind === "injected" && typeof entry.provider?.connect === "function") {
+          const res = await entry.provider.connect({ onlyIfTrusted: true });
+          const pk =
+            res?.publicKey?.toString?.() ||
+            (typeof res?.publicKey === "string" ? res.publicKey : null) ||
+            entry.provider.publicKey?.toString?.() || // Solflare resolves void
+            (typeof entry.provider.publicKey === "string" ? entry.provider.publicKey : null);
+          if (pk === storedPk) {
+            setConnectedWallet(entry, null, pk);
+            return pk;
+          }
+        }
+      } catch {
+        /* not authorized in this wallet — try the next one */
+      }
+    }
+    return null;
+  } finally {
+    _busyPk = null;
   }
-  return null;
 }
 
 export async function connectWallet(entry) {
