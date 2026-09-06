@@ -91,7 +91,19 @@ cycle units, allocation weights, eligibility and payment timing are not verified
 Socials can fall back to existing DEX probes (at most 150 candidate tokens), never
 to unrelated quote-token metadata. No additional per-token requests are made.
 
-See [live-feed semantics, progress calculation and coverage](docs/launcher-live-data.md).
+Each row also carries best-effort **risk enrichment** from public RugCheck GET
+reports: a local DANGER/WARNING/NONE/UNKNOWN level, bounded risk factors, gross
+top-15 token-account concentration (flagged strictly above 35%), and deployer
+reputation with explicit provenance (user-curated ETF/pumpcat reference incidents
+plus fresh rugged-report matches; negatives override positives). Enrichment is
+bounded to 12 starts per rolling 30 seconds with at most 2 in flight, a shared
+2500 ms stage deadline, and a five-minute cache. Timeouts, rate limits and
+upstream failures degrade rows to explicit unknown/stale states and can never
+block, delay or empty the feed. No report implies safety; unchecked rows are not
+safe rows.
+
+See [live-feed semantics, progress calculation and coverage](docs/launcher-live-data.md)
+and [risk evidence, limits and reputation provenance](docs/launcher-risk.md).
 Publish `getLauncherLive` with the frontend through the existing Base44 dashboard
 workflow. It reuses the existing server-side Helius configuration. Follow with
 hosted checks for status freshness, wallet selection and route availability;

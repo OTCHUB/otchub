@@ -1,5 +1,6 @@
 import { ApiError, errorResponse, requestParams, requestUrl, responseHeaders } from "../../shared/apiHttp.js";
 import { decodeLauncherCurve, hasConfirmedAmmPair, launcherStatus, NEAR_THRESHOLD } from "../../shared/launcherCurve.js";
+import { createLauncherRiskService, emptyLauncherRisk } from "../../shared/launcherRisk.js";
 
 const COINS_URL = "https://otcdesks.cash/api/coins";
 const DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/";
@@ -130,8 +131,22 @@ async function runBounded(tasks) {
 }
 
 export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl = fetch,
-  clock = Date.now, probeTimeoutMs = 9000 }) {
+  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions }) {
   let cached = null, inflight = null, activeRpc = 0;
+  const risks = riskService ?? createLauncherRiskService({ ...riskOptions, fetchImpl, clock });
+
+  // The risk stage is best-effort enrichment: a failing or throwing risk service
+  // must never empty the feed. Degrade to explicit NOT_CHECKED rows instead.
+  const enrichRisks = (rows, priority) => Promise.resolve()
+    .then(() => risks.enrich(rows, priority)).catch(() => undefined);
+  function attachRisks(rows, coverage) {
+    try { return risks.attach(rows, coverage); }
+    catch {
+      for (const row of rows) row.risk ||= emptyLauncherRisk();
+      return { total: rows.length, checked: 0, stale: 0, unavailable: 0,
+        notChecked: rows.length, requested: 0, limited: false, nextRetryAt: null };
+    }
+  }
 
   const fetchJson = (url, timeoutMs) => withDeadline(async (signal) => {
     const res = await fetchImpl(url, { signal });
@@ -194,7 +209,12 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         } catch { errors.add("DEXSCREENER_UNAVAILABLE"); }
       });
     }
-    await runBounded(tasks);
+    // Await the bounded risk stage alongside existing probes, never after them.
+    const [, enrichmentCoverage] = await Promise.all([
+      runBounded(tasks), enrichRisks(rows, candidates.map((c) => c.row)),
+    ]);
+    // Probes may outlast risk enrichment. Re-project freshness at response time.
+    const riskCoverage = attachRisks(rows, enrichmentCoverage);
     for (const c of candidates) {
       if (c.curve) Object.assign(c.row, c.curve);
       c.row.status = launcherStatus(c.curve, c.graduated);
@@ -205,7 +225,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       else c.row.statusAt = c.curveAt === null ? c.dexAt : Math.max(c.curveAt, c.dexAt ?? c.curveAt);
     }
     return {
-      at, stale: false, ranked: rankLauncherRows(rows, "vol24"),
+      at, stale: false, ranked: rankLauncherRows(rows, "vol24"), riskCoverage,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,
@@ -229,7 +249,10 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       // mint RPC proxy; reject params even on a warm cache without upstream work.
       await requestParams(req, requestUrl(req), []);
       const cacheAge = cached ? clock() - cached.at : Infinity;
-      if (cached && cacheAge >= 0 && cacheAge < FRESH_MS) return respond(cached, "hit");
+      if (cached && cacheAge >= 0 && cacheAge < FRESH_MS) {
+        const ranked = cached.ranked.map((row) => ({ ...row }));
+        return respond({ ...cached, ranked, riskCoverage: attachRisks(ranked, cached.riskCoverage) }, "hit");
+      }
       if (!inflight) {
         inflight = build().then((body) => { cached = body; return body; })
           .finally(() => { inflight = null; });
@@ -239,7 +262,9 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         // Recheck AFTER failure. A slow failed request must not extend the bound.
         const age = cached ? clock() - cached.at : Infinity;
         if (cached && age >= 0 && age <= MAX_AGE_MS) {
-          return respond({ ...cached, stale: true, sourceError: "COINS_UNAVAILABLE" }, "stale");
+          const ranked = cached.ranked.map((row) => ({ ...row }));
+          return respond({ ...cached, ranked, riskCoverage: attachRisks(ranked, { ...cached.riskCoverage, forceStale: true }),
+            stale: true, sourceError: "COINS_UNAVAILABLE" }, "stale");
         }
         headers.set("X-Launcher-Cache", "error");
         throw new ApiError(502, "COINS_UNAVAILABLE", "Launcher coins are temporarily unavailable.");

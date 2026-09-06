@@ -6,10 +6,13 @@ import { PublicKey } from "@solana/web3.js";
 import { createLauncherLiveHandler, launcherCandidates, rankLauncherRows } from "../base44/functions/getLauncherLive/handler.js";
 import { createCurveAddressDeriver, curveFundingProgress, decodeLauncherCurve, hasConfirmedAmmPair,
   launcherStatus, PUMP_CURVE_DISCRIMINATOR, PUMP_PROGRAM_ID } from "../base44/shared/launcherCurve.js";
+import { createLauncherRiskService, emptyLauncherRisk, isLauncherRiskMint, LAUNCHER_RISK_REFERENCES,
+  normalizeLauncherRiskReport } from "../base44/shared/launcherRisk.js";
 
 const NOW = 1_800_000_000_000;
 const COINS = "https://otcdesks.cash/api/coins";
 const DEX = "https://api.dexscreener.com/latest/dex/tokens/";
+const RUG = "https://api.rugcheck.xyz/v1/tokens/";
 const derive = createCurveAddressDeriver(PublicKey);
 const mint = (i) => {
   const bytes = new Uint8Array(32);
@@ -54,6 +57,9 @@ function setup(options = {}) {
   }
   const handler = createLauncherLiveHandler({ clock: () => now, deriveCurveAddress: derive,
     probeTimeoutMs: options.probeTimeoutMs ?? 1000,
+    // Legacy metric regressions explicitly disable risk starts. Integration tests
+    // below use the real default-enabled service with all three hosts stubbed.
+    riskService: options.riskService, riskOptions: options.riskOptions ?? { maxRequests: 0 },
     rpc: (method, params) => tracked({ type: "rpc", method, params }, async () => {
       assert.equal(method, "getMultipleAccounts");
       assert.ok(params[0].length <= 100);
@@ -63,13 +69,22 @@ function setup(options = {}) {
       if (Object.hasOwn(state, "rpcResult")) return state.rpcResult;
       return { value: params[0].map((address) => state.accounts.get(address) ?? null) };
     }),
-    fetchImpl: (url, options) => tracked({ type: url === COINS ? "coins" : "dex", url }, async () => {
+    fetchImpl: (url, options) => tracked({ type: url === COINS ? "coins" : url.startsWith(RUG) ? "risk" : "dex", url }, async () => {
       assert.ok(options.signal instanceof AbortSignal);
       if (url === COINS) {
         if (state.coinsHook) await state.coinsHook();
         if (state.failCoins) throw new Error("unsafe upstream detail");
         // Keep NaN/Infinity intact to test sanitization before JSON serialization.
         return { ok: true, json: async () => structuredClone(state.coins) };
+      }
+      if (url.startsWith(RUG)) {
+        const token = url.slice(RUG.length, -"/report".length);
+        assert.equal(url, `${RUG}${token}/report`);
+        assert.ok(isLauncherRiskMint(token));
+        assert.equal(options.method, "GET");
+        assert.equal(options.redirect, "error");
+        return state.riskHook ? state.riskHook(token, options)
+          : Response.json(state.reports?.get(token) ?? riskReport(token));
       }
       assert.ok(url.startsWith(DEX));
       assert.ok(url.slice(DEX.length).split(",").length <= 30);
@@ -178,7 +193,7 @@ test("row contract preserves finite zeros/losses and sanitizes unknown metrics a
   const { body } = await s.read();
   assert.deepEqual(body.ranked.map((r) => r.mint), [mint(1), mint(2), mint(3), mint(4)]);
   assert.deepEqual(Object.keys(body.ranked[0]).sort(), ["mint", "symbol", "name", "image", "logoUrl", "socials", "payoutInfo", "vol24", "mcap", "liquidity",
-    "change24h", "ageH", "metricsAt", "curveProgress", "status", "curveComplete", "statusAt"].sort());
+    "change24h", "ageH", "metricsAt", "curveProgress", "status", "curveComplete", "statusAt", "risk"].sort());
   assert.deepEqual([body.ranked[0].vol24, body.ranked[0].mcap, body.ranked[0].liquidity, body.ranked[0].change24h], [0, 0, 0, 0]);
   assert.equal(body.ranked[1].symbol, "");
   assert.equal(body.ranked[1].change24h, -20);
@@ -662,4 +677,476 @@ test("public GET and SDK POST {} work; arbitrary query/body mints are rejected b
   }
   assert.equal((await s.read(new Request("https://example.test", { method: "DELETE" }))).response.status, 405);
   assert.equal(s.calls.length, calls);
+});
+
+// All risk data below is synthetic. Creator identities are deliberately different
+// from live wallets: attribution must come from exact, validated runtime reports.
+const [ETF, PUMPCAT] = LAUNCHER_RISK_REFERENCES;
+function holderSample(pcts = [...Array(5).fill(0), ...Array(14).fill(2), 7]) {
+  return pcts.map((pct, i) => ({ address: mint(10_000 + i), owner: mint(20_000 + i), pct }));
+}
+function riskReport(token, extra = {}) {
+  return { mint: token, creator: mint(9000), score: 1, score_normalised: 1, rugged: false,
+    risks: [], topHolders: holderSample(), totalHolders: 100,
+    detectedAt: new Date(NOW - 5000).toISOString(), ...extra };
+}
+function referenceReports() {
+  return new Map([[ETF.mint, riskReport(ETF.mint, { creator: mint(9001) })],
+    [PUMPCAT.mint, riskReport(PUMPCAT.mint, { creator: mint(9002) })]]);
+}
+function riskHarness(options = {}) {
+  let now = NOW, active = 0, maxActive = 0;
+  const calls = [], state = { reports: referenceReports(), hook: null };
+  const service = createLauncherRiskService({ ...options, clock: () => now, fetchImpl: async (url, init) => {
+    assert.equal(new URL(url).origin, "https://api.rugcheck.xyz");
+    const token = url.slice(RUG.length, -"/report".length);
+    assert.equal(url, `${RUG}${token}/report`);
+    assert.ok(isLauncherRiskMint(token));
+    assert.equal(init.method, "GET");
+    assert.equal(init.redirect, "error");
+    assert.ok(init.signal instanceof AbortSignal);
+    calls.push({ token, at: now }); maxActive = Math.max(maxActive, ++active);
+    try { return state.hook ? await state.hook(token, init)
+      : Response.json(state.reports.get(token) ?? riskReport(token)); }
+    finally { active--; }
+  } });
+  return { service, calls, state, clock: () => now, advance: (ms) => { now += ms; },
+    setClock: (value) => { now = value; }, maxActive: () => maxActive };
+}
+const riskOf = (body, token = mint(1)) => body.ranked.find((r) => r.mint === token).risk;
+const riskCalls = (s) => s.calls.filter((c) => c.type === "risk");
+
+test("risk integration: ETF user-reference negative despite score 1/rugged false; pumpcat exact creator positive", async () => {
+  const reports = referenceReports();
+  reports.set(mint(1), riskReport(mint(1), { creator: mint(9001) }));
+  reports.set(mint(2), riskReport(mint(2), { creator: mint(9002) }));
+  reports.set(mint(3), riskReport(mint(3), { creator: mint(9003) }));
+  const s = setup({ riskOptions: {}, state: { reports, coins: [coin(1), coin(2), coin(3, {}, { symbol: "ETF" }),
+    coin(4, {}, { mint: ETF.mint }), coin(5, {}, { mint: PUMPCAT.mint })] } });
+  const { body } = await s.read(), negative = riskOf(body), positive = riskOf(body, mint(2));
+  assert.equal(negative.score, 1);
+  assert.equal(negative.rugged, false);
+  assert.equal(negative.level, "NONE");
+  assert.equal(negative.state, "READY");
+  assert.equal(negative.deployer, mint(9001));
+  assert.equal(negative.reputation.status, "MALICIOUS_REPORTED");
+  assert.deepEqual(negative.reputation.evidence, [{ ...ETF, source: "USER_REFERENCE", checkedAt: NOW }]);
+  assert.equal(negative.highRisk, true);
+  assert.equal(positive.reputation.status, "SUCCESS_REPORTED");
+  assert.deepEqual(positive.reputation.evidence, [{ ...PUMPCAT, source: "USER_REFERENCE", checkedAt: NOW }]);
+  assert.equal(positive.highRisk, false);
+  assert.equal(riskOf(body, mint(3)).reputation.status, "UNKNOWN", "Never match a symbol");
+  assert.equal(riskOf(body, ETF.mint).reputation.status, "MALICIOUS_REPORTED");
+  assert.equal(riskOf(body, PUMPCAT.mint).reputation.status, "SUCCESS_REPORTED");
+  assert.deepEqual(Object.keys(negative).sort(), Object.keys(emptyLauncherRisk()).sort());
+  assert.equal(negative.reportedAt, NOW - 5000);
+  assert.deepEqual(body.riskCoverage, { total: 5, checked: 5, stale: 0, unavailable: 0,
+    notChecked: 0, requested: 5, limited: false, nextRetryAt: null });
+  assert.equal(body.ranked[0].status, "BONDING");
+  assert.equal(body.ranked[0].mcap, 2000);
+  assert.equal(body.statusError, null);
+});
+
+test("risk integration: fresh warm-cache rugged history propagates across mints and overrides curated success", async () => {
+  const reports = referenceReports();
+  reports.set(mint(1), riskReport(mint(1), { creator: mint(9002), rugged: true }));
+  reports.set(mint(2), riskReport(mint(2), { creator: mint(9002) }));
+  const s = setup({ riskOptions: {}, state: { reports, coins: [coin(1)] } });
+  assert.equal(riskOf((await s.read()).body).level, "DANGER");
+  s.advance(30_000);
+  s.state.coins = [coin(2, { volume24h: 1000 })];
+  const { body } = await s.read(), risk = riskOf(body, mint(2));
+  assert.equal(risk.reputation.status, "MALICIOUS_REPORTED");
+  assert.deepEqual(risk.reputation.evidence, [{ mint: mint(1), label: "RugCheck rugged report",
+    outcome: "MALICIOUS_REPORTED", source: "RUGCHECK_RUGGED", checkedAt: NOW }]);
+  assert.equal(risk.highRisk, true);
+  assert.equal(riskCalls(s).length, 4, "Only the new row needs another report; history is local cache");
+  assert.equal(body.ranked[0].vol24, 1000);
+});
+
+test("risk integration: shared ETF/pumpcat creator has negative precedence without claiming ETF is rugged", async () => {
+  const reports = referenceReports();
+  reports.set(PUMPCAT.mint, riskReport(PUMPCAT.mint, { creator: mint(9001) }));
+  reports.set(mint(1), riskReport(mint(1), { creator: mint(9001) }));
+  const { body } = await setup({ riskOptions: {}, state: { reports } }).read();
+  assert.equal(riskOf(body).reputation.status, "MALICIOUS_REPORTED");
+  assert.deepEqual(riskOf(body).reputation.evidence.map((e) => e.source), ["USER_REFERENCE"]);
+  assert.equal(riskOf(body).rugged, false);
+});
+
+test("risk integration: unresolved, mismatched and error-shaped seeds cannot propagate or substitute other authorities", async () => {
+  for (const seed of [null, { creator: null }, { creator: "bad" }, { mint: mint(50) },
+    { error: "private upstream detail" }, { success: false }, { creator: undefined }, { creatorTokens: [mint(1)], creator: null }]) {
+    const reports = referenceReports();
+    reports.set(mint(1), riskReport(mint(1), { creator: mint(9001) }));
+    const s = setup({ riskOptions: {}, state: { reports, riskHook: (token) => token === ETF.mint
+      ? seed === null ? new Response(null, { status: 404 })
+        : Response.json(riskReport(token, { ...seed, mintAuthority: mint(9001), owner: mint(9001) }))
+      : Response.json(reports.get(token) ?? riskReport(token)) } });
+    const { body } = await s.read();
+    assert.equal(riskOf(body).reputation.status, "UNKNOWN");
+    assert.equal(JSON.stringify(body).includes("private upstream detail"), false);
+  }
+});
+
+test("risk normalization: only normalized 0..100 uses local >=50; raw score has no invented threshold", () => {
+  const normalize = (extra) => normalizeLauncherRiskReport(riskReport(mint(1), extra), mint(1), NOW);
+  for (const score_normalised of [undefined, null, -1, 101, Infinity, "99"]) {
+    const risk = normalize({ score: 99_999_999, score_normalised });
+    assert.equal(risk.scoreNormalised, null);
+    assert.equal(risk.level, "NONE");
+    assert.equal(risk.highRisk, false);
+  }
+  assert.equal(normalize({ score_normalised: 49.99 }).level, "NONE");
+  assert.equal(normalize({ score: -1 }).score, -1, "Raw score is display-only, not a classification cutoff");
+  assert.equal(normalize({ score_normalised: 50 }).level, "DANGER");
+  assert.equal(normalize({ rugged: true }).level, "DANGER");
+  for (const level of ["warn", "warning", "WARNING"]) {
+    const risk = normalize({ risks: [{ level, name: "Warning", value: 0, score: 0 }] });
+    assert.equal(risk.level, "WARNING"); assert.equal(risk.highRisk, true);
+    assert.equal(risk.factors[0].value, 0); assert.equal(risk.factors[0].score, 0);
+  }
+  assert.equal(normalize({ risks: [{ level: "danger" }, { level: "warn" }] }).level, "DANGER");
+  assert.equal(normalize({ risks: [{ level: "info" }] }).level, "NONE");
+  for (const risks of [undefined, null, [null], [{ level: "other" }], [{ level: "__proto__" }], [{ level: "toString" }]]) {
+    const risk = normalize({ risks });
+    assert.equal(risk.level, "UNKNOWN"); assert.equal(risk.highRisk, null);
+  }
+  for (const extra of [{ mint: mint(2) }, { score: "1" }, { rugged: "false" }, { risks: {} }, { error: null },
+    { status: 500 }, { status: "error" }, { message: "upstream failure" }, { ok: false },
+    { score: Infinity }, { risks: Array(65).fill({ level: "info" }) }]) assert.throws(() => normalize(extra), /INVALID_REPORT/);
+  const bounded = normalize({ detectedAt: new Date(NOW + 1).toISOString(), risks: [{ level: "info",
+    name: "N".repeat(1000), description: "D".repeat(2000), value: "V".repeat(1000), score: "1" }] });
+  assert.equal(bounded.reportedAt, null);
+  assert.deepEqual([bounded.factors[0].name.length, bounded.factors[0].description.length,
+    bounded.factors[0].value.length, bounded.factors[0].score], [128, 1024, 256, null]);
+});
+
+test("risk integration: unsorted top15 uses strict >35 with no rounding and gross accounts, not owners", async () => {
+  for (const peak of [7, 7.01, 7.000001]) {
+    const topHolders = holderSample([...Array(5).fill(0), ...Array(14).fill(2), peak])
+      .map((h) => ({ ...h, owner: mint(99) }));
+    const reports = referenceReports(); reports.set(mint(1), riskReport(mint(1), { topHolders }));
+    const { body } = await setup({ riskOptions: {}, state: { reports } }).read(), risk = riskOf(body);
+    assert.ok(Math.abs(risk.top15Pct - (28 + peak)) < 1e-10);
+    assert.equal(risk.holderSampleSize, 20);
+    assert.equal(risk.holderConcentrationHigh, peak > 7);
+    assert.equal(risk.highRisk, peak > 7);
+  }
+});
+
+test("holder safeguards: identical accounts deduplicate, conflicting/malformed/overfull/truncated samples stay unknown", () => {
+  const normalize = (extra) => normalizeLauncherRiskReport(riskReport(mint(1), extra), mint(1), NOW);
+  const full = holderSample();
+  assert.equal(normalize({ topHolders: [...full, full[0]] }).top15Pct, 35);
+  assert.equal(normalize({ topHolders: [...full, full[0]] }).holderSampleSize, 20);
+  const bad = [undefined, null, [], full.slice(0, 14), Array(20).fill(full[0]),
+    [...full, { ...full[0], pct: 10 }], [...full, { ...full[0], owner: mint(1) }],
+    full.map((h) => ({ ...h, pct: 6 })), ...["0", null, false, -1, 101, NaN, Infinity].map((pct) => [{ ...full[0], pct }, ...full.slice(1)]),
+    [{ ...full[0], owner: null }, ...full.slice(1)], [{ ...full[0], address: "bad" }, ...full.slice(1)]];
+  for (const topHolders of bad) {
+    const risk = normalize({ topHolders });
+    assert.equal(risk.top15Pct, null); assert.equal(risk.holderConcentrationHigh, null);
+    assert.equal(risk.highRisk, null);
+  }
+  assert.equal(normalize({ topHolders: full.slice(0, 10), totalHolders: 10 }).top15Pct, 10);
+  assert.equal(normalize({ topHolders: full.slice(0, 10), totalHolders: 9 }).top15Pct, 10);
+  for (const totalHolders of ["10", undefined, 11, 0, -1, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(normalize({ topHolders: full.slice(0, 10), totalHolders }).top15Pct, null);
+  }
+});
+
+test("risk integration: cold/expired concurrent readers singleflight and five-minute reports survive 30-second rebuilds", async () => {
+  const s = setup({ riskOptions: {} });
+  const responses = await Promise.all(Array.from({ length: 8 }, () => s.read()));
+  for (const result of responses) assert.deepEqual(result.body, responses[0].body);
+  assert.equal(riskCalls(s).length, 3);
+  const total = s.calls.length;
+  assert.deepEqual((await s.read()).body, responses[0].body);
+  assert.equal(s.calls.length, total, "Full-response cache must make no requests");
+  for (let i = 0; i < 9; i++) {
+    s.advance(30_000);
+    const { body } = await s.read();
+    assert.equal(body.riskCoverage.requested, 0);
+    assert.equal(body.riskCoverage.checked, 1);
+    assert.equal(riskOf(body).checkedAt, NOW);
+  }
+  assert.equal(riskCalls(s).length, 3);
+  s.advance(30_000);
+  await Promise.all(Array.from({ length: 5 }, () => s.read()));
+  assert.equal(riskCalls(s).length, 6);
+});
+
+test("risk integration: full-response hits recheck report age and suppress expired curated success without fetches", async () => {
+  const reports = referenceReports(); reports.set(mint(1), riskReport(mint(1), { creator: mint(9002) }));
+  const s = setup({ riskOptions: {}, state: { reports } });
+  assert.equal(riskOf((await s.read()).body).reputation.status, "SUCCESS_REPORTED");
+  s.advance(280_000); await s.read();
+  const calls = s.calls.length;
+  s.advance(20_000);
+  const { body, response } = await s.read(), risk = riskOf(body);
+  assert.equal(response.headers.get("X-Launcher-Cache"), "hit");
+  assert.equal(s.calls.length, calls);
+  assert.equal(risk.state, "STALE"); assert.equal(risk.highRisk, null);
+  assert.equal(risk.reputation.status, "UNKNOWN"); assert.deepEqual(risk.reputation.evidence, []);
+  assert.equal(body.riskCoverage.checked, 0); assert.equal(body.riskCoverage.stale, 1);
+});
+
+test("risk integration: errors retain stale negatives, never propagate expired seeds to new rows, and preserve ranking", async () => {
+  const reports = referenceReports();
+  for (const i of [1, 2]) reports.set(mint(i), riskReport(mint(i), { creator: mint(9001) }));
+  const s = setup({ riskOptions: {}, state: { reports } });
+  await s.read();
+  s.advance(300_000);
+  s.state.coins = [coin(1, { volume24h: 1 }), coin(2, { volume24h: 999 })];
+  s.state.riskHook = (token) => [ETF.mint, PUMPCAT.mint].includes(token)
+    ? new Response(null, { status: 404 }) : Response.json(reports.get(token));
+  const { body } = await s.read();
+  assert.deepEqual(body.ranked.map((r) => r.mint), [mint(2), mint(1)]);
+  assert.equal(body.stale, false); assert.equal(body.statusError, null);
+  assert.equal(riskOf(body).state, "STALE"); assert.equal(riskOf(body).error, "STALE_EVIDENCE");
+  assert.equal(riskOf(body).highRisk, true);
+  assert.equal(riskOf(body, mint(2)).reputation.status, "UNKNOWN");
+  assert.equal(riskOf(body, mint(2)).state, "READY");
+});
+
+test("risk integration: failed report refresh is stale for at most 30min and does not poison fresh metrics", async () => {
+  const reports = referenceReports(); reports.set(mint(1), riskReport(mint(1), { risks: [{ level: "danger" }] }));
+  const s = setup({ riskOptions: {}, state: { reports } }); await s.read();
+  s.state.riskHook = () => new Response(null, { status: 503 });
+  s.advance(300_000); s.state.coins[0].snapshot.change24h = 42;
+  let result = await s.read();
+  assert.equal(riskOf(result.body).state, "STALE");
+  assert.equal(riskOf(result.body).checkedAt, NOW);
+  assert.equal(riskOf(result.body).error, "UPSTREAM_UNAVAILABLE");
+  assert.equal(riskOf(result.body).highRisk, true);
+  assert.equal(result.body.ranked[0].change24h, 42); assert.equal(result.body.stale, false);
+  s.advance(1_500_000); result = await s.read();
+  assert.equal(riskOf(result.body).state, "STALE", "Inclusive 30-minute bound");
+  s.advance(1); result = await s.read();
+  assert.equal(riskOf(result.body).state, "UNAVAILABLE");
+  assert.equal(riskOf(result.body).score, null); assert.equal(riskOf(result.body).highRisk, null);
+});
+
+test("risk integration: stale coin fallback suppresses success while preserving metric data", async () => {
+  const reports = referenceReports(); reports.set(mint(1), riskReport(mint(1), { creator: mint(9002) }));
+  const s = setup({ riskOptions: {}, state: { reports } }); const first = await s.read();
+  s.advance(30_000); s.state.failCoins = true;
+  const { body } = await s.read();
+  assert.equal(body.stale, true); assert.equal(body.ranked[0].vol24, first.body.ranked[0].vol24);
+  assert.equal(riskOf(body).state, "STALE"); assert.equal(riskOf(body).error, "FEED_STALE");
+  assert.equal(riskOf(body).reputation.status, "UNKNOWN");
+  assert.equal(riskCalls(s).length, 3);
+});
+
+test("risk 429 honors default, seconds and HTTP-date Retry-After globally without queued starts", async () => {
+  for (const [header, delay] of [[null, 60_000], ["1", 60_000], ["180", 180_000],
+    [new Date(NOW + 240_000).toUTCString(), 240_000], ["invalid", 60_000]]) {
+    const h = riskHarness(), rows = [coin(1), coin(2)];
+    h.state.hook = () => new Response(null, { status: 429, headers: header ? { "Retry-After": header } : {} });
+    const coverage = await h.service.enrich(rows);
+    assert.equal(h.calls.length, 2); assert.equal(coverage.requested, 2);
+    assert.equal(coverage.nextRetryAt, NOW + delay); assert.equal(coverage.limited, true);
+    assert.ok(rows.every((r) => r.risk.state === "NOT_CHECKED" && r.risk.highRisk === null));
+    h.advance(delay - 1); await h.service.enrich(rows); assert.equal(h.calls.length, 2);
+    h.advance(1); h.state.hook = null;
+    const fresh = await h.service.enrich(rows);
+    assert.equal(fresh.checked, 2); assert.equal(fresh.requested, 4);
+  }
+});
+
+test("risk integration: 429 on refresh keeps old report stale and metrics available during cooldown", async () => {
+  const s = setup({ riskOptions: {} }); await s.read(); s.advance(300_000);
+  s.state.riskHook = () => new Response(null, { status: 429, headers: { "Retry-After": "180" } });
+  const { body } = await s.read();
+  assert.equal(body.riskCoverage.nextRetryAt, NOW + 480_000);
+  assert.equal(riskOf(body).state, "STALE"); assert.equal(body.statusError, null);
+  const calls = riskCalls(s).length;
+  s.advance(30_000); s.state.coins[0].snapshot.marketCap = 9876;
+  assert.equal((await s.read()).body.ranked[0].mcap, 9876);
+  assert.equal(riskCalls(s).length, calls);
+});
+
+test("risk errors are independent, sanitized, negatively cached; wrong mint and oversized/error bodies never become READY", async () => {
+  const h = riskHarness(), rows = Array.from({ length: 7 }, (_, i) => coin(i + 1));
+  const responses = new Map([[mint(1), () => new Response(null, { status: 403 })],
+    [mint(2), () => new Response(null, { status: 404 })], [mint(3), () => new Response("not JSON")],
+    [mint(4), () => Response.json(riskReport(mint(99)))],
+    [mint(5), () => Response.json(riskReport(mint(5), { error: "unsafe upstream detail" }))],
+    [mint(6), () => new Response(" ".repeat(524_289))]]);
+  h.state.hook = (token) => responses.has(token) ? responses.get(token)()
+    : Response.json(h.state.reports.get(token) ?? riskReport(token));
+  let coverage = await h.service.enrich(rows);
+  assert.equal(coverage.checked, 1); assert.equal(coverage.unavailable, 6);
+  assert.deepEqual(rows.slice(0, 6).map((r) => r.risk.error),
+    ["FORBIDDEN", "NOT_FOUND", "INVALID_REPORT", "INVALID_REPORT", "INVALID_REPORT", "PAYLOAD_TOO_LARGE"]);
+  assert.ok(!JSON.stringify(rows).includes("unsafe upstream detail"));
+  const count = h.calls.length;
+  h.advance(30_000); await h.service.enrich(rows); assert.equal(h.calls.length, count);
+  h.advance(30_000); h.state.hook = null;
+  coverage = await h.service.enrich(rows); assert.equal(coverage.checked, 7); assert.equal(coverage.requested, 6);
+});
+
+test("risk whole-stage timeout overlaps curve/DEX; ignored aborts retain two slots across rebuilds and cannot write late", async () => {
+  const entered = deferred(), release = deferred(); let started = 0;
+  const s = setup({ riskOptions: { budgetMs: 100, timeoutMs: 10 }, state: { riskHook: async (token) => {
+    if (++started === 2) entered.resolve(); await release.promise;
+    return Response.json(riskReport(token));
+  } } });
+  const pending = s.read(); await entered.promise; await tick();
+  assert.ok(s.calls.some((c) => c.type === "rpc") && s.calls.some((c) => c.type === "dex"));
+  const { body } = await pending;
+  assert.equal(body.riskCoverage.requested, 2); assert.equal(body.riskCoverage.notChecked, 1);
+  assert.equal(body.ranked[0].status, "BONDING"); assert.equal(body.statusError, null);
+  for (let i = 0; i < 3; i++) { s.advance(60_000); await s.read(); }
+  assert.equal(riskCalls(s).length, 2, "Abort-ignoring fetches cannot multiply on refresh");
+  release.resolve(); await tick();
+  s.advance(30_000); s.state.riskHook = () => new Response(null, { status: 404 });
+  const after = await s.read();
+  assert.equal(after.body.riskCoverage.checked, 0, "Late seed success must not enter cache");
+  assert.equal(riskCalls(s).length, 5, "Both timed-out seeds still require a real retry after late settlement");
+});
+
+test("risk body reads share the stage deadline and retain slots until abort-ignoring streams settle", async () => {
+  const h = riskHarness({ budgetMs: 15 }), controllers = [];
+  h.state.hook = () => new Response(new ReadableStream({ start(controller) { controllers.push(controller); } }));
+  const rows = [{ mint: ETF.mint }, { mint: PUMPCAT.mint }];
+  const coverage = await h.service.enrich(rows);
+  assert.equal(coverage.unavailable, 2); assert.ok(rows.every((r) => r.risk.error === "TIMEOUT"));
+  assert.equal(h.service.inspect().activeRequests, 2);
+  h.advance(60_000); await h.service.enrich(rows); assert.equal(h.calls.length, 2);
+  for (const controller of controllers) controller.close();
+  await tick();
+  assert.equal(h.service.inspect().activeRequests, 0);
+  h.service.attach(rows); assert.ok(rows.every((r) => r.risk.state !== "READY"));
+});
+
+test("risk production ceilings apply to 3000-row rosters and repeated rebuilds in a rolling window", async () => {
+  const h = riskHarness({ maxRequests: 999, concurrency: 999 }), rows = Array.from({ length: 3000 }, (_, i) => coin(i + 1));
+  const first = await h.service.enrich(rows, rows.slice(0, 150));
+  assert.equal(first.requested, 12); assert.equal(first.checked, 10); assert.equal(first.notChecked, 2990);
+  assert.equal(first.limited, true); assert.equal(first.nextRetryAt, NOW + 30_000);
+  assert.ok(h.maxActive() <= 2);
+  h.advance(29_999); assert.equal((await h.service.enrich(rows)).requested, 0);
+  assert.equal(h.calls.length, 12);
+  h.advance(1); assert.equal((await h.service.enrich(rows)).requested, 12);
+  assert.equal(h.calls.length, 24);
+  assert.equal(rows.filter((r) => r.risk.state === "READY").length, 22, "Cache attaches beyond current requests");
+});
+
+test("risk rotation eventually checks non-priority rows despite bounded eviction and repeated hot candidates", async () => {
+  const h = riskHarness({ maxEntries: 6, maxRequests: 4 }), rows = Array.from({ length: 40 }, (_, i) => coin(i + 1));
+  for (let i = 0; i < 35; i++) {
+    const coverage = await h.service.enrich(rows, rows.slice(0, 2));
+    assert.ok(coverage.requested <= 4); assert.ok(h.service.inspect().cacheSize <= 6);
+    h.advance(30_000);
+  }
+  const checked = new Set(h.calls.map((c) => c.token));
+  for (const row of rows) assert.ok(checked.has(row.mint), `Rotating coverage missed ${row.mint}`);
+  assert.ok(rows.some((r) => r.risk.state === "NOT_CHECKED"), "Evicted data must not masquerade as safe");
+});
+
+test("risk canonical validation rejects oversized base58, non-canonical encodings, and URL injection without requests", async () => {
+  const invalid = ["bad", "../escape?mint=other", "z".repeat(44), "1".repeat(33), ` ${mint(1)}`, `${mint(1)} `,
+    "0".repeat(32), null, undefined];
+  for (const value of invalid) assert.equal(isLauncherRiskMint(value), false);
+  for (const value of [mint(0), mint(1), ETF.mint, PUMPCAT.mint]) assert.equal(isLauncherRiskMint(value), true);
+  const h = riskHarness(), rows = invalid.map((mint) => ({ mint }));
+  const coverage = await h.service.enrich(rows);
+  assert.equal(h.calls.length, 0); assert.equal(coverage.unavailable, invalid.length);
+  assert.ok(rows.every((r) => r.risk.error === "INVALID_MINT" && r.risk.highRisk === null));
+  const s = setup({ riskOptions: {}, state: { coins: [coin(1, {}, { mint: "../escape" })] } });
+  assert.equal(riskOf((await s.read()).body, "../escape").error, "INVALID_MINT");
+  assert.equal(riskCalls(s).length, 0);
+});
+
+test("risk clock rollback/future cache timestamps fail unknown and keep pressure bounded; isolate caches are separate", async () => {
+  const h = riskHarness(), rows = [coin(1)]; await h.service.enrich(rows);
+  assert.equal(rows[0].risk.state, "READY");
+  h.advance(-1); h.service.attach(rows);
+  assert.equal(rows[0].risk.state, "NOT_CHECKED"); assert.equal(rows[0].risk.highRisk, null);
+  await h.service.enrich(rows); assert.equal(h.calls.length, 3);
+  const other = riskHarness(); other.service.attach(rows);
+  assert.equal(rows[0].risk.state, "NOT_CHECKED");
+  h.setClock(NaN); h.service.attach(rows);
+  assert.equal(rows[0].risk.state, "UNAVAILABLE"); assert.equal(rows[0].risk.error, "CLOCK_INVALID");
+});
+
+test("risk body processing consumes the common monotonic budget even before the real timeout timer fires", async () => {
+  let elapsed = 0;
+  const h = riskHarness({ budgetMs: 25, monotonicClock: () => elapsed });
+  h.state.hook = (token) => new Response(new ReadableStream({ pull(controller) {
+    elapsed += 15;
+    controller.enqueue(new TextEncoder().encode(JSON.stringify(riskReport(token))));
+    controller.close();
+  } }));
+  const rows = Array.from({ length: 50 }, (_, i) => coin(i + 1));
+  const coverage = await h.service.enrich(rows);
+  assert.ok(elapsed >= 25);
+  assert.ok(coverage.requested <= 2, "Body processing exhausted the stage before queued tokens could start");
+  assert.equal(coverage.checked, 0);
+  assert.equal(coverage.limited, true);
+});
+
+test("risk data handed to consumers cannot mutate cache, and refreshed creator identity discards old reputation", async () => {
+  const h = riskHarness(), rows = [coin(1)];
+  h.state.reports.set(mint(1), riskReport(mint(1), { creator: mint(9001), risks: [{ level: "info", name: "original" }] }));
+  await h.service.enrich(rows);
+  rows[0].risk.factors[0].name = "changed";
+  rows[0].risk.reputation.evidence[0].checkedAt = NOW + 999_999;
+  h.service.attach(rows);
+  assert.equal(rows[0].risk.factors[0].name, "original");
+  assert.equal(rows[0].risk.reputation.evidence[0].checkedAt, NOW);
+  h.advance(300_000);
+  h.state.reports.set(mint(1), riskReport(mint(1), { creator: mint(9003) }));
+  await h.service.enrich(rows);
+  assert.equal(rows[0].risk.state, "READY");
+  assert.equal(rows[0].risk.reputation.status, "UNKNOWN");
+  assert.deepEqual(rows[0].risk.reputation.evidence, []);
+});
+
+test("risk degradation: a throwing risk service never empties the feed on miss, hit, or stale paths", async () => {
+  // An injected service that fails in both directions. The feed must degrade to
+  // explicit NOT_CHECKED rows and fabricated zero coverage, never an error page.
+  const broken = {
+    enrich: async () => { throw new Error("unsafe risk detail"); },
+    attach: () => { throw new Error("unsafe risk detail"); },
+  };
+  const s = setup({ riskService: broken });
+  const miss = await s.read();
+  assert.equal(miss.response.status, 200);
+  assert.equal(miss.body.ranked.length, 1);
+  assert.equal(miss.body.ranked[0].mint, mint(1));
+  assert.equal(miss.body.statusError, null);
+  assert.deepEqual(miss.body.ranked[0].risk, emptyLauncherRisk());
+  assert.deepEqual(miss.body.riskCoverage, { total: 1, checked: 0, stale: 0, unavailable: 0,
+    notChecked: 1, requested: 0, limited: false, nextRetryAt: null });
+  assert.equal(JSON.stringify(miss.body).includes("unsafe risk detail"), false);
+  const hit = await s.read();
+  assert.equal(hit.response.headers.get("X-Launcher-Cache"), "hit");
+  assert.equal(hit.body.ranked.length, 1);
+  assert.deepEqual(hit.body.ranked[0].risk, emptyLauncherRisk());
+  // Stale fallback path: coins fail after the warm response expired.
+  s.advance(31_000);
+  s.state.failCoins = true;
+  const stale = await s.read();
+  assert.equal(stale.response.headers.get("X-Launcher-Cache"), "stale");
+  assert.equal(stale.body.stale, true);
+  assert.equal(stale.body.ranked.length, 1);
+  assert.deepEqual(stale.body.ranked[0].risk, emptyLauncherRisk());
+});
+
+test("risk degradation: enrich-only failure keeps attach-projected cached rows on rebuild", async () => {
+  // enrich throws but attach is healthy: rows already warm in the shared cache
+  // must still be projected rather than reset to NOT_CHECKED.
+  const inner = createLauncherRiskService({ fetchImpl: async () => Response.json(riskReport(mint(1))), clock: () => NOW });
+  const rows = [{ mint: mint(1) }];
+  await inner.enrich(rows);
+  let fail = true;
+  const flaky = { enrich: async (...args) => { if (fail) throw new Error("boom"); return inner.enrich(...args); },
+    attach: (...args) => inner.attach(...args) };
+  const s = setup({ riskService: flaky });
+  const { body } = await s.read();
+  assert.equal(body.ranked[0].risk.state, "READY");
+  assert.equal(body.riskCoverage.checked, 1);
 });
