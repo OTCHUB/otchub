@@ -52,7 +52,13 @@ function nftStockAta(vault, mintStr, tokenProgramPk) {
 // Resolve whether each stock mint lives under the standard Token program or
 // Token-2022 (the "extended" tickers use Token-2022). Defaults to the standard
 // Token program on any failure.
+//
+// A mint's owning token program is IMMUTABLE chain data — resolving it costs
+// a full extra RPC roundtrip on every scan, so cache it for the isolate's
+// lifetime instead of re-fetching it per scan.
+let _tpCache = null;
 async function resolveTokenPrograms() {
+  if (_tpCache) return _tpCache;
   const mints = STOCKS.map((s) => s.mint);
   let value;
   try {
@@ -66,6 +72,7 @@ async function resolveTokenPrograms() {
   for (let i = 0; i < mints.length; i++) {
     map[mints[i]] = value[i]?.owner === t22 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
   }
+  _tpCache = map;
   return map;
 }
 
@@ -97,36 +104,44 @@ export async function readVaultStock(assetIds) {
   }
 
   const info = new Map(); // addr -> { exists, amount, tokenProgram }
-  for (let i = 0; i < flat.length; i += BATCH) {
-    const slice = flat.slice(i, i + BATCH);
-    const pubkeys = slice.map((x) => x.addr);
-    let value;
-    try {
-      const rpcResult = await heliusRpc("getMultipleAccounts", [
-        pubkeys,
-        { encoding: "jsonParsed" },
-      ]);
-      value = rpcResult?.value || [];
-    } catch {
-      value = pubkeys.map(() => null);
-    }
-    for (let j = 0; j < slice.length; j++) {
-      const acc = value[j];
-      if (!acc) {
-        info.set(slice[j].addr, { exists: false, amount: 0, tokenProgram: null });
-        continue;
+  const batches = [];
+  for (let i = 0; i < flat.length; i += BATCH) batches.push(flat.slice(i, i + BATCH));
+  // Fetch all account batches IN PARALLEL. Sequential awaits made large scans
+  // (60+ listed desks = 8+ getMultipleAccounts roundtrips back-to-back) take
+  // seconds — the dominant scan cost. Parallel roundtrips collapse that to
+  // roughly one roundtrip's latency; a failed batch still degrades only its
+  // own accounts to "missing" (amount 0), exactly like before.
+  await Promise.all(
+    batches.map(async (slice) => {
+      const pubkeys = slice.map((x) => x.addr);
+      let value;
+      try {
+        const rpcResult = await heliusRpc("getMultipleAccounts", [
+          pubkeys,
+          { encoding: "jsonParsed" },
+        ]);
+        value = rpcResult?.value || [];
+      } catch {
+        value = pubkeys.map(() => null);
       }
-      const tokenProgram = acc.owner || null; // top-level: the SPL program
-      const vaultOwner = acc?.data?.parsed?.info?.owner || null;
-      const amtStr = acc?.data?.parsed?.info?.tokenAmount?.amount;
-      const amount = amtStr != null ? Number(amtStr) : 0;
-      info.set(slice[j].addr, {
-        exists: vaultOwner === vaults[slice[j].d].toBase58(),
-        amount,
-        tokenProgram,
-      });
-    }
-  }
+      for (let j = 0; j < slice.length; j++) {
+        const acc = value[j];
+        if (!acc) {
+          info.set(slice[j].addr, { exists: false, amount: 0, tokenProgram: null });
+          continue;
+        }
+        const tokenProgram = acc.owner || null; // top-level: the SPL program
+        const vaultOwner = acc?.data?.parsed?.info?.owner || null;
+        const amtStr = acc?.data?.parsed?.info?.tokenAmount?.amount;
+        const amount = amtStr != null ? Number(amtStr) : 0;
+        info.set(slice[j].addr, {
+          exists: vaultOwner === vaults[slice[j].d].toBase58(),
+          amount,
+          tokenProgram,
+        });
+      }
+    })
+  );
 
   for (let d = 0; d < ids.length; d++) {
     const tickers = STOCKS.map((s) => {
