@@ -66,6 +66,27 @@ publishing the app does not start it. Never put wallet keys in Base44 or Vite.
 Run offline regressions with `node --test tests/*.test.mjs`, then lint and build.
 Hosted RLS and live transaction compatibility need separate operator validation.
 
+## Launcher analytics and in-app swaps
+
+The analytics feed polls `getLauncherLive` every 30 seconds while visible. Filter
+by GRADUATED, BONDING or ABOUT_TO_GRADUATE; use ALL plus search to find any launch,
+including those whose status has not been checked. Rank by volume, momentum or
+market cap. Unknown metrics stay last. Existing public metrics keep their
+five-minute cache.
+
+Select a token name or TRADE to open its SOL pair in the in-app Jupiter panel.
+The panel verifies mint decimals and token program on-chain, supports buy/sell,
+and retains OTC as the default/reset pair. A launch's presence does **not** mean
+Jupiter has a route; liquidity, token extensions and route coverage can prevent
+execution. Balances cover the standard ATA only. No bot or live trade is started
+by these UI changes; each swap requires the user's wallet approval.
+
+See [live-feed semantics, progress calculation and coverage](docs/launcher-live-data.md).
+Publish `getLauncherLive` with the frontend through the existing Base44 dashboard
+workflow. It reuses the existing server-side Helius configuration. Follow with
+hosted checks for status freshness, wallet selection and route availability;
+the offline tests do not replace those checks.
+
 ## Docs & Support
 
 GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)

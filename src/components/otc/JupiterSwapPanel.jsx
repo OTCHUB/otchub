@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Check, Copy, Zap } from "lucide-react";
 import {
   SOL_MINT,
   OTC_MINT,
-  OTC_DECIMALS,
+  getTokenInfo,
   getQuote,
   getSwapTx,
   executeSwap,
-  fetchOtcBalance,
-  fetchSolBalance,
+  fetchTokenBalance,
+  fetchSolBalanceRaw,
 } from "@/lib/jupiterSwap";
+import { formatRawAmount, parseAmountToRaw, parseSlippageBps } from "@/lib/swapAmounts";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
 import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
@@ -19,227 +20,333 @@ import RecentSwaps from "@/components/otc/RecentSwaps";
 import PriceCandles from "@/components/otc/PriceCandles";
 import WalletConnect from "@/components/otc/WalletConnect";
 
-const LAMPORTS_PER_SOL = 1e9;
+const DEFAULT_TOKEN = { mint: OTC_MINT, symbol: "OTC" };
+const SOL_FEE_RESERVE = 10_000_000n; // 0.01 SOL, not a guarantee of the final fee/rent.
 const SLIPPAGE_OPTIONS = [
   { label: "0.5%", bps: 50 },
   { label: "1%", bps: 100 },
   { label: "3%", bps: 300 },
 ];
 
-function fmtOtc(raw) {
-  if (raw == null) return "—";
-  const v = Number(raw) / Math.pow(10, OTC_DECIMALS);
-  return v.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS });
+function snapshotTime(at) {
+  const ms = typeof at === "number" ? at : Date.parse(at);
+  return Number.isFinite(ms) && ms > 0 && ms <= 8640000000000000 ? new Date(ms).toISOString() : null;
 }
 
-function fmtLamports(raw) {
-  if (raw == null) return "—";
-  const v = Number(raw) / LAMPORTS_PER_SOL;
-  return v.toLocaleString(undefined, { maximumFractionDigits: 6 });
-}
-
-// Two-way $OTC trading via Jupiter: BUY = SOL -> $OTC, SELL = $OTC -> SOL.
-// Same reliability model as before: every swap tx is simulated before the
-// wallet is asked to sign, so a failing sim aborts with no fee spent.
-export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected }) {
+// token: { mint, symbol, name?, mcap?, change24h?, vol24?, liquidity?, metricsAt? }.
+// Home owns selection; never key/remount this panel while a wallet is signing.
+export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected, token = DEFAULT_TOKEN, onBusyChange, onResetToken }) {
+  const mint = token?.mint || OTC_MINT;
+  const symbol = token?.symbol || (mint === OTC_MINT ? "OTC" : "TOKEN");
+  const tokenLabel = `$${symbol.replace(/^\$/, "")}`;
+  const isOtc = mint === OTC_MINT;
   const [mode, setMode] = useState("BUY"); // "BUY" | "SELL"
   const [amount, setAmount] = useState("0.1");
+  const [formEpoch, setFormEpoch] = useState(0);
   const [slippageBps, setSlippageBps] = useState(100);
-  const [quote, setQuote] = useState(null);
-  const [quoting, setQuoting] = useState(false);
+  const [quoteState, setQuote] = useState(null);
+  const [quotingGeneration, setQuoting] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [logs, setLogs] = useState([]);
-  const [copied, setCopied] = useState(false);
-  const [err, setErr] = useState(null);
-  const [otcBal, setOtcBal] = useState(null);
-  const [solBal, setSolBal] = useState(null);
+  const [logState, setLogs] = useState([]);
+  const [copied, setCopied] = useState(null);
+  const [errorState, setError] = useState(null);
+  const [metadata, setMetadata] = useState(null);
+  const [balances, setBalances] = useState(null);
   const [customSlip, setCustomSlip] = useState(""); // custom slippage % (overrides presets)
-  const [prices, setPrices] = useState({}); // mint -> USD spot (SOL + $OTC)
+  const [priceState, setPrices] = useState(null);
   const [priceUnit, setPriceUnit] = useState("USD"); // shared USD/SOL toggle for candles + trades feed
   const [txPhase, setTxPhase] = useState(null); // live swap phase for the status overlay
+  const mounted = useRef(false);
+  const lifetime = useRef(0);
+  const busyRef = useRef(false);
+  const activeSwapDetail = useRef(null);
+  const quoteRequest = useRef(0);
+  const metadataRequest = useRef(0);
+  const balanceRequest = useRef(0);
+  const timers = useRef(new Set());
+  const context = useRef({ key: null, generation: 0, mint, mintEpoch: 0, wallet, walletEpoch: 0 });
+  const key = JSON.stringify([mint, wallet || null, amount, mode, slippageBps, customSlip]);
+  // Render-time invalidation hides old data before effects run, including A→B→A.
+  if (context.current.key !== key) {
+    context.current.key = key;
+    context.current.generation++;
+  }
+  if (context.current.mint !== mint) {
+    context.current.mint = mint;
+    context.current.mintEpoch++;
+  }
+  if (context.current.wallet !== wallet) {
+    context.current.wallet = wallet;
+    context.current.walletEpoch++;
+  }
+  const { generation, mintEpoch, walletEpoch } = context.current;
+  const formReady = formEpoch === mintEpoch;
+  const tokenInfo = metadata?.epoch === mintEpoch ? metadata.info : null;
+  const metadataError = metadata?.epoch === mintEpoch ? metadata.error : null;
+  const quote = tokenInfo && quoteState?.generation === generation ? quoteState.data : null;
+  const quoting = quotingGeneration === generation;
+  const currentBalances = tokenInfo && balances?.mintEpoch === mintEpoch && balances?.walletEpoch === walletEpoch ? balances : null;
+  const tokenBal = currentBalances?.token ?? null;
+  const solBal = currentBalances?.sol ?? null;
+  const prices = priceState?.epoch === mintEpoch ? priceState.data : {};
+  const logs = logState.filter((entry) => entry.generation === generation);
+  const err = errorState?.generation === generation ? errorState.message : null;
+  const setErr = (message) => setError({ generation, message });
+  const isCurrent = (life) => mounted.current && lifetime.current === life && context.current.generation === generation;
+  const isBalanceCurrent = (life) => mounted.current && lifetime.current === life && context.current.mintEpoch === mintEpoch && context.current.walletEpoch === walletEpoch;
+  const later = (fn, delay) => {
+    const timer = setTimeout(() => { timers.current.delete(timer); fn(); }, delay);
+    timers.current.add(timer);
+    return timer;
+  };
 
-  const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
-
-  // USD spot prices for SOL and $OTC so users can estimate trade size in USD.
+  // Pre-sign work dies on unmount. Already signed sends/confirmations continue.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const p = await fetchTokenPricesUsd([SOL_MINT, OTC_MINT]);
-      if (!cancelled) setPrices(p);
-    })();
+    mounted.current = true;
     return () => {
-      cancelled = true;
+      mounted.current = false;
+      lifetime.current++;
+      quoteRequest.current++;
+      balanceRequest.current++;
+      timers.current.forEach(clearTimeout);
+      timers.current.clear();
     };
-  }, [OTC_MINT]);
+  }, []);
 
-  const loadBalance = async (w) => {
-    const [bal, sol] = await Promise.all([fetchOtcBalance(w), fetchSolBalance(w)]);
-    setOtcBal(bal);
-    setSolBal(sol);
-    return bal;
+  // Reset only on an actual mint change, not refreshed token props or wallets.
+  // formReady blocks old form actions until this reset has rendered.
+  useEffect(() => {
+    if (formEpoch === mintEpoch || context.current.mintEpoch !== mintEpoch) return;
+    setMode("BUY");
+    setAmount("0.1");
+    setFormEpoch(mintEpoch);
+  }, [mintEpoch, formEpoch]);
+
+  // Mint metadata is public and independent of wallet/form state. Retries use
+  // the same mint epoch and last-request-wins guard; never trust feed decimals.
+  const loadMetadata = async () => {
+    const life = lifetime.current;
+    if (!mounted.current || context.current.mintEpoch !== mintEpoch) return;
+    const request = ++metadataRequest.current;
+    const current = () => mounted.current && lifetime.current === life && context.current.mintEpoch === mintEpoch && metadataRequest.current === request;
+    setMetadata({ epoch: mintEpoch });
+    try {
+      const info = await getTokenInfo(mint);
+      if (current()) setMetadata({ epoch: mintEpoch, info });
+    } catch (error) {
+      if (current()) setMetadata({ epoch: mintEpoch, error: error.message });
+    }
   };
 
   useEffect(() => {
-    if (wallet) loadBalance(wallet);
-    else {
-      setOtcBal(null);
-      setSolBal(null);
-    }
-  }, [wallet]);
+    loadMetadata();
+    return () => { metadataRequest.current++; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mint, mintEpoch]);
+
+  useEffect(() => {
+    if (!tokenInfo) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    const current = () => !cancelled && mounted.current && context.current.mintEpoch === mintEpoch;
+    (async () => {
+      try {
+        const data = { ...await fetchTokenPricesUsd([SOL_MINT, mint]) };
+        if (!current()) return;
+        // The shared OTC spot cache may not contain an arbitrary selected mint.
+        if (data[mint] == null) {
+          try {
+            const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: controller.signal });
+            if (res.ok) {
+              const body = await res.json();
+              const pairs = (body.pairs || []).filter((p) => p.chainId === "solana" && p.baseToken?.address === mint && Number.isFinite(Number(p.priceUsd)) && Number(p.priceUsd) > 0);
+              pairs.sort((a, b) => (Number(b.liquidity?.usd) || 0) - (Number(a.liquidity?.usd) || 0));
+              if (pairs[0]) data[mint] = Number(pairs[0].priceUsd);
+            }
+          } catch { /* Keep any known SOL price; the selected price stays unknown. */ }
+        }
+        if (current()) setPrices({ epoch: mintEpoch, data });
+      } catch { /* Missing prices remain unknown; never substitute OTC prices. */ }
+    })();
+    return () => { cancelled = true; controller.abort(); };
+  }, [mint, mintEpoch, tokenInfo]);
+
+  const loadBalance = async (life) => {
+    if (busyRef.current || !wallet || !tokenInfo || !isBalanceCurrent(life)) return;
+    const request = ++balanceRequest.current;
+    const [bal, sol] = await Promise.allSettled([fetchTokenBalance(wallet, tokenInfo), fetchSolBalanceRaw(wallet)]);
+    if (busyRef.current || !isBalanceCurrent(life) || balanceRequest.current !== request) return;
+    setBalances({
+      mintEpoch,
+      walletEpoch,
+      token: bal.status === "fulfilled" ? bal.value : null,
+      sol: sol.status === "fulfilled" ? sol.value : null,
+      tokenError: bal.status === "rejected" ? bal.reason.message : null,
+      solError: sol.status === "rejected" ? sol.reason.message : null,
+    });
+  };
+
+  useEffect(() => {
+    if (!busy) loadBalance(lifetime.current);
+    return () => { balanceRequest.current++; };
+    // Form edits reuse both in-flight reads and settled balances/errors.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mintEpoch, walletEpoch, tokenInfo, busy]);
 
   const isBuy = mode === "BUY";
-  const solUsd = prices?.[SOL_MINT] ?? null;
-  const otcUsd = prices?.[OTC_MINT] ?? null;
-  // USD value of the entered amount, the quoted output, and the balance
-  // (null = spot price not loaded yet).
-  const amountUsd = (() => {
-    const v = parseFloat(amount);
-    if (!v || v <= 0) return null;
-    const px = isBuy ? solUsd : otcUsd;
-    return px != null ? v * px : null;
-  })();
-  const outUsd = (() => {
-    if (!quote) return null;
-    const px = isBuy ? otcUsd : solUsd;
-    if (px == null) return null;
-    return isBuy
-      ? (Number(quote.outAmount) / 10 ** OTC_DECIMALS) * px
-      : (Number(quote.outAmount) / LAMPORTS_PER_SOL) * px;
-  })();
-  const balUsd = otcBal != null && otcUsd != null ? otcBal * otcUsd : null;
+  const inputMint = isBuy ? SOL_MINT : mint;
+  const outputMint = isBuy ? mint : SOL_MINT;
+  const outputDecimals = isBuy ? tokenInfo?.decimals : 9;
+  let raw = null, effectiveSlippage = slippageBps, inputError = null;
+  try {
+    if (!formReady) throw new Error("Resetting swap form…");
+    if (customSlip !== "") effectiveSlippage = parseSlippageBps(customSlip);
+    if (!tokenInfo) throw new Error(metadataError || "Verifying mint decimals…");
+    if (mint === SOL_MINT) throw new Error("Choose a token other than SOL for a SOL pair");
+    raw = parseAmountToRaw(amount, isBuy ? 9 : tokenInfo.decimals);
+    if (raw === 0n) throw new Error("Enter an amount greater than zero");
+  } catch (error) { inputError = error.message; }
+  const validPrice = (value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+  const solUsd = validPrice(prices?.[SOL_MINT]);
+  const tokenUsd = validPrice(prices?.[mint]);
+  const inputPrice = isBuy ? solUsd : tokenUsd;
+  const outputPrice = isBuy ? tokenUsd : solUsd;
+  const amountUsd = !inputError && inputPrice != null ? Number(amount) * inputPrice : null;
+  const outUsd = quote && outputPrice != null ? Number(formatRawAmount(quote.outAmount, outputDecimals)) * outputPrice : null;
+  const balUsd = tokenBal != null && tokenUsd != null ? Number(formatRawAmount(tokenBal, tokenInfo.decimals)) * tokenUsd : null;
+  const mcap = isOtc ? latest?.token_market_cap : token?.mcap;
+  const ch1h = isOtc ? latest?.token_price_change_1h : null;
+  const ch24h = isOtc ? latest?.token_price_change_24h : token?.change24h;
+  const liq = isOtc ? latest?.token_liquidity_usd : token?.liquidity;
+  const vol = isOtc ? latest?.token_volume_24h : token?.vol24;
+  const metricsAt = snapshotTime(token?.metricsAt);
 
-  // Market stats strip — all from DexScreener's live pair data: market cap,
-  // 1h / 24h price change, liquidity, and 24h volume.
-  const mcap = latest?.token_market_cap ?? null;
-  const ch1h = latest?.token_price_change_1h ?? null;
-  const ch24h = latest?.token_price_change_24h ?? null;
-  const liq = latest?.token_liquidity_usd ?? null;
-  const vol = latest?.token_volume_24h ?? null;
-
-  // Raw integer amount for the quote (lamports for BUY, base units for SELL).
-  const rawAmount = () => {
-    const v = parseFloat(amount);
-    if (!v || v <= 0) return null;
-    return isBuy
-      ? Math.round(v * LAMPORTS_PER_SOL)
-      : Math.round(v * Math.pow(10, OTC_DECIMALS));
-  };
-
-  const switchMode = (m) => {
-    setMode(m);
+  // Event-time invalidation closes the window before React's next render.
+  const invalidate = () => {
+    context.current.generation++;
+    quoteRequest.current++;
     setQuote(null);
+    setQuoting(null);
     setErr(null);
-    setAmount(m === "BUY" ? "0.1" : otcBal ? String(Math.floor(otcBal * 1000) / 1000) : "");
+  };
+  const changeAmount = (value) => {
+    if (busyRef.current) return;
+    invalidate();
+    setAmount(value);
+  };
+  const switchMode = (m) => {
+    if (busyRef.current) return;
+    invalidate();
+    setMode(m);
+    setAmount(m === "BUY" ? "0.1" : tokenBal != null ? formatRawAmount(tokenBal, tokenInfo.decimals) : "");
   };
 
   const fetchQuote = async () => {
-    const raw = rawAmount();
-    if (!raw) {
-      setErr(isBuy ? "Enter a SOL amount" : "Enter an $OTC amount");
-      setQuote(null);
-      return;
-    }
+    const life = lifetime.current;
+    if (!formReady || !isCurrent(life) || busyRef.current) return;
+    const request = ++quoteRequest.current;
+    if (inputError) { setErr(inputError); setQuote(null); return; }
+    const current = () => isCurrent(life) && request === quoteRequest.current && !busyRef.current;
     setErr(null);
-    setQuoting(true);
+    setQuoting(generation);
     setQuote(null);
     try {
-      const [inputMint, outputMint] = isBuy
-        ? [SOL_MINT, OTC_MINT]
-        : [OTC_MINT, SOL_MINT];
-      const q = await getQuote(inputMint, outputMint, raw, slippageBps);
-      setQuote(q);
+      const q = await getQuote(inputMint, outputMint, raw.toString(), effectiveSlippage);
+      if (current()) setQuote({ generation, data: q });
     } catch (e) {
-      setErr(e.message);
+      if (current()) setErr(e.message);
     } finally {
-      setQuoting(false);
+      if (current()) setQuoting(null);
     }
   };
 
-  // Auto-quote: debounce 500ms after the amount/mode/slippage changes so the
-  // trade size updates live without pressing [QUOTE] (manual button kept).
+  // Quotes are public: verification/quotes work before connecting a wallet.
   useEffect(() => {
-    if (!wallet || busy) return;
-    const raw = rawAmount();
-    if (!raw) return;
-    const t = setTimeout(() => {
-      fetchQuote();
-    }, 500);
-    return () => clearTimeout(t);
+    if (busy || inputError) return;
+    const t = setTimeout(fetchQuote, 500);
+    return () => { clearTimeout(t); quoteRequest.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, mode, slippageBps, wallet]);
+  }, [generation, tokenInfo, busy, formReady]);
 
   const doSwap = async () => {
+    const life = lifetime.current;
+    if (!formReady || busyRef.current || !isCurrent(life)) return;
     setErr(null);
-    if (!wallet) {
-      setErr("Connect a wallet first");
-      return;
-    }
-    const signer = getSignerForAddress(wallet);
-    if (!signer) {
-      setErr("Connect this wallet (above) to sign");
-      return;
-    }
-    const raw = rawAmount();
-    if (!raw) {
-      setErr(isBuy ? "Enter a SOL amount" : "Enter an $OTC amount");
-      return;
-    }
-    if (!isBuy && otcBal != null && parseFloat(amount) > otcBal) {
-      setErr(`$OTC balance too low (${otcBal.toLocaleString()})`);
-      return;
-    }
+    if (!wallet) { setErr("Connect a wallet first"); return; }
+    if (inputError) { setErr(inputError); return; }
+    if (!getSignerForAddress(wallet)) { setErr("Connect this wallet (above) to sign"); return; }
+    const inputBalance = isBuy ? solBal : tokenBal;
+    if (inputBalance == null) { setErr("A verified input balance is required; wait or retry the balance read"); return; }
+    if (raw > inputBalance) { setErr(`${isBuy ? "SOL" : tokenLabel} balance too low`); return; }
+    // Lock synchronously before notifying Home or doing any async work.
+    busyRef.current = true;
+    activeSwapDetail.current = isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`;
+    quoteRequest.current++;
+    balanceRequest.current++;
+    setQuoting(null);
     setBusy(true);
     setLogs([]);
     setTxPhase("quote");
+    const walletEpoch = context.current.walletEpoch;
+    const walletCurrent = () => context.current.walletEpoch === walletEpoch && context.current.wallet === wallet && !!getSignerForAddress(wallet);
+    const shouldContinue = () => isCurrent(life) && walletCurrent();
+    const checkContext = () => { if (!shouldContinue()) throw new Error("Swap context changed; nothing signed"); };
+    const log = (entry) => { if (isCurrent(life)) setLogs((prev) => [...prev, { ...entry, generation, t: Date.now() }]); };
+    const phase = (value) => { if (isCurrent(life)) setTxPhase(value); };
+    const notifyBusy = onBusyChange;
     try {
-      const [inputMint, outputMint] = isBuy
-        ? [SOL_MINT, OTC_MINT]
-        : [OTC_MINT, SOL_MINT];
-      const payLabel = isBuy ? `${amount} SOL` : `${amount} $OTC`;
-      const recvLabel = isBuy ? "$OTC" : "SOL";
-      log({ type: "info", msg: `Quoting ${payLabel} -> ${recvLabel}...` });
-      const q = await getQuote(inputMint, outputMint, raw, slippageBps);
-      setQuote(q);
+      notifyBusy?.(true);
+      checkContext();
+      log({ type: "info", msg: `Quoting ${amount} ${isBuy ? "SOL" : tokenLabel} -> ${isBuy ? tokenLabel : "SOL"}...` });
+      const q = await getQuote(inputMint, outputMint, raw.toString(), effectiveSlippage);
+      checkContext();
+      setQuote({ generation, data: q });
       log({ type: "info", msg: `Building swap tx for ${wallet.slice(0, 6)}...${wallet.slice(-4)}...` });
-      setTxPhase("build");
+      phase("build");
       const built = await getSwapTx(q, wallet);
-      const res = await executeSwap(built.swapTransaction, signer.signTransactionRaw, log, wallet, setTxPhase);
+      checkContext();
+      const sign = (tx) => {
+        checkContext();
+        // walletSigner resolves a global wallet; re-resolve at the final boundary.
+        return getSignerForAddress(wallet).signTransactionRaw(tx);
+      };
+      const res = await executeSwap(built.swapTransaction, sign, log, wallet, phase, shouldContinue, walletCurrent);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });
-        // refresh the on-chain $OTC balance once the swap confirms
-        setTimeout(() => wallet && loadBalance(wallet), 3000);
-      }
+        if (isCurrent(life)) later(() => loadBalance(life), 3000);
+      } else if (isCurrent(life)) setErr(`Swap stopped: ${res.reason || "not sent"}`);
     } catch (e) {
       log({ type: "err", msg: `SWAP_ABORT: ${e.message}` });
-      setErr(e.message);
+      if (isCurrent(life)) setErr(e.message);
     } finally {
-      setBusy(false);
-      setTxPhase(null);
+      busyRef.current = false;
+      if (mounted.current) { setBusy(false); setTxPhase(null); }
+      notifyBusy?.(false);
     }
   };
 
   const copyCa = async () => {
+    const life = lifetime.current;
     try {
-      await navigator.clipboard.writeText(OTC_MINT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
-    } catch (e) {
-      /* ignore */
-    }
+      await navigator.clipboard.writeText(mint);
+      if (!isCurrent(life)) return;
+      setCopied(generation);
+      later(() => { if (isCurrent(life)) setCopied(null); }, 1400);
+    } catch { /* ignore */ }
   };
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          SWAP :: {isBuy ? "SOL → $OTC" : "$OTC → SOL"}
+          SWAP :: {isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`}
         </span>
         <a
-          href="https://dexscreener.com/solana/da4pm4xsdy4m9v4cgakkbvh1pw1ysctqqa5nekghukpt"
+          href={`https://dexscreener.com/solana/${encodeURIComponent(mint)}`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 border border-cyan-400/40 bg-cyan-400/5 px-2 py-1 font-mono text-[10px] text-cyan-300 hover:border-cyan-300/60"
-          title="Live $OTC price chart & pair data on DexScreener"
+          title={`${tokenLabel} chart and available pair data on DexScreener`}
         >
           [DEXSCREENER ↗]
         </a>
@@ -256,34 +363,45 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         <button
           onClick={copyCa}
           className="inline-flex items-center gap-1 border border-green-500/40 px-2 py-1 font-mono text-[10px] text-green-300 hover:bg-green-500/10"
-          title="Copy OTC contract address"
+          title={`Copy ${tokenLabel} contract address`}
         >
-          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-          {copied ? "COPIED" : "COPY CA"}
+          {copied === generation ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          {copied === generation ? "COPIED" : "COPY CA"}
         </button>
+        {!isOtc && onResetToken && (
+          <button disabled={busy} onClick={() => { if (!busyRef.current) { invalidate(); onResetToken(); } }}
+            className="border border-green-500/40 px-2 py-1 font-mono text-[10px] text-green-300 disabled:opacity-30">
+            [RESET TO $OTC]
+          </button>
+        )}
       </div>
 
       <div
         className="mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[10px] text-emerald-400"
-        title={OTC_MINT}
+        title={mint}
       >
-        $OTC :: <span className="text-green-300">{OTC_MINT}</span>
+        {tokenLabel}{token?.name ? ` · ${token.name}` : ""} :: <a href={`https://solscan.io/token/${encodeURIComponent(mint)}`} target="_blank" rel="noreferrer" className="text-green-300 underline">{mint}</a>
       </div>
+      {!isOtc && (
+        <div className="mt-1 font-mono text-[9px] text-green-500/60">
+          SELECTED-TOKEN SNAPSHOT :: {metricsAt ? `AS OF ${metricsAt} · NOT LIVE / MAY BE STALE` : "FRESHNESS UNKNOWN"}
+        </div>
+      )}
 
       {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
-      <div className="mt-2 grid grid-cols-5 gap-1">
+      <div className={`mt-2 grid ${isOtc ? "grid-cols-5" : "grid-cols-4"} gap-1`}>
         <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
             {mcap != null ? `$${fmtCompact(mcap)}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
+        {isOtc && <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">1H</div>
           <div className={ch1h == null ? "text-green-500/40" : ch1h >= 0 ? "text-emerald-400" : "text-red-400"}>
             {ch1h != null ? `${ch1h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch1h))}` : "—"}
           </div>
-        </div>
+        </div>}
         <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
           <div className="text-[8px] uppercase tracking-widest text-green-500/50">24H</div>
           <div className={ch24h == null ? "text-green-500/40" : ch24h >= 0 ? "text-emerald-400" : "text-red-400"}>
@@ -305,12 +423,12 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       </div>
 
       {/* Mini price candles (bootstrap from snapshot history) */}
-      <PriceCandles
+      {isOtc && <PriceCandles
         latest={latest}
         history={history}
         unit={priceUnit}
         onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
-      />
+      />}
 
       {/* Direction toggle */}
       <div className="mt-2 flex gap-1">
@@ -323,7 +441,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
           }`}
         >
-          [BUY $OTC]
+          [BUY {tokenLabel}]
         </button>
         <button
           onClick={() => switchMode("SELL")}
@@ -334,7 +452,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               : "border-green-500/30 text-green-500/60 hover:border-cyan-400/40"
           }`}
         >
-          [SELL $OTC]
+          [SELL {tokenLabel}]
         </button>
       </div>
 
@@ -355,39 +473,49 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
             [▲ GO TO WALLET PANEL :: PORTFOLIO + BULK CLAIM]
           </button>
         </div>
-      ) : (
+      ) : null}
         <>
-          {/* Balance rows: native SOL + $OTC, both with live USD equivalents */}
-          <div className="mt-2 grid grid-cols-2 gap-1">
+          {/* Native SOL and standard ATA only, displayed without rounding. */}
+          {wallet && <div className="mt-2 grid grid-cols-2 gap-1">
             <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
               <span className="text-green-500/50">SOL_BAL</span>
-              <span className="text-emerald-300">
-                {solBal == null ? "READING…" : solBal.toFixed(4)}
+              <span className="min-w-0 break-all text-emerald-300">
+                {solBal == null ? (currentBalances?.solError ? "UNAVAILABLE" : "READING…") : formatRawAmount(solBal, 9)}
                 {solBal != null && solUsd != null && (
-                  <span className="ml-1 text-green-500/50">≈ {fmtUsd(solBal * solUsd)}</span>
+                  <span className="ml-1 text-green-500/50">≈ {fmtUsd(Number(formatRawAmount(solBal, 9)) * solUsd)}</span>
                 )}
               </span>
             </div>
             <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
-              <span className="text-green-500/50">$OTC_BAL</span>
-              <span className="text-emerald-300">
-                {otcBal == null ? "READING…" : otcBal.toLocaleString(undefined, { maximumFractionDigits: OTC_DECIMALS })}
+              <span className="text-green-500/50">{tokenLabel}_ATA_BAL</span>
+              <span className="min-w-0 break-all text-emerald-300">
+                {tokenBal == null ? (currentBalances?.tokenError ? "UNAVAILABLE" : "READING…") : formatRawAmount(tokenBal, tokenInfo.decimals)}
                 {balUsd != null && <span className="ml-1 text-green-500/50">≈ {fmtUsd(balUsd)}</span>}
               </span>
             </div>
+          </div>}
+          {wallet && <div className="mt-1 break-all font-mono text-[9px] text-green-500/60">
+            TOKEN BALANCE: STANDARD ATA ONLY (other token accounts excluded).
+            {(currentBalances?.tokenError || currentBalances?.solError) && (
+              <span className="text-amber-400"> Balance read failed: {currentBalances.tokenError || currentBalances.solError}</span>
+            )}
+            <button disabled={busy || !tokenInfo} onClick={() => { if (!busyRef.current) loadBalance(lifetime.current); }} className="ml-2 underline disabled:opacity-30">[RETRY BALANCES]</button>
+          </div>}
+          <div className="mt-1 font-mono text-[9px] text-green-500/60">
+            {tokenInfo ? `ON-CHAIN DECIMALS: ${tokenInfo.decimals}` : metadataError || "VERIFYING MINT…"}
+            {metadataError && <button disabled={busy} onClick={() => { if (!busyRef.current) loadMetadata(); }} className="ml-2 underline disabled:opacity-30">[RETRY MINT METADATA]</button>}
           </div>
 
           {/* Amount input */}
           <div className="mt-2 border border-green-500/20 p-2">
             <div className="flex items-center justify-between">
               <label className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
-                YOU PAY ({isBuy ? "SOL" : "$OTC"})
+                YOU PAY ({isBuy ? "SOL" : tokenLabel})
               </label>
-              {!isBuy && otcBal > 0 && (
+              {(isBuy ? solBal > SOL_FEE_RESERVE : tokenBal > 0n) && (
                 <button
                   onClick={() => {
-                    setAmount(String(otcBal));
-                    setQuote(null);
+                    changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
                   }}
                   disabled={busy}
                   className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
@@ -398,25 +526,24 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
             </div>
             <div className="mt-1 flex items-center gap-2">
               <input
-                type="number"
-                min="0"
-                step={isBuy ? "0.01" : "1"}
+                type="text"
+                inputMode="decimal"
+                aria-label="Swap amount"
                 value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setQuote(null);
-                }}
+                onChange={(e) => changeAmount(e.target.value)}
                 disabled={busy}
                 className="w-full border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
                 placeholder="0.0"
               />
               <span className="font-mono text-[10px] text-green-500/60">
-                {isBuy ? "SOL" : "$OTC"}
+                {isBuy ? "SOL" : tokenLabel}
               </span>
             </div>
             <div className="mt-1 text-right font-mono text-[10px] text-cyan-400/80">
               ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
             </div>
+            {isBuy && <div className="font-mono text-[9px] text-green-500/50">SOL MAX leaves 0.01 SOL for fees/rent; actual requirements may be higher.</div>}
+            {inputError && <div className="font-mono text-[10px] text-amber-400">{inputError}</div>}
 
             <div className="mt-2 flex items-center justify-between">
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
@@ -427,9 +554,10 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                   <button
                     key={s.bps}
                     onClick={() => {
+                      if (busyRef.current) return;
+                      invalidate();
                       setSlippageBps(s.bps);
                       setCustomSlip("");
-                      setQuote(null);
                     }}
                     disabled={busy}
                     className={`border px-1.5 py-0.5 font-mono text-[9px] disabled:opacity-30 ${
@@ -442,17 +570,14 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                   </button>
                 ))}
                 <input
-                  type="number"
-                  min="0"
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="cust %"
                   value={customSlip}
                   onChange={(e) => {
-                    const v = e.target.value;
-                    setCustomSlip(v);
-                    const pct = parseFloat(v);
-                    if (pct > 0) setSlippageBps(Math.round(pct * 100));
-                    setQuote(null);
+                    if (busyRef.current) return;
+                    invalidate();
+                    setCustomSlip(e.target.value);
                   }}
                   disabled={busy}
                   title="Custom slippage in %"
@@ -470,24 +595,20 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           <div className="mt-2 border border-green-500/20 p-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
-                YOU RECEIVE ({isBuy ? "$OTC" : "SOL"})
+                YOU RECEIVE ({isBuy ? tokenLabel : "SOL"})
               </span>
               <button
                 onClick={fetchQuote}
-                disabled={quoting || busy}
+                disabled={quoting || busy || !!inputError}
                 className="border border-green-500/40 px-2 py-0.5 font-mono text-[9px] text-green-300 hover:bg-green-500/10 disabled:opacity-30"
               >
                 {quoting ? "QUOTING..." : "[QUOTE]"}
               </button>
             </div>
-            <div className="mt-1 font-mono text-sm font-bold text-emerald-400">
-              {quote
-                ? isBuy
-                  ? fmtOtc(quote.outAmount)
-                  : fmtLamports(quote.outAmount)
-                : "—"}{" "}
+            <div className="mt-1 break-all font-mono text-sm font-bold text-emerald-400">
+              {quote ? formatRawAmount(quote.outAmount, outputDecimals) : "—"}{" "}
               <span className="text-[9px] font-normal text-green-500/50">
-                {isBuy ? "$OTC" : "SOL"}
+                {isBuy ? tokenLabel : "SOL"}
               </span>
             </div>
             {quote && (
@@ -496,10 +617,10 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </div>
             )}
             {quote && (
-              <div className="mt-1 space-y-0.5 font-mono text-[9px] text-green-500/60">
+              <div className="mt-1 space-y-0.5 break-all font-mono text-[9px] text-green-500/60">
                 <div>
-                  MIN_RECV {isBuy ? fmtOtc(quote.otherAmountThreshold) : fmtLamports(quote.otherAmountThreshold)}{" "}
-                  {isBuy ? "$OTC" : "SOL"}
+                  MIN_RECV {formatRawAmount(quote.otherAmountThreshold, outputDecimals)}{" "}
+                  {isBuy ? tokenLabel : "SOL"}
                 </div>
                 <div>PRICE_IMPACT {(Number(quote.priceImpactPct || 0) * 100).toFixed(3)}%</div>
                 <div className="text-green-500/40">
@@ -508,11 +629,14 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </div>
             )}
           </div>
+          <div className="mt-1 font-mono text-[9px] text-green-500/60">
+            Jupiter routes depend on liquidity, amount and token support. Some tokens have no route; a quote is not a guarantee of execution.
+          </div>
 
           {/* Swap action */}
           <button
             onClick={doSwap}
-            disabled={busy || !wallet}
+            disabled={busy || !wallet || !!inputError || (isBuy ? solBal : tokenBal) == null}
             className={`mt-2 w-full border py-1.5 font-mono text-[11px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
               isBuy
                 ? "border-emerald-500/60 text-emerald-300"
@@ -522,13 +646,13 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
             {busy
               ? "SWAPPING..."
               : isBuy
-              ? "[SWAP SOL → $OTC]"
-              : "[SWAP $OTC → SOL]"}
+              ? `[SWAP SOL → ${tokenLabel}]`
+              : `[SWAP ${tokenLabel} → SOL]`}
           </button>
           <HelpNote label="[?] SWAP SAFETY">
             Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with
-            your connected wallet. Claims and buys both land in the same $OTC token account shown
-            above.
+            your connected wallet. Token balances above cover only the standard associated token account.
+            Token-2022 extensions (including fees or transfer restrictions) can affect availability and execution.
           </HelpNote>
 
           {err && (
@@ -540,7 +664,8 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           {busy && (
             <TxStatusOverlay
               phase={txPhase || "prep"}
-              detail={isBuy ? "SOL → $OTC" : "$OTC → SOL"}
+              detail={activeSwapDetail.current}
+              onCancel={undefined}
             />
           )}
 
@@ -576,10 +701,9 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
             </div>
           )}
         </>
-      )}
 
       {/* Recent on-chain swaps feed (public — shown even without a wallet) */}
-      <RecentSwaps latest={latest} unit={priceUnit} />
+      {isOtc && <RecentSwaps latest={latest} unit={priceUnit} />}
     </div>
   );
 }

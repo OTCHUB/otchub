@@ -13,8 +13,8 @@ const compiled = ts.transpileModule(readFileSync(componentPath, "utf8"), {
 
 // Exercise the actual component's useMemo and rendered link props without a
 // browser or network. Effects are disabled; this is not a lifecycle/E2E test.
-function render(rows, kpi = "change24h") {
-  const states = [{ ranked: rows, feeModel: [] }, null, kpi];
+function render(rows, kpi = "change24h", options = {}) {
+  const states = [{ ranked: rows, feeModel: [] }, null, kpi, options.status ?? "ALL", options.search ?? ""];
   const module = { exports: {} };
   const modules = {
     react: {
@@ -24,6 +24,7 @@ function render(rows, kpi = "change24h") {
     },
     "@/api/base44Client": { base44: {} },
     "@/lib/format": format,
+    "@/lib/useLauncherLive": { useLauncherLive: () => ({ data: { ranked: rows, at: 1800000000000, ...options.feed }, error: options.error }) },
   };
   runInNewContext(compiled, {
     module, exports: module.exports,
@@ -32,7 +33,7 @@ function render(rows, kpi = "change24h") {
       return modules[name];
     },
   });
-  return module.exports.default();
+  return module.exports.default(options.props);
 }
 
 function nodes(element) {
@@ -57,7 +58,7 @@ test("all-negative and all-unknown rankings remain stable", () => {
 });
 
 test("other KPIs retain descending order and the feed is capped at 15", () => {
-  for (const kpi of ["vol24", "feesEst24h", "velocity"]) {
+  for (const kpi of ["vol24", "mcap"]) {
     const rows = [coin("empty", 100, { [kpi]: null }), coin("small", -1, { [kpi]: 5 }), coin("large", 0, { [kpi]: 9 })];
     assert.deepEqual(order(render(rows, kpi)), ["large", "small", "empty"]);
   }
@@ -66,21 +67,62 @@ test("other KPIs retain descending order and the feed is capped at 15", () => {
   assert.deepEqual(order(render([])), []);
 });
 
-test("each Trade link selects SOL input and that row's mint as Jupiter output", () => {
+test("Trade and token-name buttons select the exact row in-app, not a Jupiter redirect", () => {
   const mints = ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"];
-  const tree = render(mints.map((mint) => coin(mint, 1)));
-  const trades = links(tree, "jup.ag");
+  const rows = mints.map((mint) => coin(mint, 1)), selected = [];
+  const tree = render(rows, "vol24", { props: { onTrade: (row) => selected.push(row) } });
+  const trades = nodes(tree).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]");
   assert.equal(trades.length, mints.length);
   trades.forEach(({ props }, i) => {
-    const url = new URL(props.href);
-    assert.equal(url.origin, "https://jup.ag");
-    assert.equal(url.pathname, `/swap/SOL-${mints[i]}`);
-    assert.equal(props.target, "_blank");
-    assert.match(props.rel, /noreferrer/);
-    assert.match(props.children, /TRADE/);
+    assert.equal(props.disabled, false);
+    props.onClick();
+    assert.equal(selected[i], rows[i]);
   });
+  assert.equal(links(tree, "jup.ag").length, 0);
+  const nameButtons = nodes(tree).filter((n) => n.type === "button" && n.props.title?.endsWith("select for in-app swap"));
+  nameButtons[0].props.onClick();
+  assert.equal(selected.at(-1), rows[0]);
   const copies = nodes(tree).filter((n) => typeof n.type === "function" && n.type.name === "CopyCa");
   assert.deepEqual(copies.map((n) => n.props.mint), mints);
+});
+
+const text = (node) => Array.isArray(node) ? node.map(text).join("") : node && typeof node === "object"
+  ? text(node.props?.children) : typeof node === "string" || typeof node === "number" ? String(node) : "";
+
+test("status tabs filter before ranking; unknown and completed-pending are not graduated", () => {
+  const rows = [coin("grad", -5, { status: "GRADUATED" }), coin("bond", 6, { status: "BONDING" }),
+    coin("near", 9, { status: "ABOUT_TO_GRADUATE", curveComplete: true }), coin("unknown", 99)];
+  for (const [status, expected] of [["GRADUATED", "grad"], ["BONDING", "bond"], ["ABOUT_TO_GRADUATE", "near"], ["UNKNOWN", "unknown"]]) {
+    const tree = render(rows, "change24h", { status });
+    assert.deepEqual(order(tree), [expected]);
+    const tabs = nodes(tree).filter((n) => n.props?.role === "tab");
+    assert.equal(tabs.filter((n) => n.props["aria-selected"]).length, 1);
+    assert.ok(text(tabs.find((n) => n.props["aria-selected"])).startsWith(status));
+  }
+});
+
+test("curve progress replaces row fees with real zero, bounded percentage or unknown", () => {
+  const rows = [coin("zero", 0, { curveProgress: 0 }), coin("near", 0, { curveProgress: 91.25 }),
+    coin("missing", 0), coin("pending", 0, { curveProgress: 100, curveComplete: true })];
+  const tree = render(rows);
+  assert.equal(nodes(tree).filter((n) => n.type?.name === "SplitBar").length, 0);
+  const progress = nodes(tree).filter((n) => n.type?.name === "CurveProgress")
+    .map((n) => nodes(n.type(n.props)).find((child) => child.props?.role === "progressbar"));
+  assert.deepEqual(progress.map((n) => n.props["aria-valuenow"]), [0, 91.25, undefined, 100]);
+  assert.match(progress[2].props["aria-valuetext"], /unavailable/);
+  assert.match(progress[3].props["aria-valuetext"], /migration pending/);
+});
+
+test("fresh snapshots re-rank, search reaches outside top15, empty/stale states are honest", () => {
+  const rows = Array.from({ length: 30 }, (_, i) => coin(`mint${i}`, i));
+  assert.deepEqual(order(render(rows, "vol24", { search: "mint29" })), ["mint29"]);
+  assert.deepEqual(order(render([coin("a", 1), coin("b", 2)])), ["b", "a"]);
+  assert.deepEqual(order(render([coin("a", 3), coin("b", 2)])), ["a", "b"]);
+  assert.match(text(render([], "vol24")), /NO MATCHING LAUNCHES/);
+  assert.doesNotMatch(text(render([], "vol24")), /LOADING/);
+  assert.match(text(render(rows, "vol24", { error: "offline", feed: { stale: true } })), /STALE/);
+  const locked = render(rows, "vol24", { props: { onTrade: () => {}, tradingDisabled: true } });
+  assert.ok(nodes(locked).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]").every((n) => n.props.disabled));
 });
 
 test("market cap and volume use fmtUsd and price change is signed", () => {

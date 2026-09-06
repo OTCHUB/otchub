@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
@@ -49,6 +49,32 @@ export default function Home() {
   });
   const [bootDone, setBootDone] = useState(false);
   const [walletOpenSignal, setWalletOpenSignal] = useState(0);
+  const [selectedToken, setSelectedToken] = useState(null); // null keeps the default OTC/SOL pair
+  const [swapOpenSignal, setSwapOpenSignal] = useState(0);
+  const [swapBusy, setSwapBusy] = useState(false);
+  const swapBusyRef = useRef(false);
+  const onSwapBusyChange = useCallback((busy) => {
+    swapBusyRef.current = busy;
+    setSwapBusy(busy);
+  }, []);
+  const tradeLauncher = useCallback((token) => {
+    if (swapBusyRef.current) return;
+    setSelectedToken(token);
+    setSwapOpenSignal((s) => s + 1);
+  }, []);
+  const resetSwapToken = useCallback(() => {
+    if (!swapBusyRef.current) setSelectedToken(null);
+  }, []);
+  const updateLauncherSnapshot = useCallback((snapshot) => {
+    setSelectedToken((selected) => selected
+      ? snapshot.ranked.find((row) => row.mint === selected.mint) || selected : null);
+  }, []);
+  useEffect(() => {
+    if (!swapOpenSignal) return;
+    const timer = setTimeout(() => document.getElementById("otc-swap")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    return () => clearTimeout(timer);
+  }, [swapOpenSignal]);
 
   // setWallet persists (or clears) the connected address; null = disconnect.
   const setWallet = useCallback((addr) => {
@@ -270,12 +296,11 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        {/* Launcher analytics: the OTC coin-launch ecosystem (launch feed,
-            graduation status, KPI ranking, fee-model split) vs a native
-            pump.fun sample */}
+        {/* Live launch rankings select a mint in the shared SOL swap panel. */}
         <div className="mt-3">
           <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" right={null} openSignal={0}>
-            <LauncherAnalytics />
+            <LauncherAnalytics onTrade={tradeLauncher} selectedMint={selectedToken?.mint}
+              tradingDisabled={swapBusy} onSnapshot={updateLauncherSnapshot} />
           </CollapsibleCard>
         </div>
 
@@ -314,13 +339,17 @@ export default function Home() {
         {/* Trade hub: two-way token swap + NFT desk trade routes */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
-            <CollapsibleCard title="TRADE :: $OTC TOKEN">
+            <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
+              openSignal={swapOpenSignal} locked={swapBusy}>
               <JupiterSwapPanel
                 wallet={wallet}
                 latest={latest}
                 history={data?.history}
                 onGoConnect={goWalletConnect}
                 onConnected={setWallet}
+                token={selectedToken || undefined}
+                onBusyChange={onSwapBusyChange}
+                onResetToken={resetSwapToken}
               />
             </CollapsibleCard>
           </div>

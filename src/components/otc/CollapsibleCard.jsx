@@ -3,9 +3,9 @@ import React, { useState, useEffect } from "react";
 // All panels open by default; click anywhere on the header bar to toggle.
 // `openSignal` lets other panels force this card open: bump the counter and
 // the card re-expands (used by the swap panel's "connect wallet" shortcut).
-export default function CollapsibleCard({ title, children, defaultOpen = true, id, right, openSignal }) {
+export default function CollapsibleCard({ title, children, defaultOpen = true, id = undefined, right = undefined, openSignal = 0, locked = false }) {
   const [open, setOpen] = useState(defaultOpen);
-  const toggle = () => setOpen((o) => !o);
+  const toggle = () => { if (!locked) setOpen((o) => !o); };
 
   useEffect(() => {
     if (openSignal) setOpen(true);
@@ -15,6 +15,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, i
     <div id={id} className="flex h-full flex-col break-inside-avoid">
       <div
         onClick={toggle}
+        title={locked ? "Keep this panel open until the swap finishes" : undefined}
         className={`flex cursor-pointer select-none items-center justify-between bg-black px-3 py-2 ${
           open ? "border border-green-500/30 border-b-0" : "border border-green-500/30"
         }`}
