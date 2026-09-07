@@ -3,6 +3,7 @@ import { Globe, Send, Twitter } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
+import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
 import Pager from "@/components/otc/Pager";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -198,6 +199,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       setPage((current) => (feed.page !== current ? feed.page : current));
     }
   }, [feed]);
+
+  // Completed-but-unconfirmed curves: confirm AMM migration from this
+  // visitor's browser and persist it once — afterwards the GRADUATED status
+  // is global and sticky for every visitor.
+  const pendingGraduation = feed?.pendingGraduation ?? [];
+  useEffect(() => {
+    if (pendingGraduation.length) confirmPendingGraduations(pendingGraduation);
+  }, [pendingGraduation]);
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
   const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
 
@@ -336,7 +345,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         PAGE {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
         statuses checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} candidates
         (top 60 volume + top 60 gainers + newest 30). Others remain UNKNOWN.
-        Near graduation = ≥{feed?.nearThreshold ?? 90}% funding; curve completion alone is not AMM migration.
+        Near graduation = ≥{feed?.nearThreshold ?? 90}% funding · completed curves are AMM-verified, persisted globally in the DB and shown GRADUATED for every visitor.
       </div>
       {!!feed?.statusError?.length && <div className="mt-1 text-[11px] text-amber-400">Some status/progress checks unavailable; UNKNOWN is not BONDING.</div>}
       {tradingDisabled && <div className="mt-1 text-[11px] text-amber-400">Token selection locked while a swap is in progress.</div>}

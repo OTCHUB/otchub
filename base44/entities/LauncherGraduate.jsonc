@@ -1,0 +1,48 @@
+{
+  "name": "LauncherGraduate",
+  "type": "object",
+  "description": "Global graduation ledger for launcher tokens: one row per mint, written once (server re-verifies the on-chain curve-complete flag before any write) and read by the live feed so GRADUATED statuses persist for every visitor across isolates without re-probing.",
+  "properties": {
+    "mint": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "graduated_at": {
+      "type": "integer"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "browser_amm",
+        "runtime_amm"
+      ]
+    }
+  },
+  "required": [
+    "mint",
+    "graduated_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": null,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

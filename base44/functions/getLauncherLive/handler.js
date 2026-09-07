@@ -196,7 +196,7 @@ async function runBounded(tasks) {
 }
 
 export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl = fetch,
-  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions }) {
+  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore, createClient }) {
   let cached = null, inflight = null, activeRpc = 0;
   const risks = riskService ?? createLauncherRiskService({ ...riskOptions, fetchImpl, clock });
 
@@ -230,10 +230,18 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
     return withDeadline(() => pending, probeTimeoutMs);
   }
 
-  async function build() {
+  async function build(getClient) {
     const raw = await fetchJson(COINS_URL, 15_000);
     // Observation time, not a claim about the upstream snapshot's own update time.
     const at = clock(), rows = rosterRows(raw, at), errors = new Set();
+    // Global graduation ledger: visitor-confirmed AMM migrations persisted in
+    // the DB, shared by every isolate and visitor. Best-effort by design — an
+    // unavailable ledger must never fail the live feed.
+    let persisted = new Map();
+    if (graduationStore) {
+      try { persisted = await graduationStore.load(getClient); }
+      catch { errors.add("GRADUATION_LEDGER_UNAVAILABLE"); }
+    }
     const candidates = launcherCandidates(rows).map((row) => ({
       row, address: null, curve: null, curveAt: null, dexAt: null, graduated: false,
     }));
@@ -282,12 +290,30 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
     const riskCoverage = attachRisks(rows, enrichmentCoverage);
     for (const c of candidates) {
       if (c.curve) Object.assign(c.row, c.curve);
+      const persistedGrad = persisted.get(c.row.mint);
+      c.graduated = c.graduated || persistedGrad != null;
       c.row.status = launcherStatus(c.curve, c.graduated);
       // Known statuses carry the time of their supporting evidence, not a later
       // empty check. Unknown rows can still have a successful no-account check.
-      if (c.graduated) c.row.statusAt = c.dexAt;
+      if (c.graduated) c.row.statusAt = persistedGrad?.graduated_at ?? c.dexAt;
       else if (c.curve) c.row.statusAt = c.curveAt;
       else c.row.statusAt = c.curveAt === null ? c.dexAt : Math.max(c.curveAt, c.dexAt ?? c.curveAt);
+    }
+    // Ledger-backed roster rows outside the candidate set keep their persisted
+    // GRADUATED status with no live probe: every ledger entry was verified
+    // on-chain (curve complete) before it was written, so the status is sticky
+    // even after the mint drops out of the probed candidate ranking.
+    if (persisted.size) {
+      const candidateMints = new Set(candidates.map((c) => c.row.mint));
+      for (const row of rows) {
+        if (candidateMints.has(row.mint)) continue;
+        const persistedGrad = persisted.get(row.mint);
+        if (!persistedGrad) continue;
+        row.status = "GRADUATED";
+        row.curveComplete = true;
+        row.curveProgress = 100;
+        row.statusAt = persistedGrad.graduated_at;
+      }
     }
     // The full roster is ~3000 launches (~3.5MB JSON) — far too large for a
     // 30s poll (client delivery failures). Ship a bounded roster: every
@@ -302,9 +328,17 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       const s = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     }
+    // Completed-but-unconfirmed curves for the client to verify: DexScreener
+    // rate-limits the shared function-runtime egress IP, so AMM-migration
+    // evidence is confirmed from the visitor's own browser and reported once;
+    // the persisted result is then global for every visitor.
+    const pendingGraduation = graduationStore
+      ? candidates.filter((c) => c.curve?.curveComplete === true && !c.graduated)
+        .map((c) => c.row.mint).slice(0, 90)
+      : [];
     return {
       at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
-      statusCounts, rosterTotal: rows.length,
+      statusCounts, rosterTotal: rows.length, pendingGraduation,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,
@@ -323,6 +357,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         statusCounts: cache.statusCounts, rosterTotal: cache.rosterTotal,
         candidateCount: cache.candidateCount, statusChecked: cache.statusChecked,
         statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
+        pendingGraduation: cache.pendingGraduation,
         ...(sourceError ? { sourceError } : {}) };
     }
     let scoped = cache.rows;
@@ -343,6 +378,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       statusCounts, matches: scoped.length, page, pageCount, pageSize,
       rosterTotal: cache.rosterTotal, candidateCount: cache.candidateCount,
       statusChecked: cache.statusChecked, statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
+      pendingGraduation: cache.pendingGraduation,
       ...(sourceError ? { sourceError } : {}) };
   };
 
@@ -366,7 +402,8 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         return respond(respondBody(cached, params, false), "hit");
       }
       if (!inflight) {
-        inflight = build().then((body) => { cached = body; return body; })
+        const getClient = graduationStore && typeof createClient === "function" ? () => createClient(req) : null;
+        inflight = build(getClient).then((body) => { cached = body; return body; })
           .finally(() => { inflight = null; });
       }
       try {
