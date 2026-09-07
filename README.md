@@ -65,7 +65,9 @@ the domain root (`/`, plus `/treasury`, `/deployments`, `/desk/:asset`) becomes 
 dashboard, the OTC_DESK analytics move to `/otc`, and `/hub/*` links from the former
 standalone shell redirect. Launch checklist: also set `VITE_HUB_CLUSTER=mainnet-beta`,
 `VITE_HUB_PROGRAM_ID`, `VITE_HUB_RPC_URL`, and re-copy `src/hub*` from `hubconnect`
-(CA copy button + swap panel land there).
+(swap panel lands there). `/treasury` already carries the `[ VERIFICATION INFO ]` card
+(CA copy, program id, BurnState burn proof, live supply / circulating / burn %, Metaplex
+metadata + socials as indexers read them) for Dexscreener / CoinGecko listing.
 
 - `src/hub/` — UI module vendored from `hubconnect/web/src/hub` (TypeScript; Vite compiles it as-is).
 - `src/hub-sdk/` — read-only SDK + IDL vendored from `hubconnect/sdk`, aliased as `@hub-sdk`
