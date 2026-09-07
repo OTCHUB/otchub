@@ -2,7 +2,8 @@ import React from "react";
 import { fmtSol, fmtNum } from "@/lib/format";
 
 export default function BuybacksPanel({ latest }) {
-  const buybacks = latest?.buybacks?.items || [];
+  // Cap the table at 20 rows so the panel never outgrows the ROUNDS chart.
+  const buybacks = (latest?.buybacks?.items || []).slice(0, 20);
   const totalSol = buybacks.reduce((a, b) => a + (b.sol || 0), 0);
   const totalOtc = buybacks.reduce((a, b) => a + (b.otc || 0), 0);
 
