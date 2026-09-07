@@ -104,6 +104,8 @@ Pot inflow sources:
 - **D — Discount-exit SOL leg**: 50% SOL half of every treasury desk sale → pot.
 - **E — Consigned desks**: owner-sent desks (§A6.1) whose desk-pot rounds the
   treasury claims for the pool and distributes to activated desks.
+- **F — LP swap fees**: $HUB/SOL and $HUB/OTC LP positions held by the treasury
+  (§A6.2); harvested swap fees → pot.
 
 Per epoch (`EPOCH_HOURS = 24`; unclaimed rolls forward):
 
@@ -172,6 +174,30 @@ Why: owners who believe in $HUB can put idle desks' yield to work for stakers
 without selling the desk — desk-pot take is turned into $HUB staker yield while
 the owner stays long the desk.
 
+### A6.2 LP building — $HUB/SOL first, $HUB/OTC as we grow
+
+**Bootstrap LP is free**: launching via the OTC launcher means the $HUB bonding
+curve seeds the $HUB/SOL pool automatically at launch — the treasury does not
+hand-seed day-one liquidity. The LP program then deepens beyond the curve:
+
+- **Phase 1 — $HUB/SOL to target**: `LP_TARGET_SOL_DEPTH = 100–200 SOL-side`
+  (≈ $10–21k at SOL ≈ $105). Sizing: with constant-product depth R, a trade of
+  x SOL moves price ≈ x/R — 200 SOL-side absorbs a 5-SOL entry/exit at ~2.5%
+  impact and keeps the hourly-TWAP'd 10% buyback-burn (base case ≈ 0.8 SOL/hr)
+  under 1% impact per chunk. Seed by pairing **founding $HUB allocation +
+  treasury SOL** — never market-buy HUB just to add LP.
+- **Phase 2 — $HUB/OTC**: opens only after the SOL pool is at target AND $HUB
+  price has been stable ≥ 14 days post-launch. Seed ≈ **25–50 SOL-equivalent
+  per side**, pairing treasury OTC (from source C claims) with treasury HUB
+  float. Rationale: OTC is the reward stock — stakers rotate OTC ↔ HUB without
+  two SOL hops, tightening the flywheel.
+- **Funding**: ops surplus (the 10% ops share beyond running costs) + explicit
+  treasury allocations; harvested **swap fees → pot (source F)**, compounding
+  staker yield.
+- **Guardrails**: LP tokens custodied by the treasury PDA vault; HODL both legs
+  — the treasury never sells HUB out of LP; one position per pair; every
+  deposit/withdrawal announced; depth + collected fees published daily.
+
 ### A7. Buyback-burn sinks
 
 | Event | HUB burned |
@@ -211,6 +237,9 @@ cliff) — hence the sweep payback cap and treating sources A/C as uncorrelated 
 5. Consignor reward: `CONSIGNOR_SHARE` default **0%** (pure community
    contribution) vs a direct credit (e.g. 25–50%) to attract consignments —
    revisit after launch once real consignment demand is observable.
+6. LP growth funding: ops surplus + explicit allocations (default) vs carving
+   a small % of pot inflows pre-distribution (deepens the pool but dilutes
+   staker yield short-term) — revisit once LP fee revenue is measurable.
 
 ---
 
@@ -239,7 +268,7 @@ anchor-ts tests, `solana-bankrun` for fast integration tests.
 
 | Account | Seeds (all under program id) | Key fields |
 |---|---|---|
-| `Config` | `["config"]` | authority, pot PDA, ops wallet, tier weights[4], step_fee_lamports, epoch_hours, burn_pct_bp (1000), ops_pct_bp, consignment_enabled, consignor_share_bp, paused |
+| `Config` | `["config"]` | authority, pot PDA, ops wallet, tier weights[4], step_fee_lamports, epoch_hours, burn_pct_bp (1000), ops_pct_bp, consignment_enabled, consignor_share_bp, lp_enabled, lp_target_sol_lamports, paused |
 | `Epoch` | `["epoch", epoch_index u64]` | index, start_ts, end_ts, inflow_lamports, distributed_lamports, burned_lamports, finalized |
 | `DeskTier` | `["tier", asset_id]` | asset_id, tier 1–4, activated_epoch, last_claimed_epoch, voided |
 | `ConsignedDesk` | `["consign", asset_id]` | asset_id, consignor, consigned_epoch, active |
@@ -269,6 +298,7 @@ the OTC program config on-chain and proposes updates.
 | 10 | `pause` / `unpause` | authority | halts activate/claim on anomaly |
 | 11 | `consign_desk` | owner, desk NFT, treasury vault, ConsignedDesk, Config | verify owner holds the desk asset (Core/DAS); `consignment_enabled` must be true; transfer NFT to vault; record consignor + epoch |
 | 12 | `unconsign_desk` | consignor, desk NFT, treasury vault, ConsignedDesk, Config | only after the current epoch finalizes (no double-count); return NFT; set `active = false`; accrued consignor share (if any) stays claimable |
+| 13 | `build_lp` | treasury multisig, Config, treasury LP vault, AMM pool accounts | `lp_enabled` must be true; deposit paired liquidity per §A6.2 (HUB/SOL first, HUB/OTC only after phase-2 gate); LP tokens custodied in the treasury PDA vault; withdraw path can never sell HUB |
 
 Program-level invariants to assert everywhere: `inflow_lamports ==
 distributed + burn_pending + rolled_forward`; pot lamports ≥ liability; DeskTier
@@ -295,6 +325,11 @@ consignor share split). Consigned desks are claimed but never sold (§A6.1).
 3. **Treasury (exit)** — claims all accrued yield, lists at 90% of verified
    floor, escrow enforces 50% HUB burn + 50% SOL → pot in the same tx; floor
    staleness guard 5%.
+4. **LP manager** — tracks live $HUB/SOL pool depth vs `lp_target_sol_lamports`;
+   when below target and ops surplus allows, proposes `build_lp` via treasury
+   multisig; harvests accumulated LP swap fees → `register_treasury_inflow`
+   (source F); opens the $HUB/OTC position only after §A6.2 phase-2 conditions
+   hold; publishes depth + fees daily.
 
 All keepers: run from secrets-managed keyers (never commit keys), structured
 logs, and a dry-run mode. Keepers are permissionless where possible (finalize is
@@ -327,6 +362,10 @@ keeper-anyone with a small reward? — start permissioned, open later).
   (at 0% and at 50% config) → unconsign after finalize returns the desk;
   treasury exit of a consigned desk is rejected; double-claim of one consigned
   desk rejected; unconsign before finalize reverts.
+- LP: `build_lp` rejected while `lp_enabled = false`; LP tokens land in the
+  treasury PDA vault; fee harvest registers pot inflow (source F) exactly once;
+  HUB/OTC build rejected before the phase-2 gate; LP withdraw path can never
+  sell HUB (asserted).
 
 **Adversarial:**
 - Floor spoof: exit tx with stale floor > 5% delta must revert.
@@ -399,6 +438,9 @@ The program is deployed **upgradeable** on purpose:
 | CONSIGNMENT_ENABLED | true (config-gated) |
 | CONSIGNOR_SHARE | 0% of consigned desk yield (parameterized; see A9.5) |
 | UPGRADE_TIMELOCK | 48h, multisig-held upgrade authority (not immutable) |
+| LP_TARGET_SOL_DEPTH ($HUB/SOL) | 100–200 SOL-side (≈$10–21k) — seeded by founding HUB + treasury SOL |
+| HUB_OTC_LP_SEED | 25–50 SOL-eq per side, phase-2 gated (SOL pool at target + ≥14d stable) |
+| LP_CUSTODY | LP tokens in treasury PDA vault · HODL both legs · fees → pot (source F) |
 | `f` (creator fee rate) | TBD at launch (checklist item 3) |
 
 *Community tooling. Not affiliated with the OTC protocol. Verify everything
