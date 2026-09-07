@@ -474,6 +474,29 @@ The program is deployed **upgradeable** on purpose:
 
 ---
 
+### B8. Agent tooling — install AI dev skills in the repo
+
+The implementing agent should have expert Solana context loaded from day one:
+
+- **Solana Foundation skills** (official, maintained): `npx skills add
+  https://github.com/solana-foundation/solana-dev-skill`. Load especially:
+  security checklist (account validation, signer checks, attack vectors),
+  runtime concepts (rent, PDA semantics, entrypoint dispatch), common errors +
+  Anchor/Solana/Rust version compatibility matrix, and IDL client codegen
+  (Codama) for the `sdk/` package.
+- **Helius Build skill + Helius MCP server** (`npx helius-mcp@latest`): DAS-first
+  asset lookups (searchAssets over getProgramAccounts), dynamic priority-fee
+  fetching, webhook setup, typed RPC tool calls for keeper development.
+- **Testing stack note**: the official testing skill recommends LiteSVM/Mollusk
+  (with Surfpool for mainnet-fork integration) rather than `solana-bankrun`;
+  either satisfies M1's "fast integration harness" — pick one and use it
+  consistently.
+- **Caveat**: skills raise correctness, they are not an audit. The full B5/B5.1
+  suite, the B5 pre-launch checklist, and a professional audit before mainnet
+  funds remain mandatory.
+
+---
+
 ## PART C — TREASURY DASHBOARD & YIELD TRACKER (user-facing)
 
 ### C1. Purpose
