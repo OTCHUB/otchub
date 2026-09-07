@@ -2,39 +2,78 @@ import React from "react";
 import { Rectangle, ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import { fmtSol } from "@/lib/format";
 
-// Horizontal one-day flow diagram: where the pot's SOL came from and where it
-// went. Left → right: inflow sources → POT → desk distribution + retained
-// balance. Ribbon width = SOL of the last CLOSED tracked day (inflow segments
-// from the on-chain pot scan; outflow = that day's desk distribution).
+// Horizontal one-day flow diagram, styled after the dark Sankey reference:
+// colored node bars, labels above (POT gets a badge), values below, and
+// semi-transparent slate ribbons. Left → right: inflow sources → POT → desk
+// distribution + retained balance, sized by SOL of the last CLOSED tracked day
+// (inflow segments from the on-chain pot scan; outflow = that day's desk
+// distribution).
 
-function DiagramNode({ x, y, width, height, index, payload, potIndex }) {
+const SOURCE_COLORS = {
+  DESK_MINTS: "#3b82f6",
+  ME_SALES: "#22d3ee",
+  "SWEEPS·MISC": "#fbbf24",
+};
+const OUT_COLORS = {
+  DESK_HOLDERS: "#4ade80",
+  RETAINED: "#f59e0b",
+};
+const POT_COLOR = "#34d399";
+
+function DiagramNode({ x, y, width, height, index, payload, colors, badges }) {
   const name = payload?.name ?? "";
   const value = Number.isFinite(payload?.value) ? payload.value : null;
-  const isPot = index === potIndex;
-  const isOut = index > potIndex;
-  const fill = isPot ? "#34d399" : isOut ? "#22d3ee" : "#10b981";
+  const color = colors[index] || "#4ade80";
+  const cx = x + width / 2;
   return (
     <g>
-      <Rectangle x={x} y={y} width={width} height={height} fill={fill} fillOpacity={isPot ? 0.95 : 0.7} />
-      <text
-        x={isOut ? x + width + 6 : x - 6}
-        y={y + height / 2 - 2}
-        textAnchor={isOut ? "start" : "end"}
-        dominantBaseline="middle"
-        fill={isOut ? "#67e8f9" : "#4ade80"}
-        fontSize="9"
-        fontFamily="ui-monospace, monospace"
-        letterSpacing="1.5"
-      >
-        {name}
-      </text>
+      <Rectangle x={x} y={y} width={width} height={height} fill={color} fillOpacity={0.9} />
+      {badges[index] ? (
+        <>
+          <rect
+            x={cx - (name.length * 3.6 + 6)}
+            y={y - 26}
+            width={name.length * 7.2 + 12}
+            height={13}
+            fill={color}
+            fillOpacity={0.22}
+            stroke={color}
+            strokeWidth={0.5}
+          />
+          <text
+            x={cx}
+            y={y - 19.5}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#e2e8f0"
+            fontSize="8"
+            fontFamily="ui-monospace, monospace"
+            letterSpacing="1"
+          >
+            {name}
+          </text>
+        </>
+      ) : (
+        <text
+          x={cx}
+          y={y - 9}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#e2e8f0"
+          fontSize="9"
+          fontFamily="ui-monospace, monospace"
+          letterSpacing="1"
+        >
+          {name}
+        </text>
+      )}
       {value != null && value > 0 && (
         <text
-          x={isOut ? x + width + 6 : x - 6}
-          y={y + height / 2 + 10}
-          textAnchor={isOut ? "start" : "end"}
+          x={cx}
+          y={y + height + 11}
+          textAnchor="middle"
           dominantBaseline="middle"
-          fill="#86efac"
+          fill={color}
           fontSize="8"
           fontFamily="ui-monospace, monospace"
         >
@@ -49,8 +88,8 @@ function DiagramLink({ sourceX, sourceY, sourceControlX, targetControlX, targetX
   return (
     <path
       d={`M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY} L${targetX},${targetY + linkWidth} C${targetControlX},${targetY + linkWidth} ${sourceControlX},${sourceY + linkWidth} ${sourceX},${sourceY + linkWidth} Z`}
-      fill="rgba(52,211,153,0.16)"
-      stroke="rgba(52,211,153,0.45)"
+      fill="rgba(71,85,105,0.45)"
+      stroke="rgba(148,163,184,0.25)"
       strokeWidth={0.5}
     />
   );
@@ -84,7 +123,7 @@ export default function PotFlowDiagram({ latest }) {
   const nodes = sources.map(([name]) => ({ name }));
   const potIndex = nodes.length;
   nodes.push({ name: "POT" });
-  const links = sources.map(([name, value], i) => ({ source: i, target: potIndex, value }));
+  const links = sources.map(([, value], i) => ({ source: i, target: potIndex, value }));
   let outIndex = potIndex + 1;
   if (dist > 0) {
     nodes.push({ name: "DESK_HOLDERS" });
@@ -94,6 +133,11 @@ export default function PotFlowDiagram({ latest }) {
     nodes.push({ name: "RETAINED" });
     links.push({ source: potIndex, target: outIndex, value: retained });
   }
+
+  const colors = nodes.map((n, i) =>
+    i === potIndex ? POT_COLOR : SOURCE_COLORS[n.name] || OUT_COLORS[n.name] || "#4ade80"
+  );
+  const badges = nodes.map((n, i) => i === potIndex || n.name === "DESK_HOLDERS");
 
   const names = nodes.map((n) => n.name);
   const FlowTip = ({ active, payload }) => {
@@ -118,14 +162,14 @@ export default function PotFlowDiagram({ latest }) {
         </span>
       </div>
       {links.length ? (
-        <div className="mt-1 h-52 w-full sm:h-60">
+        <div className="mt-1 h-56 w-full sm:h-64">
           <ResponsiveContainer width="100%" height="100%">
             <Sankey
               data={{ nodes, links }}
               nodeWidth={10}
-              nodePadding={28}
-              margin={{ top: 6, right: 100, left: 100, bottom: 6 }}
-              node={<DiagramNode potIndex={potIndex} />}
+              nodePadding={30}
+              margin={{ top: 34, right: 8, left: 8, bottom: 22 }}
+              node={<DiagramNode colors={colors} badges={badges} />}
               link={<DiagramLink />}
             >
               <Tooltip content={FlowTip} />
