@@ -297,7 +297,10 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
         onPointerLeave={(e) => {
           if (e.pointerType === "mouse" && !gesture.current) setInspect(null);
         }}
-        className="relative h-32 w-full touch-none select-none cursor-crosshair"
+        // touch-pan-y: vertical swipes still scroll the page (the chart never
+        // traps scroll on mobile); horizontal drag pans and two-finger pinch
+        // stays ours to zoom.
+        className="relative h-32 w-full touch-pan-y select-none cursor-crosshair"
       >
         {scale && view.length >= 2 ? (
           <>

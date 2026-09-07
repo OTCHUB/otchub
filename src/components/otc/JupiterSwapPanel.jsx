@@ -422,8 +422,11 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         </div>
       </div>
 
-      {/* Mini price candles (bootstrap from snapshot history) */}
-      {isOtc && <div className="order-[13] sm:order-none">
+      {/* Mini price candles (bootstrap from snapshot history). On mobile the
+          chart rides right under the token bar (order 3.5) instead of being
+          buried below the swap button at the panel bottom — the fold cut the
+          panel mid-way and the chart was unreachable without a long scroll. */}
+      {isOtc && <div className="order-[3.5] sm:order-none">
         <PriceCandles
           latest={latest}
           history={history}
