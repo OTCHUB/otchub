@@ -25,9 +25,16 @@
 // Outflows (distribution rounds — pot SOL spent buying stock) are NOT revenue
 // and are skipped; only positive pot balance changes are counted.
 //
-// The scan is INCREMENTAL: a cursor (newest processed signature) carries
-// forward inside each OtcSnapshot's pot_sources, and every full ingest walks
-// the pot's tx list back from the newest signature until it meets the cursor.
+// The scan is INCREMENTAL and EXACTLY-ONCE by construction:
+//   - A FORWARD WALK counts only txs strictly newer than the checkpoint
+//     (signature cursor + timestamp watermark). It walks ALL the way to the
+//     cursor — a fixed page cap that stops short of the cursor is exactly
+//     what double-counted high-volume days before (the leftover window was
+//     re-counted and the backfill anchor got corrupted).
+//   - A BACKFILL WALK extends history backward from `bf_cursor`, the deepest
+//     signature ever processed. The anchor only ever moves DEEPER (or to null
+//     once the pot's full history is walked), so every backfilled tx is
+//     unseen — nothing is ever re-counted.
 // Inflows are bucketed per UTC day so the dashboard can stack the sources.
 
 import { ADDRESSES } from "./otcSources.ts";
@@ -42,18 +49,24 @@ const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc"; // Magic Ed
 const ME_PROGRAMS = new Set([ME_V1_PROGRAM, ME_V2_PROGRAM]);
 const LAMPORTS_PER_SOL = 1e9;
 const PAGE_LIMIT = 100; // Helius REST page cap
-const MAX_PAGES = 10; // incremental walk depth when the cursor is far behind
-const FIRST_RUN_PAGES = 40; // version reset: deep one-time backfill (4000 txs)
+const FIRST_RUN_PAGES = 40; // version reset: deep one-time scan (4000 txs)
 const BACKFILL_PAGES = 30; // per-run budget extending history backward (~3000 txs/run)
-// Backfill walks the pot's tx history ALL the way back to the protocol's
-// first pot deposit (bounded pages per ingest), so the day map covers the
-// full protocol lifetime — later sources (e.g. royalties) simply show as
-// zero-buckets on earlier days when they didn't exist yet.
+// Safety ceiling for the forward walk (100 pages = 10k txs). Normal runs hit
+// the cursor within a page or two; only a >10k-tx burst between two 5-minute
+// ingests can reach this. If it is ever reached, the timestamp watermark still
+// guarantees nothing already-counted is re-counted (the few txs beyond the
+// cap would be missed once, never double-counted).
+const WALK_SAFETY_PAGES = 100;
 const KEEP_DAYS = 730;
-// Bucket layout version. Bumping resets the day map + cursor so history is
-// re-backfilled with the new source split (e.g. v2 carved royalties out of
-// the old "other" bucket — without a reset those days would double-count).
-const SOURCES_VERSION = 3;
+// Bucket layout version. Bumping resets the day map + cursors so history is
+// re-scanned from scratch with the fixed checkpoint logic. v4 fixes the
+// double-count bug: v3 capped the forward walk at 10 pages without reaching
+// the cursor on high-volume days and handed a NEWER anchor to the backfill,
+// which re-counted thousands of already-processed txs into the day map
+// (current-day metrics were inflated up to ~16x). v4 walks to the cursor
+// (timestamp-watermark guarded) and never lets the backfill anchor move
+// forward, so no tx can be counted twice.
+const SOURCES_VERSION = 4;
 
 async function fetchPotTxs(before) {
   const key = secrets.get("HELIUS_API_KEY");
@@ -84,69 +97,102 @@ function classify(t) {
   };
 }
 
-// prev = the previous snapshot's pot_sources ({ days, cursor, since } | null).
-// Returns the updated { days, cursor, since } — days values in SOL per UTC
-// day, pruned to the last KEEP_DAYS. Throws on API failure so the caller can
-// keep the previous snapshot's data untouched.
+// prev = the previous snapshot's pot_sources ({ days, cursor, ... } | null).
+// Returns the updated payload — days values in SOL per UTC day, pruned to the
+// last KEEP_DAYS. Throws on API failure so the caller can keep the previous
+// snapshot's data untouched.
 export async function scanPotSources(prev) {
   // Only carry forward a day map of the same bucket layout; a version bump
-  // re-backfills from scratch so old buckets never mix with new ones.
+  // re-scans from scratch so old (possibly corrupted) buckets never carry.
   const carry = prev && prev._v === SOURCES_VERSION ? prev : null;
-  const prevCursor = carry?.cursor || null;
+  const prevCursor = carry?.cursor || null; // newest processed signature
+  const cursorTs = carry?.cursor_ts ?? null; // timestamp (s) of that tx
+  let bfCursor = carry?.bf_cursor ?? null; // deepest ever processed signature
   let newestSig = null;
-  let oldest = carry?.oldest || null;
+  let newestTs = null;
   let before = null;
   const collected = [];
 
-  const walkCap = prevCursor ? MAX_PAGES : FIRST_RUN_PAGES;
+  // FORWARD WALK — newest → back, counting ONLY txs strictly newer than the
+  // checkpoint. Two guards make re-counting impossible:
+  //  1. stop at the checkpoint signature itself;
+  //  2. stop at anything at/below the checkpoint's timestamp (the watermark:
+  //     everything previously processed is at/below it, so anything newer is
+  //     genuinely new).
+  // The walk has NO shallow page cap: stopping short of the cursor is what
+  // double-counted high-volume days before. It ends at the cursor, at history
+  // exhaustion, or at the WALK_SAFETY_PAGES ceiling.
+  const walkCap = prevCursor ? WALK_SAFETY_PAGES : FIRST_RUN_PAGES;
+  let stopped = false;
+  let exhausted = false;
   for (let page = 0; page < walkCap; page++) {
     const txs = await fetchPotTxs(before);
-    if (!Array.isArray(txs) || !txs.length) break;
-    if (!newestSig) newestSig = txs[0].signature;
-    // Oldest→newest; stop once the previous cursor is reached.
-    const ordered = [...txs].reverse();
-    let hitCursor = false;
+    if (!Array.isArray(txs) || !txs.length) {
+      exhausted = true;
+      break;
+    }
+    if (!newestSig) {
+      newestSig = txs[0].signature;
+      newestTs = txs[0].timestamp;
+    }
+    const ordered = [...txs].reverse(); // oldest→newest within the page
+    let hitCheckpoint = false;
     for (const t of ordered) {
       if (prevCursor && t.signature === prevCursor) {
-        hitCursor = true;
+        hitCheckpoint = true;
+        break;
+      }
+      if (cursorTs != null && t.timestamp <= cursorTs) {
+        hitCheckpoint = true; // watermark reached — everything older is done
         break;
       }
       const c = classify(t);
       if (c) collected.push(c);
     }
-    const lastSig = txs[txs.length - 1].signature;
-    if (hitCursor) break; // older history is anchored at carry.oldest
-    if (txs.length < PAGE_LIMIT) {
-      oldest = null; // walked to the beginning of the pot's tx history
+    if (hitCheckpoint) {
+      stopped = true;
       break;
     }
-    oldest = lastSig;
+    const lastSig = txs[txs.length - 1].signature;
+    if (txs.length < PAGE_LIMIT) {
+      exhausted = true; // walked to the beginning of the pot's tx history
+      break;
+    }
     before = lastSig;
+    // First run only (no checkpoint yet): the deepest signature we actually
+    // counted becomes the backfill anchor. On checkpointed runs this NEVER
+    // executes — moving the backfill anchor forward is exactly what
+    // re-counted history before.
+    if (!prevCursor) bfCursor = lastSig;
   }
   if (!newestSig) return null;
+  if (!prevCursor && exhausted) bfCursor = null; // full history already walked
 
-  // Backward backfill (bounded pages per run): each ingest continues from
-  // the oldest signature ever seen, walking back toward the protocol's first
-  // pot deposit. Stops automatically once the tx history is exhausted
-  // (oldest = null) — until then every run extends the map by ~1000 txs.
-  if (carry && oldest) {
-    let bfBefore = oldest;
+  // BACKFILL — extends the day map backward from the deepest ever processed
+  // signature, ~BACKFILL_PAGES per run, until the pot's full history is
+  // walked (bfCursor → null) — later sources (e.g. royalties) simply show
+  // as zero-buckets on earlier days when they didn't exist yet. The anchor
+  // only ever moves DEEPER, so every backfilled tx is unseen and nothing is
+  // ever re-counted.
+  if (carry && bfCursor) {
+    let bfBefore = bfCursor;
     for (let page = 0; page < BACKFILL_PAGES; page++) {
       const txs = await fetchPotTxs(bfBefore);
       if (!Array.isArray(txs) || !txs.length) {
-        oldest = null;
+        bfCursor = null;
         break;
       }
       for (const t of txs) {
         const c = classify(t);
         if (c) collected.push(c);
       }
+      const lastSig = txs[txs.length - 1].signature;
       if (txs.length < PAGE_LIMIT) {
-        oldest = null;
+        bfCursor = null;
         break;
       }
-      bfBefore = txs[txs.length - 1].signature;
-      oldest = bfBefore;
+      bfCursor = lastSig;
+      bfBefore = lastSig;
     }
   }
 
@@ -172,7 +218,8 @@ export async function scanPotSources(prev) {
     _v: SOURCES_VERSION,
     days,
     cursor: newestSig,
-    oldest: oldest || null,
+    cursor_ts: newestTs,
+    bf_cursor: bfCursor,
     since: dayKeys[0] || carry?.since || null,
   };
 }
