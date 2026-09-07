@@ -16,9 +16,13 @@ consistent:
 1. **/otchub** — the OTC Hub dashboard (this Base44 app): React + Tailwind +
   Vite on Base44 BaaS; DOS-terminal aesthetic; live analytics for the OTC
   ecosystem (pot routing, desk gallery, launcher analytics, claims, swaps).
-2. **/rufomo** — the RU_FOMO trading bot service (Node, deployed off-platform):
-  reads a strict signal API, executes buys with its own funded key, reports
-  outcomes back; fully sandboxed, journaled, dry-runnable.
+2. **/rufomo** — the RU_FOMO operator bot (restricted MVP; code lives in this
+  repo under `services/ru-fomo-bot`, run on a trusted single-operator POSIX
+  host with Node 22.13+): polls the strict signal API, optionally signs
+  pump.fun bonding-curve buys via PumpPortal's local trade API with a
+  dedicated key, and reports outcomes back. **Dry-run is the default** — it is
+  not an audited trading system and makes no profit, fill, or cross-host
+  exactly-once promises.
 3. **/hubconnect** — the $HUB protocol (standalone Anchor + TypeScript repo):
   stake-to-earn tier system on OTC desk NFTs + treasury desk-sweep flywheel +
   LP policy + buyback-burn deflation.
@@ -31,7 +35,7 @@ That disclaimer ships in every user-facing surface.
 | Repo | Stack | Authoritative docs |
 |---|---|---|
 | /otchub | Base44 (React/Tailwind/Vite, backend functions, entities, workflows) | `CLAUDE.md`, `AGENTS.md`, `docs/` |
-| /rufomo | Node ESM service, standalone | `services/ru-fomo-bot/README.md`, `docs/ru-fomo-implementation-contract.md`, `docs/ru-fomo-rollout.md` |
+| /rufomo (in /otchub: `services/ru-fomo-bot/`) | Node 22.13+ ESM service (`node:sqlite`, no extra deps); operator-host deployment, never hosted in Base44 | `services/ru-fomo-bot/README.md` (environment contract + signing boundary — binding), `docs/ru-fomo-implementation-contract.md`, `docs/ru-fomo-rollout.md` |
 | /hubconnect | Anchor 0.30.x + TS keepers/SDK, standalone | `docs/hubconnect-spec.md` (**v1.2 — the single source of truth for $HUB**) |
 
 Doc precedence: repo-local spec > this master prompt > general knowledge. The
@@ -80,7 +84,27 @@ Integration contracts (implement exactly, do not redesign):
   The implementation contract in `docs/ru-fomo-implementation-contract.md`
   is binding: deterministic signalIds, journal-authoritative idempotence,
   fixed code enums, rate/staleness/slippage gates. Do NOT move this logic into
-  the client or into the bot.
+  the client or into the bot. The bot's own contract (per its README) is
+  equally binding on the bot side:
+  - **Fail-closed config**: all numeric env inputs are base-10 integer
+    lamport strings; bad/missing bounds reject; only the exact string `true`
+    in `RU_FOMO_LIVE` arms live mode. Secrets enter via operator
+    env/vault injection only — never CLI args, `.env`, `VITE_*`, Base44,
+    logs, or source.
+  - **Narrow pump.fun variant only**: canonical v0 message, ≤1,232 bytes, no
+    lookup tables, sole expected signer/payer, exactly 17 accounts and three
+    instructions, `buy_exact_sol_in` with the IDL's 16 accounts in order.
+    No sells, no Token-2022, no ATA creation, no graduated/PumpSwap/Raydium,
+    no wrapping, no tips, no fallbacks. **Never loosen validation to force a
+    fill.**
+  - **Single-operator durability**: one canonical SQLite state dir per
+    wallet (0700/0600, no NFS/cloud sync), exclusive process lock, atomic
+    reservations, signature committed before broadcast, no
+    cross-host exactly-once claim; processed/unknown statuses block all new
+    buys until finalized. Journals are append-only; never delete state to
+    resume buying.
+  - **Wallet policy**: a dedicated small hot wallet only — **never a
+    treasury wallet** (including hubconnect treasury keys).
 - **otchub → both:** published public metrics (`getPublicMetrics`), spot
   prices, and OtcSnapshot fields are the ONLY market/truth inputs rufomo and
   hubconnect keepers consume from the app. Never scrape third-party APIs from
@@ -119,7 +143,11 @@ pilot loop; professional audit before mainnet funds. Multisig + 48h timelock
 upgrade authority per §B6 — the program is NOT immutable in v1.
 
 /rufomo work is **maintenance-only** unless a ticket says otherwise: it is
-implemented, contract-tested, and its rollout plan stands.
+implemented and contract-tested. Any change to its validation, signing, or
+journal semantics requires new adversarial fixtures, a full offline
+regression run (`node --test tests/ru-fomo-bot-*.test.mjs`), and operator
+review before the live variant is touched; live PumpPortal compatibility is
+deliberately NOT claimed until that review passes.
 
 ## 5. HARD RULES (apply in every repo, every change)
 
