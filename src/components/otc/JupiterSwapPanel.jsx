@@ -336,8 +336,8 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   };
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col border border-green-500/30 bg-black p-3">
+      <div className="order-1 flex flex-wrap items-center justify-between gap-2 sm:order-none">
         <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           SWAP :: {isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`}
         </span>
@@ -354,7 +354,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           href="https://jup.ag"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[12px] text-amber-300 hover:border-amber-300/60"
+          className="hidden items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[12px] text-amber-300 hover:border-amber-300/60 sm:inline-flex"
           title="Routing & liquidity by the Jupiter aggregator"
         >
           <Zap className="h-3 w-3" />
@@ -377,19 +377,19 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       </div>
 
       <div
-        className="mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[12px] text-emerald-400"
+        className="order-2 mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[12px] text-emerald-400 sm:order-none"
         title={mint}
       >
-        {tokenLabel}{token?.name ? ` · ${token.name}` : ""} :: <a href={`https://solscan.io/token/${encodeURIComponent(mint)}`} target="_blank" rel="noreferrer" className="text-green-300 underline">{mint}</a>
+        {tokenLabel}{token?.name ? ` · ${token.name}` : ""} :: <a href={`https://solscan.io/token/${encodeURIComponent(mint)}`} target="_blank" rel="noreferrer" className="text-green-300 underline"><span className="sm:hidden">{mint.slice(0, 4)}…{mint.slice(-4)}</span><span className="hidden sm:inline">{mint}</span></a>
       </div>
       {!isOtc && (
-        <div className="mt-1 font-mono text-[11px] text-green-500/60">
+        <div className="order-3 mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
           SELECTED-TOKEN SNAPSHOT :: {metricsAt ? `AS OF ${metricsAt} · NOT LIVE / MAY BE STALE` : "FRESHNESS UNKNOWN"}
         </div>
       )}
 
       {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
-      <div className={`mt-2 grid grid-cols-2 gap-1 ${isOtc ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+      <div className={`order-12 mt-2 grid grid-cols-2 gap-1 sm:order-none ${isOtc ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
         <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
           <div className="text-[10px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
@@ -423,19 +423,21 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       </div>
 
       {/* Mini price candles (bootstrap from snapshot history) */}
-      {isOtc && <PriceCandles
-        latest={latest}
-        history={history}
-        unit={priceUnit}
-        onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
-      />}
+      {isOtc && <div className="order-[13] sm:order-none">
+        <PriceCandles
+          latest={latest}
+          history={history}
+          unit={priceUnit}
+          onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
+        />
+      </div>}
 
       {/* Direction toggle */}
-      <div className="mt-2 flex gap-1">
+      <div className="order-4 mt-2 flex gap-1 sm:order-none">
         <button
           onClick={() => switchMode("BUY")}
           disabled={busy}
-          className={`flex-1 border py-1 font-mono text-[12px] font-bold disabled:opacity-30 ${
+          className={`flex-1 border py-2 font-mono text-[12px] font-bold disabled:opacity-30 sm:py-1 ${
             isBuy
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
               : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
@@ -446,7 +448,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         <button
           onClick={() => switchMode("SELL")}
           disabled={busy}
-          className={`flex-1 border py-1 font-mono text-[12px] font-bold disabled:opacity-30 ${
+          className={`flex-1 border py-2 font-mono text-[12px] font-bold disabled:opacity-30 sm:py-1 ${
             !isBuy
               ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300"
               : "border-green-500/30 text-green-500/60 hover:border-cyan-400/40"
@@ -457,7 +459,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       </div>
 
       {!wallet ? (
-        <div className="mt-3">
+        <div className="order-5 mt-3 sm:order-none">
           <div className="mb-2 text-center font-mono text-[12px] text-green-500/50">
             CONNECT A WALLET TO ENABLE SWAP :: ALSO UNLOCKS PORTFOLIO + BULK CLAIM
           </div>
@@ -476,7 +478,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       ) : null}
         <>
           {/* Native SOL and standard ATA only, displayed without rounding. */}
-          {wallet && <div className="mt-2 grid grid-cols-2 gap-1">
+          {wallet && <div className="order-6 mt-2 grid grid-cols-2 gap-1 sm:order-none">
             <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[12px]">
               <span className="text-green-500/50">SOL_BAL</span>
               <span className="min-w-0 break-all text-emerald-300">
@@ -494,20 +496,20 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </span>
             </div>
           </div>}
-          {wallet && <div className="mt-1 break-all font-mono text-[11px] text-green-500/60">
+          {wallet && <div className="order-[14] mt-1 break-all font-mono text-[11px] text-green-500/60 sm:order-none">
             TOKEN BALANCE: STANDARD ATA ONLY (other token accounts excluded).
             {(currentBalances?.tokenError || currentBalances?.solError) && (
               <span className="text-amber-400"> Balance read failed: {currentBalances.tokenError || currentBalances.solError}</span>
             )}
             <button disabled={busy || !tokenInfo} onClick={() => { if (!busyRef.current) loadBalance(lifetime.current); }} className="ml-2 underline disabled:opacity-30">[RETRY BALANCES]</button>
           </div>}
-          <div className="mt-1 font-mono text-[11px] text-green-500/60">
+          <div className="order-[15] mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
             {tokenInfo ? `ON-CHAIN DECIMALS: ${tokenInfo.decimals}` : metadataError || "VERIFYING MINT…"}
             {metadataError && <button disabled={busy} onClick={() => { if (!busyRef.current) loadMetadata(); }} className="ml-2 underline disabled:opacity-30">[RETRY MINT METADATA]</button>}
           </div>
 
           {/* Amount input */}
-          <div className="mt-2 border border-green-500/20 p-2">
+          <div className="order-7 mt-2 border border-green-500/20 p-2 sm:order-none">
             <div className="flex items-center justify-between">
               <label className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
                 YOU PAY ({isBuy ? "SOL" : tokenLabel})
@@ -518,7 +520,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                     changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
                   }}
                   disabled={busy}
-                  className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+                  className="border border-cyan-400/40 px-2.5 py-1.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30 sm:px-1.5 sm:py-0.5"
                 >
                   [MAX]
                 </button>
@@ -560,7 +562,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                       setCustomSlip("");
                     }}
                     disabled={busy}
-                    className={`border px-1.5 py-0.5 font-mono text-[11px] disabled:opacity-30 ${
+                    className={`border px-2 py-1.5 font-mono text-[11px] disabled:opacity-30 sm:px-1.5 sm:py-0.5 ${
                       slippageBps === s.bps && !customSlip
                         ? "border-emerald-500/60 text-emerald-400"
                         : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
@@ -581,7 +583,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                   }}
                   disabled={busy}
                   title="Custom slippage in %"
-                  className={`w-16 min-w-0 flex-1 border bg-black px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-30 ${
+                  className={`w-16 min-w-0 flex-1 border bg-black px-2 py-1.5 font-mono text-[11px] outline-none disabled:opacity-30 sm:px-1.5 sm:py-0.5 ${
                     customSlip
                       ? "border-cyan-400/60 text-cyan-300"
                       : "border-green-500/30 text-green-500/60 focus:border-cyan-400/60"
@@ -592,7 +594,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           </div>
 
           {/* Quote */}
-          <div className="mt-2 border border-green-500/20 p-2">
+          <div className="order-8 mt-2 border border-green-500/20 p-2 sm:order-none">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
                 YOU RECEIVE ({isBuy ? tokenLabel : "SOL"})
@@ -600,7 +602,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               <button
                 onClick={fetchQuote}
                 disabled={quoting || busy || !!inputError}
-                className="border border-green-500/40 px-2 py-0.5 font-mono text-[11px] text-green-300 hover:bg-green-500/10 disabled:opacity-30"
+                className="border border-green-500/40 px-2.5 py-1.5 font-mono text-[11px] text-green-300 hover:bg-green-500/10 disabled:opacity-30 sm:px-2 sm:py-0.5"
               >
                 {quoting ? "QUOTING..." : "[QUOTE]"}
               </button>
@@ -629,7 +631,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </div>
             )}
           </div>
-          <div className="mt-1 font-mono text-[11px] text-green-500/60">
+          <div className="order-[16] mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
             Jupiter routes depend on liquidity, amount and token support. Some tokens have no route; a quote is not a guarantee of execution.
           </div>
 
@@ -637,7 +639,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           <button
             onClick={doSwap}
             disabled={busy || !wallet || !!inputError || (isBuy ? solBal : tokenBal) == null}
-            className={`mt-2 w-full border py-1.5 font-mono text-[13px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
+            className={`order-9 mt-2 w-full border py-2.5 font-mono text-[13px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 sm:order-none sm:py-1.5 ${
               isBuy
                 ? "border-emerald-500/60 text-emerald-300"
                 : "border-cyan-400/60 text-cyan-300"
@@ -649,14 +651,16 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               ? `[SWAP SOL → ${tokenLabel}]`
               : `[SWAP ${tokenLabel} → SOL]`}
           </button>
-          <HelpNote label="[?] SWAP SAFETY">
-            Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with
-            your connected wallet. Token balances above cover only the standard associated token account.
-            Token-2022 extensions (including fees or transfer restrictions) can affect availability and execution.
-          </HelpNote>
+          <div className="order-[17] sm:order-none">
+            <HelpNote label="[?] SWAP SAFETY">
+              Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with
+              your connected wallet. Token balances above cover only the standard associated token account.
+              Token-2022 extensions (including fees or transfer restrictions) can affect availability and execution.
+            </HelpNote>
+          </div>
 
           {err && (
-            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[12px] text-amber-400">
+            <div className="order-10 mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[12px] text-amber-400 sm:order-none">
               ERR: {err}
             </div>
           )}
@@ -671,7 +675,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
 
           {/* Log */}
           {logs.length > 0 && (
-            <div className="mt-2 max-h-40 overflow-y-auto border border-green-500/20 bg-black p-2">
+            <div className="order-11 mt-2 max-h-40 overflow-y-auto border border-green-500/20 bg-black p-2 sm:order-none">
               {logs.map((l, i) => (
                 <div
                   key={i}
@@ -703,7 +707,9 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         </>
 
       {/* Recent on-chain swaps feed (public — shown even without a wallet) */}
-      {isOtc && <RecentSwaps latest={latest} unit={priceUnit} />}
+      {isOtc && <div className="order-[18] sm:order-none">
+        <RecentSwaps latest={latest} unit={priceUnit} />
+      </div>}
     </div>
   );
 }
