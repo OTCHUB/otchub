@@ -53,11 +53,19 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
-## $HUB Protocol Dashboard (landing page)
+## $HUB Protocol Dashboard (feature-flagged, off by default)
 
-The domain root (`/`, plus `/treasury`, `/deployments`, `/desk/:asset`) is the read-only
-$HUB protocol dashboard (treasury, burn, pot, per-tier yield). The OTC_DESK analytics
-dashboard lives at `/otc`; `/hub/*` links from the former standalone shell redirect.
+The $HUB protocol dashboard (treasury, burn, pot, per-tier yield) is vendored into this repo
+but **disabled until the token launches on mainnet**: `otchub.dev` shows only mainnet content.
+`src/lib/hubFlag.js` reads `VITE_HUB_ENABLED`; while off, `/` is the OTC_DESK analytics
+dashboard, `/otc` redirects to `/`, unknown paths 404, and the hub module is not bundled.
+
+Set `VITE_HUB_ENABLED=true` (Base44 env vars, then republish) to switch it on. When enabled,
+the domain root (`/`, plus `/treasury`, `/deployments`, `/desk/:asset`) becomes the $HUB
+dashboard, the OTC_DESK analytics move to `/otc`, and `/hub/*` links from the former
+standalone shell redirect. Launch checklist: also set `VITE_HUB_CLUSTER=mainnet-beta`,
+`VITE_HUB_PROGRAM_ID`, `VITE_HUB_RPC_URL`, and re-copy `src/hub*` from `hubconnect`
+(CA copy button + swap panel land there).
 
 - `src/hub/` — UI module vendored from `hubconnect/web/src/hub` (TypeScript; Vite compiles it as-is).
 - `src/hub-sdk/` — read-only SDK + IDL vendored from `hubconnect/sdk`, aliased as `@hub-sdk`

@@ -1,15 +1,21 @@
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
-import Hub from './pages/Hub';
 import About from './pages/About';
 import Connect from './pages/Connect';
+import { HUB_ENABLED } from './lib/hubFlag';
 // Add page imports here
+
+// $HUB dashboard stays dark until the token launches on mainnet. Lazy import so
+// the module (and @anchor-lang/core) is not bundled into the main chunk while off.
+const Hub = HUB_ENABLED ? React.lazy(() => import('./pages/Hub')) : null;
 
 // app.otchub.dev (standalone $HUB shell) served the module under /hub/*; the
 // merged app serves it at the root, so strip the prefix and keep the rest.
@@ -42,17 +48,31 @@ const AuthenticatedApp = () => {
   }
 
   // Render the main app
+  if (!HUB_ENABLED) {
+    return (
+      <Routes>
+        {/* Add your page Route elements here */}
+        <Route path="/" element={<Home />} />
+        <Route path="/otc" element={<Navigate to="/" replace />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/connect" element={<Connect />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    );
+  }
+
   return (
-    <Routes>
-      {/* Add your page Route elements here */}
-      <Route path="/otc" element={<Home />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/connect" element={<Connect />} />
-      <Route path="/hub/*" element={<HubLegacyRedirect />} />
-      {/* $HUB protocol metrics are the landing page: "/", /treasury, /deployments,
-          /desk/:asset. HubRoutes redirects any other unknown path back to "/". */}
-      <Route path="/*" element={<Hub />} />
-    </Routes>
+    <React.Suspense fallback={null}>
+      <Routes>
+        <Route path="/otc" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/connect" element={<Connect />} />
+        <Route path="/hub/*" element={<HubLegacyRedirect />} />
+        {/* $HUB protocol metrics are the landing page: "/", /treasury, /deployments,
+            /desk/:asset. HubRoutes redirects any other unknown path back to "/". */}
+        <Route path="/*" element={<Hub />} />
+      </Routes>
+    </React.Suspense>
   );
 };
 

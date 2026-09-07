@@ -95,7 +95,7 @@ export default function Connect() {
               <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
             </h1>
             <Link
-              to="/otc"
+              to="/"
               className="border border-green-500/50 px-2.5 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
             >
               [← BACK_TO_DASH]
