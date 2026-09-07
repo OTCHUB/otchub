@@ -24,6 +24,7 @@ import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen from "@/components/otc/BootScreen";
+import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 import KeeperPanel from "@/components/otc/KeeperPanel";
 import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
@@ -191,7 +192,8 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black font-mono text-green-400">
+    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+      <TerminalTopBar label="OTC_HUB_TERMINAL" />
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
         <header className="border border-green-500/30 bg-black p-3">
@@ -429,6 +431,7 @@ export default function Home() {
           <div>DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH · OFFICIAL APP: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
         </footer>
       </div>
+      <TerminalBottomBar>COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH</TerminalBottomBar>
     </div>
   );
 }

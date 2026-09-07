@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { fmtNum, fmtSol, fmtUsd, fmtPct } from "@/lib/format";
+import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 
 const HEADER = [
   "+---------------------------------------------+",
@@ -79,33 +80,27 @@ export default function BootScreen({ onComplete }) {
     return () => clearInterval(id);
   }, [built, onComplete]);
 
-  // Clamp to exactly 0–100 so the bar can never overflow its frame and always
-  // finishes at 100% when the boot sequence completes.
+  // The bar tracks EXACTLY how many of the milestone lines have printed —
+  // one line = one step of the sequence, 100% only when the last line is up.
   const progress = built?.length
     ? Math.max(0, Math.min(100, Math.round((lines.length / built.length) * 100)))
     : 0;
 
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black font-mono text-green-400">
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+      <TerminalTopBar label="OTC_HUB_BOOT_SEQUENCE" />
+
       {/* Full-screen CRT treatment: scanlines + vignette fill any viewport */}
       <div className="pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(to_bottom,transparent,transparent_2px,rgba(0,255,80,0.025)_3px)]" />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.75))]" />
 
-      {/* Status bar frames the top of the screen */}
-      <div className="relative z-20 flex items-center justify-between border-b border-green-500/20 px-3 py-1.5 text-[11px] text-green-500/60 sm:px-6 sm:text-[12px]">
-        <span>TTY1 :: OTC_HUB_BOOT_SEQUENCE</span>
-        <span className="flex items-center gap-1.5 text-emerald-400">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          MAINNET_LINK_ACTIVE
-        </span>
-      </div>
-
-      <div className="relative z-20 flex flex-1 items-center justify-center overflow-y-auto px-4 py-6 sm:px-8 sm:py-10">
+      {/* Scrollable terminal body: stays inside the viewport on every screen */}
+      <div className="relative z-20 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
         <div className="w-full max-w-3xl xl:max-w-4xl">
-          <div className="whitespace-pre text-[10px] leading-tight text-green-500/70 sm:text-[13px] xl:text-[13px]">
+          <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
             {HEADER.join("\n")}
           </div>
-          <div className="mt-3 space-y-0 text-[12px] leading-relaxed sm:text-xs xl:text-sm">
+          <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
             {!data && (
               <div>
                 <span className="text-green-500/50">&gt; </span>
@@ -129,26 +124,27 @@ export default function BootScreen({ onComplete }) {
               <span className="animate-pulse">▋</span> BOOT_COMPLETE
             </div>
           )}
-          {/* Boot progress bar */}
-          <div className="mt-3 border border-green-500/30 p-1.5">
-            <div className="flex items-center justify-between text-[11px] text-green-500/60">
-              <span>BOOT_SEQ</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="mt-1 h-1.5 w-full overflow-hidden bg-green-500/10">
-              <div
-                className="h-full max-w-full bg-green-500/60 transition-all duration-100"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+        </div>
+      </div>
+
+      {/* Boot progress bar: pinned above the fixed footer, always visible and
+          in lockstep with the milestone text scrolling above it */}
+      <div className="relative z-20 mx-auto w-full max-w-3xl shrink-0 px-4 pb-2 sm:px-8 xl:max-w-4xl">
+        <div className="border border-green-500/30 p-1.5">
+          <div className="flex items-center justify-between text-[10px] text-green-500/60 sm:text-[11px]">
+            <span>BOOT_SEQ</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="mt-1 h-1.5 w-full overflow-hidden bg-green-500/10">
+            <div
+              className="h-full max-w-full bg-green-500/60 transition-all duration-100"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
       </div>
 
-      {/* Status bar frames the bottom of the screen */}
-      <div className="relative z-20 border-t border-green-500/20 px-3 py-1.5 text-center text-[11px] text-green-500/40 sm:text-[12px]">
-        COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH
-      </div>
+      <TerminalBottomBar>COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH</TerminalBottomBar>
     </div>
   );
 }
