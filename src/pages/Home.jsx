@@ -260,9 +260,6 @@ export default function Home() {
               </button>
             </div>
           </div>
-          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[12px] text-amber-400/80">
-            COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH · UNOFFICIAL ANALYTICS DASHBOARD
-          </div>
           {error && (
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[13px] text-amber-400">
               ERR: {error}
@@ -272,7 +269,7 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          <CollapsibleCard title="WALLET" id="otc-wallet" openSignal={walletOpenSignal}>
+          <CollapsibleCard title="WALLET" id="otc-wallet" mobileOpen openSignal={walletOpenSignal}>
             {wallet ? (
               <WalletPortfolio
                 address={wallet}
@@ -292,7 +289,7 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
           <div className="h-full lg:col-span-2">
-            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage">
+            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage" mobileOpen>
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>
           </div>
@@ -303,7 +300,7 @@ export default function Home() {
 
         {/* Live launch rankings select a mint in the shared SOL swap panel. */}
         <div className="mt-3">
-          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" right={null} openSignal={0}>
+          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" mobileOpen right={null} openSignal={0}>
             <LauncherAnalytics onTrade={tradeLauncher} selectedMint={selectedToken?.mint}
               tradingDisabled={swapBusy} onSnapshot={updateLauncherSnapshot} />
           </CollapsibleCard>
@@ -345,7 +342,7 @@ export default function Home() {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
             <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
-              openSignal={swapOpenSignal} locked={swapBusy}>
+              mobileOpen openSignal={swapOpenSignal} locked={swapBusy}>
               <JupiterSwapPanel
                 wallet={wallet}
                 latest={latest}
