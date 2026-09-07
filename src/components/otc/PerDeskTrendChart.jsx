@@ -44,8 +44,8 @@ export default function PerDeskTrendChart({ latest }) {
   const avgVal = avgSol != null ? toUnit(avgSol) : null;
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+      <div className="flex shrink-0 items-center justify-between">
         <div>
           <div className="text-[12px] uppercase tracking-widest text-green-500/70">
             PER_DESK_EARN :: {unit}/DAY
@@ -68,7 +68,7 @@ export default function PerDeskTrendChart({ latest }) {
           ))}
         </div>
       </div>
-      <div className="mt-3 h-48 sm:h-56">
+      <div className="mt-3 h-48 shrink-0 sm:h-56 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />

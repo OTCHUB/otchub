@@ -26,14 +26,14 @@ export default function RoundsChart({ latest }) {
   const solUsd = latest?.sol_price_usd ?? null;
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+      <div className="shrink-0 text-[12px] uppercase tracking-widest text-green-500/70">
         ROUND_VELOCITY :: ROUNDS / DAY
       </div>
-      <div className="mt-1 text-[11px] text-green-500/40">
+      <div className="mt-1 shrink-0 text-[11px] text-green-500/40">
         distribution rounds executed per day · tooltip also shows desk count
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-1 font-mono">
+      <div className="mt-2 grid shrink-0 grid-cols-3 gap-1 font-mono">
         <div className="border border-green-500/20 px-2 py-1">
           <div className="text-[10px] uppercase tracking-widest text-green-500/50">
             ROUNDS_TODAY
@@ -80,12 +80,14 @@ export default function RoundsChart({ latest }) {
           </div>
         </div>
       </div>
-      <HelpNote label="[?] POT_BAL / OWED_LEGEND">
-        POT_BAL = SOL sitting in the pot right now. OWED_BACKLOG = desk earnings
-        not yet pushed into vaults — cleared by a permissionless distribute
-        (runs automatically when claiming). Rounds are driven by buyback spend.
-      </HelpNote>
-      <div className="mt-3 h-52 sm:h-64">
+      <div className="shrink-0">
+        <HelpNote label="[?] POT_BAL / OWED_LEGEND">
+          POT_BAL = SOL sitting in the pot right now. OWED_BACKLOG = desk earnings
+          not yet pushed into vaults — cleared by a permissionless distribute
+          (runs automatically when claiming). Rounds are driven by buyback spend.
+        </HelpNote>
+      </div>
+      <div className="mt-3 h-52 shrink-0 sm:h-64 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />

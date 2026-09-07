@@ -112,24 +112,24 @@ export default function SupplyChart({ history, latest }) {
     : "";
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       {/* Header — same panel title style as the other charts */}
-      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
+      <div className="shrink-0 text-[12px] uppercase tracking-widest text-green-500/70">
         SUPPLY :: $OTC_BURN vs DESK_MINT
       </div>
-      <div className="mt-1 text-[11px] text-green-500/40">
+      <div className="mt-1 shrink-0 text-[11px] text-green-500/40">
         DAILY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
       </div>
 
       {/* Metric cards */}
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 flex shrink-0 flex-wrap gap-2">
         <MetricCard label="SUPPLY_NOW" value={supplyNow != null ? `${fmtM(supplyNow)} OTC` : "—"} sub={burnPct != null ? `-${burnPct}%` : null} subRed />
         <MetricCard label="TOTAL_BURNED" value={fmtM(totalBurned)} sub={deskDeposits != null ? `${fmtM(deskDeposits)} desk_deposits` : null} />
         <MetricCard label="DESKS" value={fmtK(desksNow)} sub={desksPct != null ? `${desksPct}% of ${DESK_CAP.toLocaleString()}` : null} />
       </div>
 
       {/* Chart — same axis/legend treatment as the other charts */}
-      <div className="mt-3 h-64 sm:h-72">
+      <div className="mt-3 h-64 shrink-0 sm:h-72 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 4, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
@@ -180,7 +180,7 @@ export default function SupplyChart({ history, latest }) {
       </div>
 
       {/* Footer */}
-      <div className="mt-3 border-t border-green-500/20 pt-2">
+      <div className="mt-3 shrink-0 border-t border-green-500/20 pt-2">
         <div className="text-[11px] leading-tight text-green-500/50">DATA_AS_OF: {asOf}</div>
       </div>
     </div>

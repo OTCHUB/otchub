@@ -7,11 +7,11 @@ export default function BuybacksPanel({ latest }) {
   const totalOtc = buybacks.reduce((a, b) => a + (b.otc || 0), 0);
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+      <div className="shrink-0 text-[12px] uppercase tracking-widest text-green-500/70">
         BUYBACKS :: TREASURY
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
         <div className="border border-green-500/20 p-2">
           <div className="text-[11px] uppercase text-green-500/50">SOL_BUYBACK</div>
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtSol(totalSol, 3)}</div>
@@ -21,7 +21,7 @@ export default function BuybacksPanel({ latest }) {
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtNum(totalOtc)}</div>
         </div>
       </div>
-      <div className="mt-2 max-h-48 overflow-auto">
+      <div className="mt-2 min-h-0 flex-1 overflow-auto lg:max-h-none max-h-48">
         <table className="w-full font-mono text-[13px]">
           <thead className="sticky top-0 bg-black text-[11px] uppercase text-green-500/50">
             <tr className="border-b border-green-500/20">

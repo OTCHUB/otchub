@@ -10,14 +10,14 @@ export default function ByStockChart({ latest }) {
   const data = raw.map((s) => ({ symbol: s.symbol, dist: s.distributed_sol }));
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+      <div className="shrink-0 text-[12px] uppercase tracking-widest text-green-500/70">
         BY_STOCK :: DESK DISTRIBUTIONS (SOL)
       </div>
-      <div className="mt-1 text-[11px] text-green-500/40">
+      <div className="mt-1 shrink-0 text-[11px] text-green-500/40">
         13-stock desk rotation only · launchpad (launcher) payouts excluded · top 12
       </div>
-      <div className="mt-3 h-72">
+      <div className="mt-3 h-72 shrink-0 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, bottom: 0, left: 10 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
