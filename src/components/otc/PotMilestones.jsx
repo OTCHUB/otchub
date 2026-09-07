@@ -10,9 +10,10 @@ const CONFIG_ACCOUNT = "9b5VLbpXedgXcjWyboXqHMbDgeHJtb5PBsy6TE18REU4";
 const PROTOCOL_WALLET = "DqMAVQ1RcQath18PrSLBVZHjwWXXN8cFEua2XuQ2rbQh";
 const POT = "BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR";
 const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
-const VAULT_AUTHORITIES = [
-  { key: "14fL3h2oe5VKk7Jkh77ML2UFMKQeKGPxZy14ZLcqkQUd", note: "claimant of $OTC creator fees · account never funded · ≠ POT ≠ PROTOCOL_WALLET" },
-  { key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ", note: "claimant of launcher creator fees · same pattern" },
+const PUMP_GLOBAL_VAULT = "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"; // 34.6 SOL live, traced 09-07
+const DEAD_VAULTS = [
+  { key: "14fL3h2oe5VKk7Jkh77ML2UFMKQeKGPxZy14ZLcqkQUd", note: "old $OTC fee-vault record · CLOSED account · never funded" },
+  { key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ", note: "old launcher fee-vault record · CLOSED account · never funded" },
 ];
 
 const SEGMENTS = [
@@ -116,9 +117,16 @@ export default function PotMilestones({ latest }) {
             </a>{" "}
             · owned by the OTC program · no fee-vault routing entry found
           </Row>
-          {VAULT_AUTHORITIES.map((v) => (
-            <Row key={v.key} tone="text-amber-300/90">
-              VAULT_AUTH{" "}
+          <Row tone="text-amber-300/90">
+            PUMP_VAULT{" "}
+            <a href={scan(PUMP_GLOBAL_VAULT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
+              {short(PUMP_GLOBAL_VAULT)} ↗
+            </a>{" "}
+            · 34.6 SOL live · swap fees settle here + pool vaults (traced 09-07) · pot not a fee recipient
+          </Row>
+          {DEAD_VAULTS.map((v) => (
+            <Row key={v.key} tone="text-amber-300/70">
+              OLD_VAULT{" "}
               <a href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
                 {short(v.key)} ↗
               </a>{" "}
@@ -155,8 +163,8 @@ export default function PotMilestones({ latest }) {
             {cliff ? ` −${cliff.pct}% overnight` : ""} while $OTC trading volume stayed flat?
           </li>
           <li>
-            Who controls the fee-vault authorities {VAULT_AUTHORITIES.map((v) => short(v.key)).join(" / ")},
-            and why do they replace the pot as fee claimant?
+            Why is the 10% desk share of launchpad swap fees no longer routed to the pot (per-swap deposits
+            −{cliff ? cliff.pct : 85}% vs peak) while launcher-coin holders received ≈53% of all distributed funds?
           </li>
           <li>Are vault balances swept to the pot on a schedule — where is it announced and auditable?</li>
           <li>
