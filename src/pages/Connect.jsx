@@ -74,7 +74,7 @@ const CLIENTS = [
 function Section({ title, children }) {
   return (
     <div className="mt-3 border border-green-500/30 bg-black p-3">
-      <div className="mb-2 text-[10px] uppercase tracking-widest text-green-500/60">{title}</div>
+      <div className="mb-2 text-[12px] uppercase tracking-widest text-green-500/60">{title}</div>
       {children}
     </div>
   );
@@ -96,12 +96,12 @@ export default function Connect() {
             </h1>
             <Link
               to="/"
-              className="border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+              className="border border-green-500/50 px-2.5 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
             >
               [← BACK_TO_DASH]
             </Link>
           </div>
-          <p className="mt-1 text-[10px] text-green-500/50">
+          <p className="mt-1 text-[12px] text-green-500/50">
             HOOK UP ANY AI CLIENT TO THIS APP&apos;S LIVE DATA — PUBLIC, READ-ONLY, NO SIGN-IN
           </p>
         </header>
@@ -120,14 +120,14 @@ export default function Connect() {
             {TOOLS.map((t) => (
               <div key={t.name} className="border border-green-500/20 px-2 py-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-[11px] font-bold text-green-300">{t.name}</span>
-                  <span className="text-[9px] text-green-500/40">::{t.entity}</span>
+                  <span className="text-[13px] font-bold text-green-300">{t.name}</span>
+                  <span className="text-[11px] text-green-500/40">::{t.entity}</span>
                 </div>
-                <div className="mt-0.5 text-[10px] leading-relaxed text-green-500/70">{t.desc}</div>
+                <div className="mt-0.5 text-[12px] leading-relaxed text-green-500/70">{t.desc}</div>
               </div>
             ))}
           </div>
-          <div className="mt-2 text-[9px] text-green-500/40">
+          <div className="mt-2 text-[11px] text-green-500/40">
             Sensitive entities (users, contact messages, locks, keeper runs) are NOT exposed. Wallet
             and admin operations stay app-side only.
           </div>
@@ -138,8 +138,8 @@ export default function Connect() {
           <div className="grid gap-2 lg:grid-cols-2">
             {CLIENTS.map((c) => (
               <div key={c.name} className="border border-green-500/20 p-2">
-                <div className="text-[11px] font-bold text-green-300">{c.name}</div>
-                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-green-500/70">
+                <div className="text-[13px] font-bold text-green-300">{c.name}</div>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[12px] leading-relaxed text-green-500/70">
                   {c.steps.map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}
@@ -147,7 +147,7 @@ export default function Connect() {
               </div>
             ))}
           </div>
-          <div className="mt-2 text-[9px] text-green-500/40">
+          <div className="mt-2 text-[11px] text-green-500/40">
             After we ship changes, refresh the connector in your client — assistants cache the tool
             list.
           </div>
@@ -162,7 +162,7 @@ export default function Connect() {
           />
         </Section>
 
-        <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
+        <footer className="mt-4 space-y-1 text-center text-[12px] text-green-500/30">
           <div>OTC_HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTCDESKS.CASH</div>
           <div>MCP SERVER GOES LIVE ON PUBLISH — DATA UPDATES EVERY ~5 MIN</div>
         </footer>

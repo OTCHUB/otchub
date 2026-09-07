@@ -74,9 +74,9 @@ export default function ApiAgentPanel() {
   };
 
   return (
-    <section aria-label="Hosted API dashboard" className="min-w-0 space-y-2 border border-emerald-500/30 bg-black p-2 font-mono text-[10px] leading-relaxed text-green-300 break-words [overflow-wrap:anywhere]">
+    <section aria-label="Hosted API dashboard" className="min-w-0 space-y-2 border border-emerald-500/30 bg-black p-2 font-mono text-[12px] leading-relaxed text-green-300 break-words [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[10px] uppercase tracking-widest text-cyan-300">API_AGENT :: HOSTED FUNCTIONS</h3>
+        <h3 className="text-[12px] uppercase tracking-widest text-cyan-300">API_AGENT :: HOSTED FUNCTIONS</h3>
         <button type="button" onClick={checkPublicRead} disabled={probe.phase === "loading"}
           className="border border-emerald-500/50 px-2 py-1 text-emerald-300 hover:bg-emerald-500/10 disabled:cursor-wait disabled:opacity-50">
           {probe.phase === "loading" ? "[CHECKING…]" : probe.checkedAt === null ? "[CHECK PUBLIC API]" : "[REFRESH PUBLIC CHECK]"}

@@ -78,10 +78,10 @@ export default function ArbitrageCard({ latest, holdings }) {
     <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           ARBITRAGE :: MINT vs SECONDARY{liveScanning ? " · SCANNING…" : scanError ? " · SCAN_DOWN" : scanPartial ? " · PARTIAL" : ""}
         </span>
-        <span className={`border px-2 py-0.5 font-mono text-[10px] ${rec.cls}`}>
+        <span className={`border px-2 py-0.5 font-mono text-[12px] ${rec.cls}`}>
           {rec.label}
         </span>
       </div>
@@ -95,17 +95,17 @@ export default function ArbitrageCard({ latest, holdings }) {
           title="Buy $OTC in the swap panel, then mint a fresh desk with it"
           className="cursor-pointer border border-amber-500/30 bg-amber-500/5 p-2 text-center hover:bg-amber-500/10"
         >
-          <div className="text-[9px] uppercase tracking-widest text-amber-500/70">
+          <div className="text-[11px] uppercase tracking-widest text-amber-500/70">
             MINT_FRESH
           </div>
           <div className="mt-1 font-mono text-lg font-bold text-amber-400 sm:text-xl">
             {fmtSol(mintSol)}
           </div>
-          <div className="mt-0.5 text-[9px] text-amber-500/50">
+          <div className="mt-0.5 text-[11px] text-amber-500/50">
             ≈ {fmtUsd(latest?.mint_cost_usd)} · stock 0
           </div>
         </div>
-        <div className="flex items-center px-1 text-[10px] text-green-500/50">VS</div>
+        <div className="flex items-center px-1 text-[12px] text-green-500/50">VS</div>
         <div
           onClick={() =>
             document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -117,7 +117,7 @@ export default function ArbitrageCard({ latest, holdings }) {
               : "border border-cyan-500/30 bg-cyan-500/5"
           }`}
         >
-          <div className="text-[9px] uppercase tracking-widest text-cyan-400/70">
+          <div className="text-[11px] uppercase tracking-widest text-cyan-400/70">
             NET_SECONDARY
           </div>
           <div
@@ -127,14 +127,14 @@ export default function ArbitrageCard({ latest, holdings }) {
           >
             {fmtSol(effectiveSecSol)}
           </div>
-          <div className="mt-0.5 text-[9px] text-cyan-500/50">
+          <div className="mt-0.5 text-[11px] text-cyan-500/50">
             floor {fmtSol(bestFloor, 2)} − stock {fmtSol(bestAccrued, 2)}
           </div>
         </div>
       </div>
 
       {/* One-line verdict */}
-      <div className={`mt-2 border px-2 py-1.5 text-center font-mono text-[10px] sm:text-[11px] ${rec.cls}`}>
+      <div className={`mt-2 border px-2 py-1.5 text-center font-mono text-[12px] sm:text-[13px] ${rec.cls}`}>
         {recKey === "buy_secondary"
           ? `SECONDARY_WINS :: save ${fmtSol(savingsSol, 3)} (${fmtPct(
               mintSol && savingsSol != null ? (savingsSol / mintSol) * 100 : null
@@ -147,11 +147,11 @@ export default function ArbitrageCard({ latest, holdings }) {
       {/* NEAR_FLOOR: the 3 cheapest desks to snipe right now */}
       <div className="mt-3 flex min-h-0 flex-1 flex-col border border-green-500/20">
         <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
-          <span className="text-[9px] uppercase tracking-widest text-green-500/50">
+          <span className="text-[11px] uppercase tracking-widest text-green-500/50">
             NEAR_FLOOR :: TOP_{TOP_N} ({ranked.length}) · NET_ASC · LIVE_VAULT
           </span>
           {excludedEmpty > 0 && (
-            <span className="text-[9px] text-red-400/60">
+            <span className="text-[11px] text-red-400/60">
               {excludedEmpty} SKIPPED (EMPTY_VAULT)
             </span>
           )}
@@ -167,7 +167,7 @@ export default function ArbitrageCard({ latest, holdings }) {
               href={`${ME_BASE}/${h.asset_id}`}
               target="_blank"
               rel="noreferrer"
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 border-b border-green-500/10 px-2 py-1.5 text-[10px] hover:bg-green-500/5 last:border-0"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 border-b border-green-500/10 px-2 py-1.5 text-[12px] hover:bg-green-500/5 last:border-0"
             >
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="text-green-500/40">#{i + 1}</span>
@@ -197,7 +197,7 @@ export default function ArbitrageCard({ latest, holdings }) {
           ))
         ) : scanError ? (
           /* scan failed (quota/RPC) — do NOT claim there are no listings */
-          <div className="px-2 py-2 text-center text-[10px] text-amber-400/80">
+          <div className="px-2 py-2 text-center text-[12px] text-amber-400/80">
             SCAN_UNAVAILABLE :: vault scan failed — net-cost metrics degraded
             <button
               onClick={rescan}
@@ -207,7 +207,7 @@ export default function ArbitrageCard({ latest, holdings }) {
             </button>
           </div>
         ) : (
-          <div className="px-2 py-2 text-center text-[10px] text-green-500/50">
+          <div className="px-2 py-2 text-center text-[12px] text-green-500/50">
             {liveScanning
               ? "SCANNING :: READING VAULT BALANCES…"
               : scanPartial
@@ -236,7 +236,7 @@ export default function ArbitrageCard({ latest, holdings }) {
             href={`${ME_BASE}/${snipe.asset_id}`}
             target="_blank"
             rel="noreferrer"
-            className={`border px-2 py-1 font-mono text-[10px] ${
+            className={`border px-2 py-1 font-mono text-[12px] ${
               recKey === "buy_secondary"
                 ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
                 : "border-green-500/30 text-green-500/60"
@@ -250,7 +250,7 @@ export default function ArbitrageCard({ latest, holdings }) {
             onClick={() =>
               document.getElementById("otc-listings")?.scrollIntoView({ behavior: "smooth", block: "start" })
             }
-            className="border border-green-500/30 px-2 py-1 font-mono text-[10px] text-green-500/60"
+            className="border border-green-500/30 px-2 py-1 font-mono text-[12px] text-green-500/60"
           >
             [→ BUY_SECONDARY · LISTINGS]
           </button>
@@ -260,7 +260,7 @@ export default function ArbitrageCard({ latest, holdings }) {
           onClick={() =>
             document.getElementById("otc-swap")?.scrollIntoView({ behavior: "smooth", block: "start" })
           }
-          className={`border px-2 py-1 font-mono text-[10px] ${
+          className={`border px-2 py-1 font-mono text-[12px] ${
             recKey === "mint"
               ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
               : "border-green-500/30 text-green-500/60"

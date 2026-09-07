@@ -94,13 +94,13 @@ export default function EarningsChart({ latest, history }) {
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+          <div className="text-[12px] uppercase tracking-widest text-green-500/70">
             EARNINGS :: {unit} / DAY
           </div>
-          <div className="mt-1 text-[9px] text-green-500/40">
+          <div className="mt-1 text-[11px] text-green-500/40">
             bars = total into desks · line = avg / desk · closed days only · bootstrap excluded from avg
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] font-mono">
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] font-mono">
             <span className="text-emerald-400/80">
               BREAKEVEN: 1D {breakeven1dDays != null ? `${breakeven1dDays.toFixed(1)}d` : "—"} · 7D_AVG {breakevenDays != null ? `${breakevenDays.toFixed(1)}d` : "—"} @ FLOOR {fmtSol(floorSol, 2)}
             </span>
@@ -108,7 +108,7 @@ export default function EarningsChart({ latest, history }) {
               APR: 1D {apr1dPct != null ? `${apr1dPct.toFixed(0)}%` : "—"} · 7D_AVG {aprAvgPct != null ? `${aprAvgPct.toFixed(0)}%` : "—"}
             </span>
           </div>
-          <div className="mt-1 text-[9px] text-green-500/40">
+          <div className="mt-1 text-[11px] text-green-500/40">
             APR = per-desk daily earning annualized vs NFT floor · 1D = last CLOSED day · last {fmtSol(todayPerDeskSol, 4)} vs 7d {fmtSol(trailingAvgSol, 4)}
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function EarningsChart({ latest, history }) {
             <button
               key={u}
               onClick={() => setUnit(u)}
-              className={`border px-2 py-0.5 font-mono text-[10px] ${
+              className={`border px-2 py-0.5 font-mono text-[12px] ${
                 unit === u ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"
               }`}
             >
@@ -130,15 +130,15 @@ export default function EarningsChart({ latest, history }) {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="label" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
-            <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
-            <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
+            <XAxis dataKey="label" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
+            <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
+            <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
               labelStyle={{ color: "#22c55e" }}
               formatter={(v, n) => (n === "AVG_DESK" ? [v == null ? "bootstrap" : fmt(v), n] : [fmt(v), n])}
             />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Bar yAxisId="sol" dataKey="total" name="TOTAL" fill="#0a3a1a" stroke="#1a6b3a" />
             <Line yAxisId="avg" type="monotone" dataKey="avg" name="AVG_DESK" stroke="#4ade80" dot={{ r: 2, fill: "#4ade80" }} strokeWidth={1.5} connectNulls />
           </ComposedChart>
@@ -148,11 +148,11 @@ export default function EarningsChart({ latest, history }) {
       {/* APR + breakeven trend — shows whether the yield is rising or fading */}
       <div className="mt-3 border-t border-green-500/20 pt-2">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+          <div className="text-[12px] uppercase tracking-widest text-green-500/70">
             APR &amp; BREAKEVEN :: TREND (PER DESK / DAY)
           </div>
           <span
-            className={`border px-2 py-0.5 font-mono text-[10px] ${dirCls}`}
+            className={`border px-2 py-0.5 font-mono text-[12px] ${dirCls}`}
             title="Direction of the per-desk daily earning rate: D/D = latest closed day vs the day before · vs 7D = latest closed day vs the trailing 7-day average"
           >
             RATE_DIR {dir}{" "}
@@ -162,7 +162,7 @@ export default function EarningsChart({ latest, history }) {
               : ""}
           </span>
         </div>
-        <div className="mt-1 text-[9px] text-green-500/40">
+        <div className="mt-1 text-[11px] text-green-500/40">
           APR = daily per-desk earning annualized vs that day's NFT floor · BE = days to recoup
           the floor at that day's earning rate · closed days only · bootstrap days excluded
         </div>
@@ -170,11 +170,11 @@ export default function EarningsChart({ latest, history }) {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-              <XAxis dataKey="label" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+              <XAxis dataKey="label" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
               <YAxis
                 yAxisId="apr"
                 stroke="#1a6b3a"
-                fontSize={10}
+                fontSize={12}
                 tick={{ fill: "#2a8b4a" }}
                 tickFormatter={(v) => `${+v.toFixed(0)}%`}
                 width={56}
@@ -183,19 +183,19 @@ export default function EarningsChart({ latest, history }) {
                 yAxisId="be"
                 orientation="right"
                 stroke="#1a6b3a"
-                fontSize={10}
+                fontSize={12}
                 tick={{ fill: "#2a8b4a" }}
                 tickFormatter={(v) => `${+v.toFixed(0)}d`}
                 width={48}
               />
               <Tooltip
-                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
                 labelStyle={{ color: "#22c55e" }}
                 formatter={(v, n) =>
                   v == null ? ["—", n] : [n === "APR" ? `${v.toFixed(1)}%` : `${v.toFixed(1)} days`, n]
                 }
               />
-              <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+              <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
               <Line yAxisId="apr" type="monotone" dataKey="apr" name="APR" stroke="#22d3ee" dot={{ r: 2, fill: "#22d3ee" }} strokeWidth={1.5} connectNulls />
               <Line yAxisId="be" type="monotone" dataKey="be" name="BREAKEVEN" stroke="#fbbf24" dot={{ r: 2, fill: "#fbbf24" }} strokeWidth={1.5} connectNulls />
             </ComposedChart>

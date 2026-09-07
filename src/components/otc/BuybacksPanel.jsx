@@ -8,22 +8,22 @@ export default function BuybacksPanel({ latest }) {
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         BUYBACKS :: TREASURY
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <div className="border border-green-500/20 p-2">
-          <div className="text-[9px] uppercase text-green-500/50">SOL_BUYBACK</div>
+          <div className="text-[11px] uppercase text-green-500/50">SOL_BUYBACK</div>
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtSol(totalSol, 3)}</div>
         </div>
         <div className="border border-green-500/20 p-2">
-          <div className="text-[9px] uppercase text-green-500/50">OTC_BURNED</div>
+          <div className="text-[11px] uppercase text-green-500/50">OTC_BURNED</div>
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtNum(totalOtc)}</div>
         </div>
       </div>
       <div className="mt-2 max-h-48 overflow-auto">
-        <table className="w-full font-mono text-[11px]">
-          <thead className="sticky top-0 bg-black text-[9px] uppercase text-green-500/50">
+        <table className="w-full font-mono text-[13px]">
+          <thead className="sticky top-0 bg-black text-[11px] uppercase text-green-500/50">
             <tr className="border-b border-green-500/20">
               <th className="py-1 text-left">DATE</th>
               <th className="text-right">SOL</th>

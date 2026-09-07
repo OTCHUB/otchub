@@ -66,7 +66,7 @@ export default function McpApiExamples() {
     <div className="border border-green-500/20">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-2 py-1 text-[9px] uppercase tracking-widest text-green-500/60 hover:text-green-400"
+        className="flex w-full items-center justify-between px-2 py-1 text-[11px] uppercase tracking-widest text-green-500/60 hover:text-green-400"
       >
         <span>API_EXAMPLES :: REQ/RES FOR ALL TOOLS</span>
         <span>{open ? "[−]" : "[+]"}</span>
@@ -83,7 +83,7 @@ export default function McpApiExamples() {
               <button
                 key={e.tool}
                 onClick={() => setActive(e.tool)}
-                className={`border px-2 py-0.5 text-[10px] ${
+                className={`border px-2 py-0.5 text-[12px] ${
                   active === e.tool
                     ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
                     : "border-green-500/30 text-green-500/60 hover:bg-green-500/10"
@@ -95,13 +95,13 @@ export default function McpApiExamples() {
           </div>
           {EXAMPLES.filter((e) => e.tool === active).map((e) => (
             <div key={e.tool} className="mt-2 space-y-2">
-              <p className="text-[9px] text-green-500/50">{e.desc}</p>
+              <p className="text-[11px] text-green-500/50">{e.desc}</p>
               <CopyBlock label={`REQUEST :: tools/call ${e.tool}`} value={e.request} />
               <div className="border border-green-500/20 bg-black">
-                <div className="border-b border-green-500/20 px-2 py-1 text-[9px] uppercase tracking-widest text-green-500/50">
+                <div className="border-b border-green-500/20 px-2 py-1 text-[11px] uppercase tracking-widest text-green-500/50">
                   RESPONSE :: 200 OK (TRIMMED)
                 </div>
-                <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all px-2 py-2 text-[10px] leading-relaxed text-cyan-300/80">
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all px-2 py-2 text-[12px] leading-relaxed text-cyan-300/80">
                   {e.response}
                 </pre>
               </div>

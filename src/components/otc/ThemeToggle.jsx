@@ -17,7 +17,7 @@ export default function ThemeToggle() {
       ) : (
         <Sun className="h-3.5 w-3.5" />
       )}
-      <span className="text-[10px] sm:text-[11px]">[{theme === "light" ? "DARK" : "LIGHT"}]</span>
+      <span className="text-[12px] sm:text-[13px]">[{theme === "light" ? "DARK" : "LIGHT"}]</span>
     </button>
   );
 }

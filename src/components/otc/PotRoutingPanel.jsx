@@ -30,7 +30,7 @@ const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
 
 function RouteRow({ mark, markCls, label, value, valueCls, href, note }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 border border-green-500/15 px-2 py-1 font-mono text-[9px]">
+    <div className="flex min-w-0 items-center gap-2 border border-green-500/15 px-2 py-1 font-mono text-[11px]">
       <span className={`shrink-0 ${markCls}`}>{mark}</span>
       <span className="min-w-0 flex-1 truncate uppercase text-green-400/80">{label}</span>
       {note && <span className="shrink-0 text-green-500/50">{note}</span>}
@@ -46,7 +46,7 @@ function RouteRow({ mark, markCls, label, value, valueCls, href, note }) {
 
 function Detail({ label, children }) {
   return (
-    <details className="border border-green-500/15 px-2 py-1 text-[9px]">
+    <details className="border border-green-500/15 px-2 py-1 text-[11px]">
       <summary className="cursor-pointer select-none font-mono uppercase tracking-widest text-green-500/50 hover:text-green-400">
         {label}
       </summary>
@@ -81,10 +81,10 @@ export default function PotRoutingPanel({ latest }) {
     <div className="space-y-1.5">
       {/* one-line header */}
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="truncate font-mono text-[12px] uppercase tracking-widest text-green-500/70">
           POT_ROUTING :: {dayLbl ?? "—"} · IN +{fmtSol(inflow, 2)} SOL
         </span>
-        <span className="flex shrink-0 items-center gap-1 font-mono text-[9px] text-emerald-400">
+        <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-emerald-400">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
           LIVE
         </span>
@@ -109,7 +109,7 @@ export default function PotRoutingPanel({ latest }) {
         href={scan(OTC_PROGRAM)} />
 
       {/* broken route — single red line */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 border border-red-500/40 bg-red-500/5 px-2 py-1 font-mono text-[9px] text-red-400">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 border border-red-500/40 bg-red-500/5 px-2 py-1 font-mono text-[11px] text-red-400">
         <span>✖ CREATOR_FEES ($OTC·LAUNCHER) → PUMP GLOBAL/POOL VAULTS ≠ POT · DESK SHARE COLLAPSED</span>
         {dropPct != null && dropPct > 0 && (
           <span className="text-red-400/80">−{dropPct}% vs peak {peak.day?.slice(5)}</span>

@@ -26,7 +26,7 @@ const SEGMENTS = [
 const d = (day) => (day ? day.slice(5) : "—");
 
 const Row = ({ children, tone = "text-green-500/70" }) => (
-  <div className={`font-mono text-[9px] leading-relaxed ${tone}`}>{children}</div>
+  <div className={`font-mono text-[11px] leading-relaxed ${tone}`}>{children}</div>
 );
 
 export default function PotMilestones({ latest }) {
@@ -76,7 +76,7 @@ export default function PotMilestones({ latest }) {
     <div className="mt-3 space-y-2">
       {/* milestones timeline */}
       <div className="border border-green-500/20 px-2 py-1.5">
-        <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <div className="text-[12px] uppercase tracking-widest text-green-500/70">
           MILESTONES :: ROUTING_TIMELINE{since ? ` · tracked since ${d(since)}` : ""}
         </div>
         <div className="mt-1 space-y-0.5">
@@ -106,7 +106,7 @@ export default function PotMilestones({ latest }) {
 
       {/* verified on-chain fee config */}
       <div className="border border-green-500/20 px-2 py-1.5">
-        <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <div className="text-[12px] uppercase tracking-widest text-green-500/70">
           CONFIG :: FEE ROUTING (VERIFIED ON-CHAIN 2026-09-06)
         </div>
         <div className="mt-1 space-y-0.5">
@@ -156,8 +156,8 @@ export default function PotMilestones({ latest }) {
 
       {/* the desk-owner ask */}
       <div className="border border-red-500/40 bg-red-500/5 px-2 py-1.5">
-        <div className="text-[10px] uppercase tracking-widest text-red-400">ASK_THE_DEV :: THE DESK-OWNER CASE</div>
-        <ul className="mt-1 list-inside list-decimal space-y-0.5 font-mono text-[9px] text-red-400/90 marker:text-red-400/60">
+        <div className="text-[12px] uppercase tracking-widest text-red-400">ASK_THE_DEV :: THE DESK-OWNER CASE</div>
+        <ul className="mt-1 list-inside list-decimal space-y-0.5 font-mono text-[11px] text-red-400/90 marker:text-red-400/60">
           <li>
             Which config change on {cliff ? d(cliff.day) : "the cliff date"} cut creator-fee inflow to the pot
             {cliff ? ` −${cliff.pct}% overnight` : ""} while $OTC trading volume stayed flat?

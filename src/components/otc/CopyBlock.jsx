@@ -24,10 +24,10 @@ export default function CopyBlock({ label, value, note }) {
   return (
     <div className="border border-green-500/30 bg-black">
       <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
-        <span className="text-[9px] uppercase tracking-widest text-green-500/50">{label}</span>
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">{label}</span>
         <button
           onClick={copy}
-          className={`border px-2 py-0.5 text-[10px] ${
+          className={`border px-2 py-0.5 text-[12px] ${
             copied
               ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
               : "border-green-500/50 text-green-400 hover:bg-green-500/10"
@@ -36,10 +36,10 @@ export default function CopyBlock({ label, value, note }) {
           {copied ? "COPIED ✓" : "[COPY]"}
         </button>
       </div>
-      <pre className="whitespace-pre-wrap break-all px-2 py-2 text-[10px] leading-relaxed text-green-300">
+      <pre className="whitespace-pre-wrap break-all px-2 py-2 text-[12px] leading-relaxed text-green-300">
         {value}
       </pre>
-      {note && <div className="border-t border-green-500/10 px-2 py-1 text-[9px] text-green-500/40">{note}</div>}
+      {note && <div className="border-t border-green-500/10 px-2 py-1 text-[11px] text-green-500/40">{note}</div>}
     </div>
   );
 }

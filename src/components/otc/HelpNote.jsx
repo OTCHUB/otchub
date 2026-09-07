@@ -17,7 +17,7 @@ export default function HelpNote({
   const [open, setOpen] = useState(false);
   const t = TONES[tone] || TONES.green;
   return (
-    <div className={`mt-1 font-mono text-[9px] ${className}`}>
+    <div className={`mt-1 font-mono text-[11px] ${className}`}>
       <button
         onClick={() => setOpen((v) => !v)}
         className={`inline-flex min-h-[24px] items-center gap-1 uppercase tracking-wide ${t.btn}`}

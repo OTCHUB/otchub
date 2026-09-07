@@ -19,18 +19,18 @@ function PagedTable({ title, headers, rows }) {
 
   return (
     <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         {title}
       </div>
       <div className="mt-2 overflow-auto">
-        <table className="w-full font-mono text-[11px]">
-          <thead className="text-[9px] uppercase text-green-500/50">
+        <table className="w-full font-mono text-[13px]">
+          <thead className="text-[11px] uppercase text-green-500/50">
             <tr className="border-b border-green-500/20">{headers}</tr>
           </thead>
           <tbody>{slice}</tbody>
         </table>
         {!rows.length && (
-          <div className="py-4 text-center text-[11px] text-green-500/40">NO_DATA</div>
+          <div className="py-4 text-center text-[13px] text-green-500/40">NO_DATA</div>
         )}
       </div>
       <Pager page={page} pages={pages} onPage={setPageNo} total={rows.length} label="ROWS" />

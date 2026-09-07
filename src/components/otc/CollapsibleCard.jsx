@@ -20,7 +20,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, i
           open ? "border border-green-500/30 border-b-0" : "border border-green-500/30"
         }`}
       >
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-green-500/70">
+        <div className="flex items-center gap-2 text-[12px] uppercase tracking-widest text-green-500/70">
           <span className="text-green-500/60">{open ? "[−]" : "[+]"}</span>
           {title}
         </div>

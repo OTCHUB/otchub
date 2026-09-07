@@ -24,10 +24,10 @@ const fmtK = (v) => (v == null ? "—" : v.toLocaleString());
 function MetricCard({ label, value, sub, subRed }) {
   return (
     <div className="flex-1 border border-green-500/20 bg-black px-2 py-1">
-      <div className="text-[8px] uppercase tracking-widest text-green-500/50">{label}</div>
+      <div className="text-[10px] uppercase tracking-widest text-green-500/50">{label}</div>
       <div className="mt-0.5 font-mono text-[12px] font-bold leading-none text-emerald-400">{value}</div>
       {sub != null && (
-        <div className={`mt-0.5 font-mono text-[8px] ${subRed ? "text-red-400" : "text-green-500/50"}`}>{sub}</div>
+        <div className={`mt-0.5 font-mono text-[10px] ${subRed ? "text-red-400" : "text-green-500/50"}`}>{sub}</div>
       )}
     </div>
   );
@@ -114,10 +114,10 @@ export default function SupplyChart({ history, latest }) {
   return (
     <div className="border border-green-500/30 bg-black p-3">
       {/* Header — same panel title style as the other charts */}
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         SUPPLY :: $OTC_BURN vs DESK_MINT
       </div>
-      <div className="mt-1 text-[9px] text-green-500/40">
+      <div className="mt-1 text-[11px] text-green-500/40">
         DAILY $OTC SUPPLY vs CUMULATIVE DESK NFTs SINCE LAUNCH{launchLabel ? ` (${launchLabel})` : ""}
       </div>
 
@@ -136,7 +136,7 @@ export default function SupplyChart({ history, latest }) {
             <XAxis
               dataKey="label"
               stroke="#1a6b3a"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#2a8b4a" }}
               minTickGap={20}
               interval="preserveStartEnd"
@@ -147,7 +147,7 @@ export default function SupplyChart({ history, latest }) {
               domain={supplyDomain}
               allowDataOverflow
               stroke={SUPPLY_COLOR}
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: SUPPLY_COLOR }}
               tickFormatter={(v) => fmtM(v)}
               width={44}
@@ -158,13 +158,13 @@ export default function SupplyChart({ history, latest }) {
               domain={desksDomain}
               allowDataOverflow
               stroke={DESKS_COLOR}
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: DESKS_COLOR }}
               tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K` : `${v}`)}
               width={38}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
               labelStyle={{ color: "#22c55e" }}
               itemStyle={{ color: "#4ade80" }}
               formatter={(v, n) => [
@@ -172,7 +172,7 @@ export default function SupplyChart({ history, latest }) {
                 n,
               ]}
             />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
             <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
           </ComposedChart>
@@ -181,7 +181,7 @@ export default function SupplyChart({ history, latest }) {
 
       {/* Footer */}
       <div className="mt-3 border-t border-green-500/20 pt-2">
-        <div className="text-[9px] leading-tight text-green-500/50">DATA_AS_OF: {asOf}</div>
+        <div className="text-[11px] leading-tight text-green-500/50">DATA_AS_OF: {asOf}</div>
       </div>
     </div>
   );

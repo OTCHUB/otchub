@@ -338,14 +338,14 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           SWAP :: {isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`}
         </span>
         <a
           href={`https://dexscreener.com/solana/${encodeURIComponent(mint)}`}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 border border-cyan-400/40 bg-cyan-400/5 px-2 py-1 font-mono text-[10px] text-cyan-300 hover:border-cyan-300/60"
+          className="inline-flex items-center gap-1 border border-cyan-400/40 bg-cyan-400/5 px-2 py-1 font-mono text-[12px] text-cyan-300 hover:border-cyan-300/60"
           title={`${tokenLabel} chart and available pair data on DexScreener`}
         >
           [DEXSCREENER ↗]
@@ -354,7 +354,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           href="https://jup.ag"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[10px] text-amber-300 hover:border-amber-300/60"
+          className="inline-flex items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[12px] text-amber-300 hover:border-amber-300/60"
           title="Routing & liquidity by the Jupiter aggregator"
         >
           <Zap className="h-3 w-3" />
@@ -362,7 +362,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         </a>
         <button
           onClick={copyCa}
-          className="inline-flex items-center gap-1 border border-green-500/40 px-2 py-1 font-mono text-[10px] text-green-300 hover:bg-green-500/10"
+          className="inline-flex items-center gap-1 border border-green-500/40 px-2 py-1 font-mono text-[12px] text-green-300 hover:bg-green-500/10"
           title={`Copy ${tokenLabel} contract address`}
         >
           {copied === generation ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
@@ -370,52 +370,52 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         </button>
         {!isOtc && onResetToken && (
           <button disabled={busy} onClick={() => { if (!busyRef.current) { invalidate(); onResetToken(); } }}
-            className="border border-green-500/40 px-2 py-1 font-mono text-[10px] text-green-300 disabled:opacity-30">
+            className="border border-green-500/40 px-2 py-1 font-mono text-[12px] text-green-300 disabled:opacity-30">
             [RESET TO $OTC]
           </button>
         )}
       </div>
 
       <div
-        className="mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[10px] text-emerald-400"
+        className="mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[12px] text-emerald-400"
         title={mint}
       >
         {tokenLabel}{token?.name ? ` · ${token.name}` : ""} :: <a href={`https://solscan.io/token/${encodeURIComponent(mint)}`} target="_blank" rel="noreferrer" className="text-green-300 underline">{mint}</a>
       </div>
       {!isOtc && (
-        <div className="mt-1 font-mono text-[9px] text-green-500/60">
+        <div className="mt-1 font-mono text-[11px] text-green-500/60">
           SELECTED-TOKEN SNAPSHOT :: {metricsAt ? `AS OF ${metricsAt} · NOT LIVE / MAY BE STALE` : "FRESHNESS UNKNOWN"}
         </div>
       )}
 
       {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
       <div className={`mt-2 grid grid-cols-2 gap-1 ${isOtc ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
           <div className="text-emerald-300">
             {mcap != null ? `$${fmtCompact(mcap)}` : "—"}
           </div>
         </div>
-        {isOtc && <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">1H</div>
+        {isOtc && <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">1H</div>
           <div className={ch1h == null ? "text-green-500/40" : ch1h >= 0 ? "text-emerald-400" : "text-red-400"}>
             {ch1h != null ? `${ch1h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch1h))}` : "—"}
           </div>
         </div>}
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">24H</div>
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">24H</div>
           <div className={ch24h == null ? "text-green-500/40" : ch24h >= 0 ? "text-emerald-400" : "text-red-400"}>
             {ch24h != null ? `${ch24h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch24h))}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">LIQ</div>
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">LIQ</div>
           <div className="text-cyan-300">
             {liq != null ? `$${fmtCompact(liq)}` : "—"}
           </div>
         </div>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[9px]">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">VOL_24H</div>
+        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">VOL_24H</div>
           <div className="text-cyan-300">
             {vol != null ? `$${fmtCompact(vol)}` : "—"}
           </div>
@@ -435,7 +435,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         <button
           onClick={() => switchMode("BUY")}
           disabled={busy}
-          className={`flex-1 border py-1 font-mono text-[10px] font-bold disabled:opacity-30 ${
+          className={`flex-1 border py-1 font-mono text-[12px] font-bold disabled:opacity-30 ${
             isBuy
               ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
               : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
@@ -446,7 +446,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         <button
           onClick={() => switchMode("SELL")}
           disabled={busy}
-          className={`flex-1 border py-1 font-mono text-[10px] font-bold disabled:opacity-30 ${
+          className={`flex-1 border py-1 font-mono text-[12px] font-bold disabled:opacity-30 ${
             !isBuy
               ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300"
               : "border-green-500/30 text-green-500/60 hover:border-cyan-400/40"
@@ -458,7 +458,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
 
       {!wallet ? (
         <div className="mt-3">
-          <div className="mb-2 text-center font-mono text-[10px] text-green-500/50">
+          <div className="mb-2 text-center font-mono text-[12px] text-green-500/50">
             CONNECT A WALLET TO ENABLE SWAP :: ALSO UNLOCKS PORTFOLIO + BULK CLAIM
           </div>
           {/* Inline connect: no jump needed — connect right here and the swap
@@ -467,7 +467,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           <WalletConnect onConnected={onConnected} />
           <button
             onClick={() => onGoConnect?.()}
-            className="mt-2 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[11px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
+            className="mt-2 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[13px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
             title="Open the wallet panel (portfolio + bulk claim)"
           >
             [▲ GO TO WALLET PANEL :: PORTFOLIO + BULK CLAIM]
@@ -477,7 +477,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         <>
           {/* Native SOL and standard ATA only, displayed without rounding. */}
           {wallet && <div className="mt-2 grid grid-cols-2 gap-1">
-            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[12px]">
               <span className="text-green-500/50">SOL_BAL</span>
               <span className="min-w-0 break-all text-emerald-300">
                 {solBal == null ? (currentBalances?.solError ? "UNAVAILABLE" : "READING…") : formatRawAmount(solBal, 9)}
@@ -486,7 +486,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                 )}
               </span>
             </div>
-            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[10px]">
+            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[12px]">
               <span className="text-green-500/50">{tokenLabel}_ATA_BAL</span>
               <span className="min-w-0 break-all text-emerald-300">
                 {tokenBal == null ? (currentBalances?.tokenError ? "UNAVAILABLE" : "READING…") : formatRawAmount(tokenBal, tokenInfo.decimals)}
@@ -494,14 +494,14 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </span>
             </div>
           </div>}
-          {wallet && <div className="mt-1 break-all font-mono text-[9px] text-green-500/60">
+          {wallet && <div className="mt-1 break-all font-mono text-[11px] text-green-500/60">
             TOKEN BALANCE: STANDARD ATA ONLY (other token accounts excluded).
             {(currentBalances?.tokenError || currentBalances?.solError) && (
               <span className="text-amber-400"> Balance read failed: {currentBalances.tokenError || currentBalances.solError}</span>
             )}
             <button disabled={busy || !tokenInfo} onClick={() => { if (!busyRef.current) loadBalance(lifetime.current); }} className="ml-2 underline disabled:opacity-30">[RETRY BALANCES]</button>
           </div>}
-          <div className="mt-1 font-mono text-[9px] text-green-500/60">
+          <div className="mt-1 font-mono text-[11px] text-green-500/60">
             {tokenInfo ? `ON-CHAIN DECIMALS: ${tokenInfo.decimals}` : metadataError || "VERIFYING MINT…"}
             {metadataError && <button disabled={busy} onClick={() => { if (!busyRef.current) loadMetadata(); }} className="ml-2 underline disabled:opacity-30">[RETRY MINT METADATA]</button>}
           </div>
@@ -509,7 +509,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           {/* Amount input */}
           <div className="mt-2 border border-green-500/20 p-2">
             <div className="flex items-center justify-between">
-              <label className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
+              <label className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
                 YOU PAY ({isBuy ? "SOL" : tokenLabel})
               </label>
               {(isBuy ? solBal > SOL_FEE_RESERVE : tokenBal > 0n) && (
@@ -518,7 +518,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                     changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
                   }}
                   disabled={busy}
-                  className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
+                  className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
                 >
                   [MAX]
                 </button>
@@ -535,18 +535,18 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                 className="w-full min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
                 placeholder="0.0"
               />
-              <span className="shrink-0 font-mono text-[10px] text-green-500/60">
+              <span className="shrink-0 font-mono text-[12px] text-green-500/60">
                 {isBuy ? "SOL" : tokenLabel}
               </span>
             </div>
-            <div className="mt-1 text-right font-mono text-[10px] text-cyan-400/80">
+            <div className="mt-1 text-right font-mono text-[12px] text-cyan-400/80">
               ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
             </div>
-            {isBuy && <div className="font-mono text-[9px] text-green-500/50">SOL MAX leaves 0.01 SOL for fees/rent; actual requirements may be higher.</div>}
-            {inputError && <div className="font-mono text-[10px] text-amber-400">{inputError}</div>}
+            {isBuy && <div className="font-mono text-[11px] text-green-500/50">SOL MAX leaves 0.01 SOL for fees/rent; actual requirements may be higher.</div>}
+            {inputError && <div className="font-mono text-[12px] text-amber-400">{inputError}</div>}
 
             <div className="mt-2 flex flex-wrap items-center justify-between gap-y-1">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
                 SLIPPAGE
               </span>
               <div className="flex min-w-0 flex-wrap gap-1">
@@ -560,7 +560,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                       setCustomSlip("");
                     }}
                     disabled={busy}
-                    className={`border px-1.5 py-0.5 font-mono text-[9px] disabled:opacity-30 ${
+                    className={`border px-1.5 py-0.5 font-mono text-[11px] disabled:opacity-30 ${
                       slippageBps === s.bps && !customSlip
                         ? "border-emerald-500/60 text-emerald-400"
                         : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
@@ -581,7 +581,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
                   }}
                   disabled={busy}
                   title="Custom slippage in %"
-                  className={`w-16 min-w-0 flex-1 border bg-black px-1.5 py-0.5 font-mono text-[9px] outline-none disabled:opacity-30 ${
+                  className={`w-16 min-w-0 flex-1 border bg-black px-1.5 py-0.5 font-mono text-[11px] outline-none disabled:opacity-30 ${
                     customSlip
                       ? "border-cyan-400/60 text-cyan-300"
                       : "border-green-500/30 text-green-500/60 focus:border-cyan-400/60"
@@ -594,30 +594,30 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           {/* Quote */}
           <div className="mt-2 border border-green-500/20 p-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-green-500/50">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
                 YOU RECEIVE ({isBuy ? tokenLabel : "SOL"})
               </span>
               <button
                 onClick={fetchQuote}
                 disabled={quoting || busy || !!inputError}
-                className="border border-green-500/40 px-2 py-0.5 font-mono text-[9px] text-green-300 hover:bg-green-500/10 disabled:opacity-30"
+                className="border border-green-500/40 px-2 py-0.5 font-mono text-[11px] text-green-300 hover:bg-green-500/10 disabled:opacity-30"
               >
                 {quoting ? "QUOTING..." : "[QUOTE]"}
               </button>
             </div>
             <div className="mt-1 break-all font-mono text-sm font-bold text-emerald-400">
               {quote ? formatRawAmount(quote.outAmount, outputDecimals) : "—"}{" "}
-              <span className="text-[9px] font-normal text-green-500/50">
+              <span className="text-[11px] font-normal text-green-500/50">
                 {isBuy ? tokenLabel : "SOL"}
               </span>
             </div>
             {quote && (
-              <div className="mt-0.5 font-mono text-[10px] text-cyan-400/80">
+              <div className="mt-0.5 font-mono text-[12px] text-cyan-400/80">
                 ≈ {outUsd != null ? fmtUsd(outUsd) : "—"}
               </div>
             )}
             {quote && (
-              <div className="mt-1 space-y-0.5 break-all font-mono text-[9px] text-green-500/60">
+              <div className="mt-1 space-y-0.5 break-all font-mono text-[11px] text-green-500/60">
                 <div>
                   MIN_RECV {formatRawAmount(quote.otherAmountThreshold, outputDecimals)}{" "}
                   {isBuy ? tokenLabel : "SOL"}
@@ -629,7 +629,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               </div>
             )}
           </div>
-          <div className="mt-1 font-mono text-[9px] text-green-500/60">
+          <div className="mt-1 font-mono text-[11px] text-green-500/60">
             Jupiter routes depend on liquidity, amount and token support. Some tokens have no route; a quote is not a guarantee of execution.
           </div>
 
@@ -637,7 +637,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           <button
             onClick={doSwap}
             disabled={busy || !wallet || !!inputError || (isBuy ? solBal : tokenBal) == null}
-            className={`mt-2 w-full border py-1.5 font-mono text-[11px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
+            className={`mt-2 w-full border py-1.5 font-mono text-[13px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 ${
               isBuy
                 ? "border-emerald-500/60 text-emerald-300"
                 : "border-cyan-400/60 text-cyan-300"
@@ -656,7 +656,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
           </HelpNote>
 
           {err && (
-            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[10px] text-amber-400">
+            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[12px] text-amber-400">
               ERR: {err}
             </div>
           )}
@@ -675,7 +675,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
               {logs.map((l, i) => (
                 <div
                   key={i}
-                  className={`break-all font-mono text-[9px] leading-snug ${
+                  className={`break-all font-mono text-[11px] leading-snug ${
                     l.type === "ok"
                       ? "text-emerald-400"
                       : l.type === "err"

@@ -36,11 +36,11 @@ export default function ListingsDepthChart({ holdings }) {
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           DEPTH :: LISTINGS &amp; SWEEP COST (SOL)
         </span>
         <span className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-green-500/50">
+          <span className="font-mono text-[12px] text-green-500/50">
             {fmtNum(full.length)} LISTED · FLOOR {fmtSol(floor, 2)} · SWEEP_ALL {fmtSol(totalSol, 1)}
           </span>
           {full.length > 2 && (
@@ -52,7 +52,7 @@ export default function ListingsDepthChart({ holdings }) {
                 <button
                   key={r.k}
                   onClick={() => setRange(r.k)}
-                  className={`border px-1.5 py-0.5 font-mono text-[9px] ${
+                  className={`border px-1.5 py-0.5 font-mono text-[11px] ${
                     range === r.k
                       ? "border-emerald-500/50 text-emerald-400"
                       : "border-green-500/30 text-green-500/60 hover:bg-green-500/10"
@@ -70,12 +70,12 @@ export default function ListingsDepthChart({ holdings }) {
           )}
         </span>
       </div>
-      <div className="mt-1 text-[9px] text-green-500/40">
+      <div className="mt-1 text-[11px] text-green-500/40">
         DEPTH = desks listed at or below each price · SWEEP = SOL needed to buy them all and lift
         the floor past that level{range === "NEAR" && shownTop != null ? ` · view ≤ ${fmtSol(shownTop, 2)} (${fmtSol(halfSol, 1)} sweeps 50% of supply)` : ""}
       </div>
       {data.length < 2 ? (
-        <div className="py-6 text-center text-[11px] text-green-500/40">
+        <div className="py-6 text-center text-[13px] text-green-500/40">
           NO_DEPTH — appears once desks are listed for sale
         </div>
       ) : (
@@ -94,14 +94,14 @@ export default function ListingsDepthChart({ holdings }) {
                 type="number"
                 domain={["dataMin", "dataMax"]}
                 stroke="#1a6b3a"
-                fontSize={10}
+                fontSize={12}
                 tick={{ fill: "#2a8b4a" }}
                 tickFormatter={(v) => (+v).toFixed(2)}
               />
               <YAxis
                 yAxisId="count"
                 stroke="#1a6b3a"
-                fontSize={10}
+                fontSize={12}
                 tick={{ fill: "#2a8b4a" }}
                 allowDecimals={false}
                 width={40}
@@ -110,21 +110,21 @@ export default function ListingsDepthChart({ holdings }) {
                 yAxisId="sweep"
                 orientation="right"
                 stroke="#1a6b3a"
-                fontSize={10}
+                fontSize={12}
                 tick={{ fill: "#b45309" }}
                 tickFormatter={(v) => `${+v.toFixed(1)}`}
                 width={44}
               />
               <Tooltip
                 cursor={{ stroke: "#22c55e", strokeDasharray: "3 3" }}
-                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
                 labelStyle={{ color: "#22c55e" }}
                 labelFormatter={(v) => `≤ ${fmtSol(v, 3)} SOL`}
                 formatter={(v, n) =>
                   n === "SWEEP_SOL" ? [`${fmtSol(v, 2)} SOL to sweep`, n] : [`${fmtNum(v)} desks`, n]
                 }
               />
-              <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+              <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
               <Area
                 yAxisId="count"
                 type="stepAfter"

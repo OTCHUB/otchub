@@ -17,7 +17,7 @@ const CREATORS = [
 
 export default function PotPumpTrace() {
   return (
-    <div className="space-y-0.5 border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[9px]">
+    <div className="space-y-0.5 border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[11px]">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-amber-300">
         <span>PUMP.FUN :: SWAP_FEE → PUMP GLOBAL VAULT {short(PUMP_GLOBAL_VAULT)} (34.6 SOL LIVE) + POOL VAULT · CREATOR_FEE 0% ON SAMPLED POOL · 0% → POT</span>
         <a href={scan(PUMP_PROGRAM)} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">PGM ↗</a>
@@ -34,7 +34,7 @@ export default function PotPumpTrace() {
           </a>
         ))}
       </div>
-      <details className="border border-green-500/15 px-1 py-0.5 text-[9px]">
+      <details className="border border-green-500/15 px-1 py-0.5 text-[11px]">
         <summary className="cursor-pointer select-none uppercase tracking-widest text-green-500/50 hover:text-green-400">
           [+] TRACE EVIDENCE
         </summary>

@@ -17,7 +17,7 @@ const COLORS = {
 function Bar({ label, value, total, color, broken = false, note }) {
   const pct = !broken && total > 0 ? Math.min(100, (value / total) * 100) : 0;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] sm:gap-2">
+    <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] sm:gap-2">
       <span className="w-[70px] shrink-0 truncate uppercase tracking-wide text-green-500/70 sm:w-24">
         {label}
       </span>
@@ -39,13 +39,13 @@ function Bar({ label, value, total, color, broken = false, note }) {
       >
         {broken ? "✖ 0.00" : `+${fmtSol(value, 2)}`}
       </span>
-      {note && <span className="hidden shrink-0 text-[8px] text-green-500/40 sm:block">{note}</span>}
+      {note && <span className="hidden shrink-0 text-[10px] text-green-500/40 sm:block">{note}</span>}
     </div>
   );
 }
 
 const Arrow = ({ label, value }) => (
-  <div className="flex items-center justify-center gap-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-green-500/60">
+  <div className="flex items-center justify-center gap-1.5 py-0.5 font-mono text-[11px] uppercase tracking-widest text-green-500/60">
     <span className="h-3 w-0.5 pot-flow-y" />
     <span>▼ {label} {value != null ? `+${fmtSol(value, 2)} SOL` : ""}</span>
   </div>
@@ -85,10 +85,10 @@ export default function PotFlowDiagram({ latest }) {
   return (
     <div className="space-y-1.5 border border-green-500/20 px-2 py-2">
       <div className="flex flex-wrap items-center justify-between gap-1">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="font-mono text-[12px] uppercase tracking-widest text-green-500/70">
           FLOW :: {day ? day.slice(5) : "—"} · CLOSED DAY · BAR = SOL
         </span>
-        <span className="font-mono text-[9px] text-green-500/60">
+        <span className="font-mono text-[11px] text-green-500/60">
           IN {fmtSol(inflow, 1)} · DIST {fmtSol(dist, 1)} · KEPT {fmtSol(retained, 1)}
         </span>
       </div>
@@ -103,8 +103,8 @@ export default function PotFlowDiagram({ latest }) {
           <Arrow label="IN" value={inflow} />
 
           <div className="mx-auto max-w-[200px] border-2 border-emerald-400 bg-emerald-400/10 px-3 py-1 text-center">
-            <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-emerald-300">POT</div>
-            <div className="font-mono text-[9px] text-green-500/70">{fmtSol(latest?.pot_sol_balance ?? null, 1)} SOL</div>
+            <div className="font-mono text-[13px] font-bold uppercase tracking-widest text-emerald-300">POT</div>
+            <div className="font-mono text-[11px] text-green-500/70">{fmtSol(latest?.pot_sol_balance ?? null, 1)} SOL</div>
           </div>
 
           <Arrow label="OUT" />
@@ -113,12 +113,12 @@ export default function PotFlowDiagram({ latest }) {
           <Bar label="RETAINED" value={retained} total={inflow} color={COLORS.retained} note="in pot" />
         </>
       ) : (
-        <div className="py-3 text-center font-mono text-[10px] text-green-500/50">
+        <div className="py-3 text-center font-mono text-[12px] text-green-500/50">
           NO FLOW DATA FOR THE LAST CLOSED DAY
         </div>
       )}
 
-      <div className="text-center font-mono text-[8px] text-red-400/80">
+      <div className="text-center font-mono text-[10px] text-red-400/80">
         ✖ CREATOR_FEES · 10% DESK SHARE OF LAUNCHPAD FEES NOT LANDING
       </div>
 
@@ -126,10 +126,10 @@ export default function PotFlowDiagram({ latest }) {
       {totalDist != null && deskLedgerSol > 0 && launcherSol != null && (
         <div className="space-y-1 border border-fuchsia-500/30 bg-fuchsia-500/5 px-2 py-1.5">
           <div className="flex flex-wrap items-center justify-between gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-fuchsia-300/80">
+            <span className="font-mono text-[12px] uppercase tracking-widest text-fuchsia-300/80">
               REWARD_SPLIT :: WHO GETS ENRICHED
             </span>
-            <span className="font-mono text-[9px] text-green-500/60">
+            <span className="font-mono text-[11px] text-green-500/60">
               {fmtSol(totalDist, 0)} SOL DISTRIBUTED · {launcherPct}/{100 - launcherPct} SPLIT
             </span>
           </div>
@@ -137,10 +137,10 @@ export default function PotFlowDiagram({ latest }) {
             note={launcherPct != null ? `${launcherPct}%` : null} />
           <Bar label="DESK_HOLDERS" value={deskLedgerSol} total={totalDist} color="#4ade80"
             note={`${100 - launcherPct}%`} />
-          <div className="font-mono text-[8px] text-green-500/50">
+          <div className="font-mono text-[10px] text-green-500/50">
             LAUNCH_BASKETS: GPRO · PUMP · QQQx · SPYx · TTWO · HOODx … → LAUNCHER-COIN HOLDERS · DESKS: 13-STOCK ROTATION · LEDGER: otcdesks.cash
           </div>
-          <div className="font-mono text-[9px] text-fuchsia-300/90">
+          <div className="font-mono text-[11px] text-fuchsia-300/90">
             ✦ LAUNCH HOLDERS OUT-EARN DESKS ≈{(deskLedgerSol > 0 ? (launcherSol / deskLedgerSol).toFixed(1) : "—")}:1
             — LAUNCHPAD FEES ENRICH LAUNCHERS &amp; HOLDERS FIRST
           </div>

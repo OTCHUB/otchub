@@ -29,7 +29,7 @@ export default function ArbitrageChart({ history }) {
   const axisFmt = (t) =>
     new Date(t).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
   const tip = {
-    contentStyle: { background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 11 },
+    contentStyle: { background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 13 },
     labelStyle: { color: "#22c55e" },
     itemStyle: { color: "#4ade80" },
   };
@@ -37,10 +37,10 @@ export default function ArbitrageChart({ history }) {
   return (
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           ARBITRAGE :: MINT vs SECONDARY (USD)
         </span>
-        <span className="font-mono text-[9px] text-green-500/50">
+        <span className="font-mono text-[11px] text-green-500/50">
           spread&gt;0 ⇒ secondary cheaper
         </span>
       </div>
@@ -49,25 +49,25 @@ export default function ArbitrageChart({ history }) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
+            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
+            <YAxis stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Line type="monotone" dataKey="mint" name="MINT_COST" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
             <Line type="monotone" dataKey="secondary" name="SECONDARY_COST" stroke="#22d3ee" dot={false} strokeWidth={1.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-2 text-[9px] uppercase tracking-widest text-green-500/50">
+      <div className="mt-2 text-[11px] uppercase tracking-widest text-green-500/50">
         SPREAD (MINT − SECONDARY) :: OPPORTUNITY
       </div>
       <div className="mt-1 h-24">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={9} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
+            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={11} tick={{ fill: "#2a8b4a" }} />
+            <YAxis stroke="#1a6b3a" fontSize={11} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
             <ReferenceLine y={0} stroke="#4ade80" />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
             <Bar dataKey="spread" name="SPREAD">

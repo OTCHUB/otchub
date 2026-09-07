@@ -16,7 +16,7 @@ const Chip = ({ tone, children }) => {
       : tone === "amber"
         ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
         : "border-emerald-500/50 bg-emerald-500/10 text-emerald-300";
-  return <span className={`shrink-0 border px-1 font-mono text-[9px] ${cls}`}>{children}</span>;
+  return <span className={`shrink-0 border px-1 font-mono text-[11px] ${cls}`}>{children}</span>;
 };
 
 export default function PotWatchStrip() {
@@ -50,15 +50,15 @@ export default function PotWatchStrip() {
     <div className="space-y-1 border border-green-500/20 px-2 py-1.5">
       {/* desk owing — the pivotal obligation, always first */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-green-300">
+        <span className="font-mono text-[12px] font-bold uppercase tracking-widest text-green-300">
           DESKS OWED :: {fmtSol(owed, 2)}
         </span>
         {c.covered === true && <Chip tone="green">POT COVERS OWED</Chip>}
         {c.covered === false && <Chip tone="red">SHORTFALL −{fmtSol(c.shortfall_sol, 2)}</Chip>}
         {watch?.desks != null && (
-          <span className="font-mono text-[9px] text-green-500/50">{watch.desks} DESKS</span>
+          <span className="font-mono text-[11px] text-green-500/50">{watch.desks} DESKS</span>
         )}
-        <span className="ml-auto shrink-0 font-mono text-[9px] text-green-500/60">
+        <span className="ml-auto shrink-0 font-mono text-[11px] text-green-500/60">
           POT {fmtSol(potSol, 2)}
           {watch?.at ? ` · checked ${timeAgo(new Date(watch.at).toISOString())}` : ""}
         </span>
@@ -80,7 +80,7 @@ export default function PotWatchStrip() {
       )}
 
       {/* config watch — catches any on-chain fee-config change */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px]">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
         <span className="uppercase tracking-widest text-green-500/50">CONFIG_WATCH</span>
         {watch == null && <span className="text-green-500/40">{err ? "OFFLINE" : "…"}</span>}
         {watch?.config?.changed ? (
@@ -104,7 +104,7 @@ export default function PotWatchStrip() {
       </div>
 
       {/* live pot inflow */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px]">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
         <span className="uppercase tracking-widest text-green-500/50">POT_LAST_INFLOW</span>
         {inflow ? (
           <>
@@ -125,7 +125,7 @@ export default function PotWatchStrip() {
         )}
       </div>
 
-      {err && <div className="font-mono text-[9px] text-amber-400">WATCH_ERR: {err}</div>}
+      {err && <div className="font-mono text-[11px] text-amber-400">WATCH_ERR: {err}</div>}
     </div>
   );
 }

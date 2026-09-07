@@ -61,7 +61,7 @@ export default function CommunityMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         title="OTC community links + RU_FOMO console"
-        className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+        className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
       >
         [COMMUNITY {open ? "▴" : "▾"}]
       </button>
@@ -69,7 +69,7 @@ export default function CommunityMenu() {
         /* anchor left on wrapped/mobile rows (opens toward free space),
            right on >=sm — never bleeds off either edge; width caps at viewport */
         <div className="absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-1.5rem)] border border-green-500/50 bg-[#0a0a0a] font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)] sm:left-auto sm:right-0">
-          <div className="border-b border-green-500/20 px-3 py-1.5 text-[9px] uppercase tracking-widest text-green-500/50">
+          <div className="border-b border-green-500/20 px-3 py-1.5 text-[11px] uppercase tracking-widest text-green-500/50">
             community ::
           </div>
           {LINKS.map((l) => (
@@ -79,15 +79,15 @@ export default function CommunityMenu() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 border-b border-green-500/10 px-3 py-2 text-[11px] text-green-400 last:border-b-0 hover:bg-green-500/10"
+              className="flex items-center gap-2 border-b border-green-500/10 px-3 py-2 text-[13px] text-green-400 last:border-b-0 hover:bg-green-500/10"
             >
               <l.icon className="h-3.5 w-3.5 shrink-0" />
               <span className="flex-1">
                 {l.label} ↗
-                <span className="block text-[9px] text-green-500/50">{l.hint}</span>
+                <span className="block text-[11px] text-green-500/50">{l.hint}</span>
               </span>
               {l.badge && (
-                <span className="border border-green-500/60 px-1 py-px text-[9px] font-bold uppercase tracking-widest text-green-300 animate-pulse">
+                <span className="border border-green-500/60 px-1 py-px text-[11px] font-bold uppercase tracking-widest text-green-300 animate-pulse">
                   {l.badge}
                 </span>
               )}

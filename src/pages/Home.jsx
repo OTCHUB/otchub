@@ -201,7 +201,7 @@ export default function Home() {
                 &gt; OTC_HUB :: OTC_DESK TOOLS
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
-              <p className="text-[10px] text-green-500/50">
+              <p className="text-[12px] text-green-500/50">
                 LAST_UPDATE {timeAgo(latest?.updated_date || latest?.created_date)}
                 {live ? " · " : ""}{live && <span className="text-emerald-400">● LIVE</span>}
                 {" · "}{data?.snapshot_count || 0} SNAPSHOTS
@@ -215,7 +215,7 @@ export default function Home() {
                 href="https://otcdesks.cash"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
                 title="Official otcdesks.cash protocol app"
               >
                 [OTC_APP ↗]
@@ -224,7 +224,7 @@ export default function Home() {
                 href="https://fomo.otchub.dev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-fuchsia-500/70 px-2 py-1 text-[10px] font-bold text-fuchsia-400 hover:bg-fuchsia-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-fuchsia-500/70 px-2 py-1 text-[12px] font-bold text-fuchsia-400 hover:bg-fuchsia-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
                 title="RU_FOMO — live FOMO trader tape, signal scores and anti-rug safety gate"
               >
                 [RU_FOMO ↗]
@@ -233,7 +233,7 @@ export default function Home() {
                 href="https://otcdesks.observer/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
                 title="Community OTC_DESK visualization tool — desk charts and holder stats"
               >
                 [OBSERVER ↗]
@@ -242,7 +242,7 @@ export default function Home() {
                 href="https://all-things-otc.replit.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
                 title="All Things OTC — community OTC resource site"
               >
                 [ATH_OTC ↗]
@@ -258,11 +258,11 @@ export default function Home() {
               </button>
             </div>
           </div>
-          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-400/80">
+          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[12px] text-amber-400/80">
             COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH · UNOFFICIAL ANALYTICS DASHBOARD
           </div>
           {error && (
-            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-400">
+            <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[13px] text-amber-400">
               ERR: {error}
             </div>
           )}
@@ -315,7 +315,7 @@ export default function Home() {
             </CollapsibleCard>
           </div>
           <div className="hidden border border-green-500/30 bg-black lg:flex lg:flex-col">
-            <div className="flex items-center justify-between border-b border-green-500/20 px-3 py-2 text-[10px] uppercase tracking-widest text-green-500/70">
+            <div className="flex items-center justify-between border-b border-green-500/20 px-3 py-2 text-[12px] uppercase tracking-widest text-green-500/70">
               <span>TERMINAL :: CHAIN_FEED</span>
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -424,7 +424,7 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
+        <footer className="mt-4 space-y-1 text-center text-[12px] text-green-500/30">
           <div>OTC_HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTCDESKS.CASH</div>
           <div>DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH · OFFICIAL APP: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
         </footer>

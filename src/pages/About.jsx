@@ -16,18 +16,18 @@ export default function About() {
                 &gt; ABOUT :: OTC_HUB
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
-              <p className="text-[10px] text-green-500/50">
+              <p className="text-[12px] text-green-500/50">
                 OTC_DESK SOLANA TOOL · EST. 2026
               </p>
             </div>
             <Link
               to="/"
-              className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+              className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
             >
               [← DASHBOARD]
             </Link>
           </div>
-          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-400/80">
+          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[12px] text-amber-400/80">
             COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH · UNOFFICIAL ANALYTICS DASHBOARD
           </div>
         </header>

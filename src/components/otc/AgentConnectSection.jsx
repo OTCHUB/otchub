@@ -12,10 +12,10 @@ export default function AgentConnectSection() {
   return (
     <div className="border border-emerald-500/30">
       <div className="flex items-center justify-between border-b border-emerald-500/20 px-2 py-1">
-        <span className="text-[9px] uppercase tracking-widest text-emerald-500/70">
+        <span className="text-[11px] uppercase tracking-widest text-emerald-500/70">
           AGENT_CONNECT :: MCP_SERVER
         </span>
-        <Link to="/connect" className="text-[9px] text-cyan-400/80 hover:text-cyan-300">
+        <Link to="/connect" className="text-[11px] text-cyan-400/80 hover:text-cyan-300">
           [FULL_GUIDE ↗]
         </Link>
       </div>

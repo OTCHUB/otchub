@@ -89,7 +89,7 @@ export default function TerminalVisual({ variant = "feed", className = "" }) {
   return (
     <div className={`flex h-full min-h-[180px] flex-col overflow-hidden bg-black ${className}`}>
       <div className="min-h-0 flex-1 px-2.5 py-2">
-        <div className="flex h-full flex-col justify-end gap-0.5 text-[9px] leading-snug sm:text-[10px]">
+        <div className="flex h-full flex-col justify-end gap-0.5 text-[11px] leading-snug sm:text-[12px]">
           {rows.map((r, i) => (
             <div
               key={i}

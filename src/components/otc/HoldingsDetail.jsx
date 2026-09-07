@@ -62,10 +62,10 @@ export default function HoldingsDetail({
             {h.image_url ? (
               <Image src={h.image_url} fittingType="fill" className="h-full w-full" />
             ) : (
-              <div className="flex h-full items-center justify-center text-[10px] text-green-500/30">NO_IMG</div>
+              <div className="flex h-full items-center justify-center text-[12px] text-green-500/30">NO_IMG</div>
             )}
           </div>
-          <div className="flex-1 space-y-1 text-[11px]">
+          <div className="flex-1 space-y-1 text-[13px]">
             <div className="text-green-500/50">
               STOCK_HOLDING: <span className="font-bold text-emerald-400">{fmtSol(h.accrued_value_sol, 4)}</span> · {fmtUsd(h.accrued_value_usd, 2)}
             </div>
@@ -84,7 +84,7 @@ export default function HoldingsDetail({
               </>
             )}
             {walletOwned && (
-              <div className="pt-1 text-[10px]">
+              <div className="pt-1 text-[12px]">
                 {claimDesk ? (
                   <>
                     <div className={claimDesk.claimable.length ? "text-emerald-400" : "text-green-500/50"}>
@@ -114,14 +114,14 @@ export default function HoldingsDetail({
             <div className="break-all text-green-500/40">ID: {h.asset_id}</div>
             {breakdown.length > 0 && (
               <div className="pt-1">
-                <div className="text-[9px] uppercase tracking-widest text-green-500/50">
+                <div className="text-[11px] uppercase tracking-widest text-green-500/50">
                   {breakdown[0]?.live
                     ? "VAULT_STOCK BY SYMBOL :: LIVE (SUMS TO CLAIMABLE)"
                     : "STOCK_HOLDING BY SYMBOL :: EST (PROTOCOL-AVG SPLIT)"}
                 </div>
                 <div className="mt-1 max-h-28 space-y-0.5 overflow-auto pr-1">
                   {breakdown.map((b) => (
-                    <div key={b.symbol} className="flex justify-between text-[10px]">
+                    <div key={b.symbol} className="flex justify-between text-[12px]">
                       <span className="text-green-300">{b.symbol}</span>
                       <span className="text-emerald-400/80">{fmtSol(b.sol, 4)} · {fmtUsd(b.usd, 2)}</span>
                     </div>
@@ -131,7 +131,7 @@ export default function HoldingsDetail({
             )}
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
+        <div className="mt-3 flex flex-wrap gap-2 text-[12px]">
           {walletOwned ? (
             <>
               <button

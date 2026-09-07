@@ -8,14 +8,14 @@ const Row = ({ label, value, desc }) => (
     className="flex items-center justify-between border-b border-green-500/10 py-1 last:border-0"
     title={desc}
   >
-    <span className="text-[11px] text-green-500/60">{label}</span>
+    <span className="text-[13px] text-green-500/60">{label}</span>
     <span className="font-mono text-xs text-green-300">{value}</span>
   </div>
 );
 
 const Section = ({ title, children }) => (
   <div className="mt-3 border-t border-green-500/20 pt-2">
-    <div className="text-[9px] uppercase tracking-widest text-green-500/50">{title}</div>
+    <div className="text-[11px] uppercase tracking-widest text-green-500/50">{title}</div>
     {children}
   </div>
 );
@@ -28,7 +28,7 @@ export default function ProtocolPanel({ latest }) {
 
   return (
     <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         PROTOCOL_ECONOMICS
       </div>
       <div className="mt-2">
@@ -45,7 +45,7 @@ export default function ProtocolPanel({ latest }) {
         <Row label="BURNT_FOREVER" value={burnt != null ? `${fmtNum(burnt)} OTC` : "—"} desc="Burned via desk mints + usage" />
         <div className="py-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-green-500/60">BURNT_PCT</span>
+            <span className="text-[13px] text-green-500/60">BURNT_PCT</span>
             <span className="font-mono text-xs text-amber-400">{burntPct != null ? `${burntPct}%` : "—"}</span>
           </div>
           <div className="mt-1 h-1.5 w-full border border-green-500/20 bg-black">

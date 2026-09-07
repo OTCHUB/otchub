@@ -123,11 +123,11 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
   return (
     <div className="border border-amber-500/30 bg-black p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-amber-400/80">
+        <span className="text-[12px] uppercase tracking-widest text-amber-400/80">
           ☢ DISTRIBUTE(index) :: PERMISSIONLESS_CRANK
         </span>
         {owed != null && (
-          <span className="border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[9px] text-amber-300">
+          <span className="border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-300">
             OWED_BACKLOG :: {fmtSol(owed, 3)} UN-CRANKED
           </span>
         )}
@@ -143,11 +143,11 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
       </HelpNote>
 
       {!desks.length ? (
-        <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center text-[11px] text-amber-400/80">
+        <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center text-[13px] text-amber-400/80">
           NO_DESK_DATA :: loading collection desks...
         </div>
       ) : !wallet ? (
-        <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center text-[11px] text-amber-400/80">
+        <div className="mt-3 border border-amber-500/30 bg-amber-500/5 px-2 py-2 text-center text-[13px] text-amber-400/80">
           CONNECT WALLET ABOVE TO ARM THE CRANK
         </div>
       ) : (
@@ -155,7 +155,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
           {/* Controls */}
           <div className="mt-2 flex flex-wrap items-center gap-2 border border-amber-500/20 p-2">
             <div className="flex items-center gap-1">
-              <span className="text-[9px] uppercase tracking-widest text-amber-500/60">
+              <span className="text-[11px] uppercase tracking-widest text-amber-500/60">
                 ROUNDS_DEPTH
               </span>
               <input
@@ -168,11 +168,11 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
                   setDepth(v);
                 }}
                 disabled={busy}
-                className="w-14 border border-amber-500/40 bg-black px-1.5 py-0.5 text-center text-[11px] text-amber-300 outline-none focus:border-amber-400 disabled:opacity-40"
+                className="w-14 border border-amber-500/40 bg-black px-1.5 py-0.5 text-center text-[13px] text-amber-300 outline-none focus:border-amber-400 disabled:opacity-40"
                 title="How many rounds to crank per desk-slot per launch. 1 = advance every desk one round."
               />
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-amber-500/60">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-amber-500/60">
               <span>{fmtNum(desks.length)} DESKS</span>
               <span>{fmtNum(ixCount)} IX</span>
               <span>≈{fmtNum(estTxs)} TX</span>
@@ -186,7 +186,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
             <button
               onClick={() => setArmed((v) => !v)}
               disabled={busy}
-              className={`border px-4 py-3 text-[11px] font-bold tracking-widest disabled:opacity-40 ${
+              className={`border px-4 py-3 text-[13px] font-bold tracking-widest disabled:opacity-40 ${
                 armed
                   ? "border-red-500 bg-red-500/15 text-red-300 animate-pulse"
                   : "border-amber-500/40 text-amber-400 hover:border-amber-400/70"
@@ -208,7 +208,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
               {busy ? `☢ CRANKING :: ${phaseLabel}` : "▓▓▓ [ ☢ LAUNCH_DISTRIBUTE ] ▓▓▓"}
             </button>
           </div>
-          <p className="mt-1 text-[9px] text-amber-500/40">
+          <p className="mt-1 text-[11px] text-amber-500/40">
             {armed
               ? "ARMED — launch will request ~" + estWaves + " batched signature(s). REJECT any prompt to abort."
               : "Arm, then launch. Sim-first, permissionless, abortable at any prompt."}
@@ -217,7 +217,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
           {/* Live progress */}
           {busy && progress && (
             <div className="mt-2 border border-red-500/40 bg-red-500/5 p-2">
-              <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center justify-between text-[12px]">
                 <span className="text-red-300">
                   {progress.phase === "start"
                     ? `INIT · ${progress.totalGroups} GROUP(S)`
@@ -254,7 +254,7 @@ export default function DistributeCrank({ wallet, allDesks, latest }) {
               {logs.map((l, i) => (
                 <div
                   key={i}
-                  className={`text-[9px] leading-snug ${
+                  className={`text-[11px] leading-snug ${
                     l.type === "ok"
                       ? "text-emerald-400"
                       : l.type === "err"

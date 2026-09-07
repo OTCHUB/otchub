@@ -439,7 +439,7 @@ export default function ClaimPanel({
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-emerald-400/80">
+        <span className="text-[12px] uppercase tracking-widest text-emerald-400/80">
           CLAIM_TOOL :: STOCK → WALLET
         </span>
         <div className="flex gap-1">
@@ -447,21 +447,21 @@ export default function ClaimPanel({
             onClick={selectRecommended}
             disabled={busy || !plan}
             title="Select the top 3 desks by claimable value — recommended batch size"
-            className="border border-amber-500/40 px-2 py-0.5 text-[10px] text-amber-400 hover:border-amber-400/60 disabled:opacity-30"
+            className="border border-amber-500/40 px-2 py-0.5 text-[12px] text-amber-400 hover:border-amber-400/60 disabled:opacity-30"
           >
             [REC_TOP3]
           </button>
           <button
             onClick={selectAll}
             disabled={!desks.length || busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+            className="border border-green-500/30 px-2 py-0.5 text-[12px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
           >
             [SELECT_ALL]
           </button>
           <button
             onClick={clearAll}
             disabled={busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[10px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+            className="border border-green-500/30 px-2 py-0.5 text-[12px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
           >
             [CLEAR]
           </button>
@@ -483,7 +483,7 @@ export default function ClaimPanel({
         const tSol = Object.values(lifetime).reduce((a, d) => a + (d.value_sol || 0), 0);
         const tUsd = Object.values(lifetime).reduce((a, d) => a + (d.value_usd || 0), 0);
         return (
-          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[9px] text-amber-400/80">
+          <div className="mt-2 border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px] text-amber-400/80">
             LIFETIME_CLAIMED (ON-CHAIN) :: {fmtSol(tSol, 3)} · {fmtUsd(tUsd)} · {Object.keys(lifetime).length} desk(s)
           </div>
         );
@@ -492,7 +492,7 @@ export default function ClaimPanel({
       {/* Desk list (read-only status) */}
       <div className="mt-2 max-h-52 overflow-y-auto border border-green-500/20">
         {desks.length === 0 && (
-          <div className="p-3 text-center text-[10px] text-green-500/40">
+          <div className="p-3 text-center text-[12px] text-green-500/40">
             NO_DESKS_OWNED
           </div>
         )}
@@ -524,16 +524,16 @@ export default function ClaimPanel({
                 {d.image_url ? (
                   <Image src={d.image_url} fittingType="fill" className="h-full w-full" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-[8px] text-green-500/30">
+                  <div className="flex h-full items-center justify-center text-[10px] text-green-500/30">
                     N/A
                   </div>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-[10px] text-green-300">
+                <div className="truncate font-mono text-[12px] text-green-300">
                   {d.name}
                 </div>
-                <div className="font-mono text-[8px] text-green-500/40">
+                <div className="font-mono text-[10px] text-green-500/40">
                   {d.asset_id.slice(0, 8)}...
                 </div>
               </div>
@@ -541,18 +541,18 @@ export default function ClaimPanel({
                 {deskPlan ? (
                   <>
                     <div
-                      className={`font-mono text-[11px] font-bold leading-tight ${
+                      className={`font-mono text-[13px] font-bold leading-tight ${
                         deskPlan.claimable.length ? "text-emerald-300" : "text-green-500/40"
                       }`}
                     >
                       {fmtUsd(deskUsdValue(deskPlan), 2)}
                     </div>
-                    <div className="font-mono text-[8px] leading-tight text-green-500/60">
+                    <div className="font-mono text-[10px] leading-tight text-green-500/60">
                       {fmtSol(deskSolValue(deskPlan), 4)}
                     </div>
                     {deskPlan.claimable.length > 0 ? (
                       <div
-                        className="font-mono text-[8px] leading-tight text-cyan-400/70"
+                        className="font-mono text-[10px] leading-tight text-cyan-400/70"
                         title={
                           lastClaim
                             ? `Fresh stock accrued since your last claim (${agoLabel(lastClaim)})`
@@ -563,18 +563,18 @@ export default function ClaimPanel({
                         {deskPlan.claimable.length} {lastClaim ? "NEW_ACCRUAL" : "CLAIMABLE"}
                       </div>
                     ) : cleared.has(d.asset_id) ? (
-                      <div className="font-mono text-[8px] leading-tight text-emerald-400">
+                      <div className="font-mono text-[10px] leading-tight text-emerald-400">
                         ✓ CLEARED
                       </div>
                     ) : (
-                      <div className="font-mono text-[8px] leading-tight text-green-500/30">
+                      <div className="font-mono text-[10px] leading-tight text-green-500/30">
                         0 CLAIMABLE
                       </div>
                     )}
                     {(() => {
                       const need = (deskPlan.tickers || []).filter((t) => !t.exists).length;
                       return need > 0 ? (
-                        <div className="font-mono text-[8px] leading-tight text-cyan-500/70">
+                        <div className="font-mono text-[10px] leading-tight text-cyan-500/70">
                           {need} NEEDS ACTIVATE
                         </div>
                       ) : null;
@@ -583,25 +583,25 @@ export default function ClaimPanel({
                       const o = owed?.get(d.asset_id);
                       if (!o?.items?.length) return null;
                       return (
-                        <div className="font-mono text-[8px] leading-tight text-cyan-300/80">
+                        <div className="font-mono text-[10px] leading-tight text-cyan-300/80">
                           OWED ≥ {fmtUsd(owedUsdFor(o), 2)} · PULL_OWED
                         </div>
                       );
                     })()}
                   </>
                 ) : (
-                  <div className="font-mono text-[9px] text-green-500/30">SCAN…</div>
+                  <div className="font-mono text-[11px] text-green-500/30">SCAN…</div>
                 )}
                 {lifetime[d.asset_id] && (
                   <div className="mt-0.5 border-t border-amber-500/20 pt-0.5">
-                    <div className="font-mono text-[8px] leading-tight text-amber-400/70">
+                    <div className="font-mono text-[10px] leading-tight text-amber-400/70">
                       LT {fmtSol(lifetime[d.asset_id].value_sol, 3)}
                     </div>
-                    <div className="font-mono text-[8px] leading-tight text-amber-300/60">
+                    <div className="font-mono text-[10px] leading-tight text-amber-300/60">
                       {fmtUsd(lifetime[d.asset_id].value_usd)}
                     </div>
                     {lastClaim && (
-                      <div className="font-mono text-[8px] leading-tight text-amber-300/40">
+                      <div className="font-mono text-[10px] leading-tight text-amber-300/40">
                         LAST_CLAIM {agoLabel(lastClaim)}
                       </div>
                     )}
@@ -618,7 +618,7 @@ export default function ClaimPanel({
         <button
           onClick={() => scan(true)}
           disabled={scanning || busy || !address}
-          className="border border-green-500/40 px-2.5 py-1 text-[10px] text-green-400 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+          className="border border-green-500/40 px-2.5 py-1 text-[12px] text-green-400 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
         >
           {scanning ? "SCANNING..." : "[SCAN_DESKS]"}
         </button>
@@ -626,20 +626,20 @@ export default function ClaimPanel({
           onClick={() => setPullOwed((v) => !v)}
           disabled={busy}
           title="ON: also activate missing accounts + pull owed backlog from the protocol pot before claiming (more approvals). OFF: claim only stock already in the vaults (smooth)."
-          className={`border px-2.5 py-1 text-[10px] disabled:opacity-30 ${pullOwed ? "border-cyan-400 text-cyan-300 bg-cyan-500/10" : "border-green-500/40 text-green-400 hover:border-emerald-500/50"}`}
+          className={`border px-2.5 py-1 text-[12px] disabled:opacity-30 ${pullOwed ? "border-cyan-400 text-cyan-300 bg-cyan-500/10" : "border-green-500/40 text-green-400 hover:border-emerald-500/50"}`}
         >
           [PULL_OWED:{pullOwed ? "ON" : "OFF"}]
         </button>
         <button
           onClick={() => runClaimAll()}
           disabled={!plan || busy || !desks.length}
-          className="border border-emerald-500/60 px-3 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
+          className="border border-emerald-500/60 px-3 py-1 text-[12px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
         >
           {busy ? phaseLabel : selected.size ? `[CLAIM_SELECTED (${selected.size})]` : "[CLAIM_ALL]"}
         </button>
       </div>
       {plan && (
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-green-500/60">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-green-500/60">
           <span className="text-amber-400/80">
             REC :: ≤3 DESKS PER RUN — larger batches may fail/timeout
           </span>
@@ -684,7 +684,7 @@ export default function ClaimPanel({
           how many wallet signatures remain. */}
       {busy && progress && (
         <div className="mt-2 border border-emerald-500/40 bg-emerald-500/5 p-2">
-          <div className="flex items-center justify-between font-mono text-[10px]">
+          <div className="flex items-center justify-between font-mono text-[12px]">
             <span className="text-emerald-300">
               {progress.phase === "resolve"
                 ? "RESOLVING TICKERS…"
@@ -713,7 +713,7 @@ export default function ClaimPanel({
             />
           </div>
           {progress.desks && progress.desks.length > 0 && (
-            <div className="mt-1 font-mono text-[9px] leading-snug text-green-500/70">
+            <div className="mt-1 font-mono text-[11px] leading-snug text-green-500/70">
               <span className="text-emerald-400/90">PROCESSING:</span>{" "}
               {progress.desks.join(" · ")}
             </div>
@@ -741,7 +741,7 @@ export default function ClaimPanel({
           {logs.map((l, i) => (
             <div
               key={i}
-              className={`break-all font-mono text-[9px] leading-snug ${
+              className={`break-all font-mono text-[11px] leading-snug ${
                 l.type === "ok"
                   ? "text-emerald-400"
                   : l.type === "err"

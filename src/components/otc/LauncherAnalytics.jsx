@@ -38,7 +38,7 @@ function TokenAsset({ token, large = false }) {
   const [failedUrl, setFailedUrl] = useState("");
   const src = logoOf(token), label = token.name || token.symbol || token.mint;
   return (
-    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-green-500/30 bg-green-500/10 ${large ? "h-56 w-56 max-w-full text-3xl" : "h-8 w-8 text-[10px]"}`}>
+    <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden border border-green-500/30 bg-green-500/10 ${large ? "h-56 w-56 max-w-full text-3xl" : "h-8 w-8 text-[12px]"}`}>
       {src && src !== failedUrl ? <img src={src} alt={`${label} ${large ? "token image" : "logo"}`}
         width={large ? 224 : 32} height={large ? 224 : 32} loading={large ? "eager" : "lazy"}
         decoding="async" referrerPolicy="no-referrer" onError={() => setFailedUrl(src)}
@@ -66,7 +66,7 @@ function TokenDetails({ token }) {
         {logo && <a href={logo} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-300 underline">Open original image ↗</a>}
       </div>
       <div className="min-w-0 space-y-3">
-        <div className="break-all font-mono text-[11px] text-green-500/70">{token.mint} <CopyCa mint={token.mint} /></div>
+        <div className="break-all font-mono text-[13px] text-green-500/70">{token.mint} <CopyCa mint={token.mint} /></div>
         <div className="flex flex-wrap gap-2" aria-label="Token social links">
           {socials.map(({ label, Icon, url }) => <a key={label} href={url} target="_blank" rel="noopener noreferrer"
             aria-label={label} className="inline-flex min-h-11 items-center gap-1.5 border border-green-500/30 px-3 text-xs text-cyan-300 hover:bg-green-500/10">
@@ -82,8 +82,8 @@ function TokenDetails({ token }) {
             </div>)}
         </dl>
         <div className="border border-green-500/20 p-2"><CurveProgress token={token} />
-          <p className="mt-1 text-[10px] text-green-500/60">Reserve-derived funding progress, not market cap.</p></div>
-        <p className="text-[10px] text-green-500/60">Market snapshot: {token.metricsAt ? new Date(token.metricsAt).toLocaleString() : "unavailable"}
+          <p className="mt-1 text-[12px] text-green-500/60">Reserve-derived funding progress, not market cap.</p></div>
+        <p className="text-[12px] text-green-500/60">Market snapshot: {token.metricsAt ? new Date(token.metricsAt).toLocaleString() : "unavailable"}
           <br />Status evidence: {token.statusAt ? new Date(token.statusAt).toLocaleString() : "unavailable"}</p>
       </div>
     </div>
@@ -101,9 +101,9 @@ function TokenDetails({ token }) {
         </div>}
         <p className="text-green-500/70">Reported rewardCycle: {Number.isSafeInteger(payout.rewardCycle) && payout.rewardCycle >= 0 ? payout.rewardCycle : "unavailable"} · units/meaning unverified</p>
       </> : <p className="text-green-500/70">Payout metadata unavailable; this does not mean no rewards.</p>}
-      <p className="text-[11px] text-amber-200/70">Allocation, eligibility and payout timing are not provided by this feed. These are source-reported settings, not verified distributions or guaranteed returns.</p>
+      <p className="text-[13px] text-amber-200/70">Allocation, eligibility and payout timing are not provided by this feed. These are source-reported settings, not verified distributions or guaranteed returns.</p>
     </section>
-    <p className="text-[10px] text-green-500/60">Assets and links are third-party metadata, not endorsements. Verify payout mints and launch terms before trading.</p>
+    <p className="text-[12px] text-green-500/60">Assets and links are third-party metadata, not endorsements. Verify payout mints and launch terms before trading.</p>
   </>;
 }
 
@@ -117,7 +117,7 @@ function CopyCa({ mint }) {
         e.preventDefault(); e.stopPropagation();
         try { await navigator.clipboard.writeText(mint); setOk(true); setTimeout(() => setOk(false), 1200); } catch { /* Clipboard permission may be denied. */ }
       }}
-      className={`border px-1 font-mono text-[9px] ${ok ? "border-emerald-400 text-emerald-300" : "border-green-500/30 text-green-500/60 hover:text-green-300"}`}
+      className={`border px-1 font-mono text-[11px] ${ok ? "border-emerald-400 text-emerald-300" : "border-green-500/30 text-green-500/60 hover:text-green-300"}`}
     >
       {ok ? "[✓]" : "[⧉ CA]"}
     </button>
@@ -129,7 +129,7 @@ function CurveProgress({ token }) {
   const label = token.curveComplete && token.status !== "GRADUATED" ? "100% · migration pending" : progress == null ? "unavailable" : `${progress.toFixed(1)}%`;
   return (
     <span className="inline-flex min-w-24 flex-col gap-0.5" title="Bonding curve quote-asset funding progress from on-chain reserves; not market-cap progress">
-      <span className="text-[8px] text-cyan-300">CURVE {label}</span>
+      <span className="text-[10px] text-cyan-300">CURVE {label}</span>
       <span role="progressbar" aria-label={`${token.symbol || token.mint} bonding curve progress`}
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress ?? undefined} aria-valuetext={label}
         className="flex h-1.5 w-24 overflow-hidden border border-green-500/30 bg-green-500/5">
@@ -230,14 +230,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     <Dialog open={detailMint !== null} onOpenChange={(open) => { if (!open) setDetailMint(null); }}>
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           OTC_ANALYTICS :: LAUNCHER ECOSYSTEM
         </span>
-        <span className="text-[9px] text-green-500/40">{feed ? `${counts.ALL} matching · ${feed.stale || live.error ? "STALE" : "30s POLL"}` : "…"}</span>
+        <span className="text-[11px] text-green-500/40">{feed ? `${counts.ALL} matching · ${feed.stale || live.error ? "STALE" : "30s POLL"}` : "…"}</span>
       </div>
 
-      {live.error && <div role="status" className="mt-2 text-[10px] text-amber-400">{live.error}</div>}
-      {feed?.at && <div className="mt-1 text-[9px] text-green-500/50">Feed fetched {new Date(feed.at).toLocaleTimeString()} · source snapshots may lag</div>}
+      {live.error && <div role="status" className="mt-2 text-[12px] text-amber-400">{live.error}</div>}
+      {feed?.at && <div className="mt-1 text-[11px] text-green-500/50">Feed fetched {new Date(feed.at).toLocaleTimeString()} · source snapshots may lag</div>}
 
       {/* cohort KPIs */}
       <div className="mt-2 grid grid-cols-2 gap-1.5 text-center sm:grid-cols-4">
@@ -248,7 +248,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           ["MEDIAN AGE", c ? fmtAge(c.medianAgeH) : "—"],
         ].map(([k, v]) => (
           <div key={k} className="border border-green-500/20 p-1.5">
-            <div className="text-[9px] uppercase tracking-widest text-green-500/50">{k}</div>
+            <div className="text-[11px] uppercase tracking-widest text-green-500/50">{k}</div>
             <div className="font-mono text-sm font-bold text-green-300">{v}</div>
           </div>
         ))}
@@ -256,28 +256,28 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       <div role="tablist" aria-label="Launcher status" className="mt-2 flex flex-wrap gap-1">
         {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-          onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-1 text-[9px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-1 text-[11px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
           {s} ({counts[s] ?? 0})
         </button>)}
       </div>
       <div role="tablist" aria-label="Launch timeframe" className="mt-1 flex flex-wrap items-center gap-1">
-        <span className="text-[9px] uppercase tracking-widest text-green-500/50">SINCE</span>
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">SINCE</span>
         {TIMEFRAMES.map(([tf]) => <button key={tf} type="button" role="tab" aria-selected={timeframe === tf}
           onClick={() => { setTimeframe(tf); setPage(1); }}
-          className={`border px-1.5 py-1 text-[9px] ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          className={`border px-1.5 py-1 text-[11px] ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
           {tf}
         </button>)}
       </div>
       <input aria-label="Search launcher tokens" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         placeholder="Symbol, name or mint · searches the full tape"
-        className="mt-2 w-full border border-green-500/30 bg-black px-2 py-1 text-[10px] text-green-300" />
+        className="mt-2 w-full border border-green-500/30 bg-black px-2 py-1 text-[12px] text-green-300" />
 
       {/* KPI ranking */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-[9px] uppercase tracking-widest text-green-500/50">RANK BY</span>
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">RANK BY</span>
         {KPIS.map((k) => (
           <button key={k.key} type="button" onClick={() => { setKpi(k.key); setPage(1); }}
-            className={`border px-1.5 py-0.5 text-[9px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
+            className={`border px-1.5 py-0.5 text-[11px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
             [ {k.label} ]
           </button>
         ))}
@@ -287,7 +287,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-80 lg:max-h-none">
         {ranked.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
-            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[10px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[12px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
             {/* line 1 — identity: rank, logo, symbol, status, age */}
             <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
               <span className="text-green-500/40">#{(page - 1) * (feed?.pageSize ?? 50) + i + 1}</span>
@@ -319,7 +319,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               <CurveProgress token={t} />
               <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-green-500/70 sm:ml-2 sm:flex-nowrap">
                 <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-                   className="border border-emerald-500/50 px-1 font-mono text-[9px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                   className="border border-emerald-500/50 px-1 font-mono text-[11px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
                    title={`Trade $${t.symbol} here via Jupiter (route availability varies)`}>
                   [⇄ TRADE]
                 </button>
@@ -329,27 +329,27 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
             </span>
           </div>
         ))}
-        {!ranked.length && <div className="px-2 py-3 text-center text-[10px] text-green-500/50">{feed ? "NO MATCHING LAUNCHES · try another status, timeframe or search" : live.error ? "UNAVAILABLE" : "LOADING…"}</div>}
+        {!ranked.length && <div className="px-2 py-3 text-center text-[12px] text-green-500/50">{feed ? "NO MATCHING LAUNCHES · try another status, timeframe or search" : live.error ? "UNAVAILABLE" : "LOADING…"}</div>}
       </div>
       <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="LAUNCHES" />
-      <div className="mt-1 text-[9px] text-green-500/50">
+      <div className="mt-1 text-[11px] text-green-500/50">
         PAGE {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
         statuses checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} candidates
         (top 60 volume + top 60 gainers + newest 30). Others remain UNKNOWN.
         Near graduation = ≥{feed?.nearThreshold ?? 90}% funding; curve completion alone is not AMM migration.
       </div>
-      {!!feed?.statusError?.length && <div className="mt-1 text-[9px] text-amber-400">Some status/progress checks unavailable; UNKNOWN is not BONDING.</div>}
-      {tradingDisabled && <div className="mt-1 text-[9px] text-amber-400">Token selection locked while a swap is in progress.</div>}
+      {!!feed?.statusError?.length && <div className="mt-1 text-[11px] text-amber-400">Some status/progress checks unavailable; UNKNOWN is not BONDING.</div>}
+      {tradingDisabled && <div className="mt-1 text-[11px] text-amber-400">Token selection locked while a swap is in progress.</div>}
 
       {/* fee model + comparison */}
-      <div className="mt-2 border border-green-500/20 px-2 py-1.5 text-[9px] text-green-500/60">
+      <div className="mt-2 border border-green-500/20 px-2 py-1.5 text-[11px] text-green-500/60">
         {err && <span className="text-amber-400">Cohort snapshot unavailable. </span>}
         FEE_SPLIT :: {(data?.feeModel || []).map((s, i) => (
           <span key={s.key} className="mr-2"><span className={`inline-block h-1.5 w-1.5 ${SPLIT_CLS[i]}`} /> {s.label} {s.pct}%</span>
         ))}
         <span className="text-green-500/40">est from 24h vol × 1% curve fee</span>
       </div>
-      <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-[9px]">
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-[11px]">
         <div className="border border-emerald-500/30 p-1.5">
           <div className="uppercase tracking-widest text-emerald-400/80">OTC LAUNCHER</div>
           <div className="mt-0.5 font-mono text-green-300">
@@ -363,8 +363,8 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           </div>
         </div>
       </div>
-      <div className="mt-1 text-[8px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = top-200 by 24h volume · pump.fun sample biased to active pairs</div>
-      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[8px] text-red-400/80">
+      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = top-200 by 24h volume · pump.fun sample biased to active pairs</div>
+      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400/80">
         NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN · DYOR BEFORE BUYING · HIGH VOLUME &amp; LIQUIDITY PREFERRED
         — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL
       </div>

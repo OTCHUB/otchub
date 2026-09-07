@@ -58,17 +58,17 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
   return (
     <div className="mt-3 border border-green-500/20">
       <div className="flex items-center justify-between border-b border-green-500/20 px-2 py-1">
-        <span className="text-[9px] uppercase tracking-widest text-green-500/50">
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">
           RECENT_SWAPS :: LIVE ON-CHAIN (DEXSCREENER PAIR)
         </span>
-        <span className="flex items-center gap-1.5 text-[9px] text-emerald-400/70">
+        <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/70">
           {loading && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />}
           {list.length ? `${list.length} TX` : "LOADING…"}
         </span>
       </div>
 
       {/* Header row — DexScreener-style columns */}
-      <div className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[8px] uppercase tracking-widest text-green-500/40">
+      <div className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] gap-x-2 border-b border-green-500/10 px-2 py-1 text-[10px] uppercase tracking-widest text-green-500/40">
         <span>SIDE</span>
         <span className="text-right">USD</span>
         <span className="text-right">PRICE ({unit})</span>
@@ -103,7 +103,7 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
                 target="_blank"
                 rel="noreferrer"
                 title={ago(s.time) !== "—" ? `${ago(s.time)} ago · ${s.sig}` : s.sig}
-                className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[9px] last:border-0 hover:bg-green-500/5"
+                className="grid grid-cols-[46px_1fr_1fr_40px_1.4fr] items-center gap-x-2 border-b border-green-500/10 px-2 py-1.5 font-mono text-[11px] last:border-0 hover:bg-green-500/5"
               >
                 <span
                   className={`border px-1 text-center font-bold ${
@@ -132,7 +132,7 @@ export default function RecentSwaps({ latest, unit = "SOL" }) {
             );
           })
         ) : (
-          <div className="px-2 py-3 text-center font-mono text-[9px] text-green-500/40">
+          <div className="px-2 py-3 text-center font-mono text-[11px] text-green-500/40">
             {loading ? "DECODING ON-CHAIN SWAPS…" : "NO_RECENT_SWAPS"}
           </div>
         )}

@@ -25,7 +25,7 @@ export default function TrendChart({ history }) {
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         PRICE_TRENDS :: USD
       </div>
       <div className="mt-3 h-52 sm:h-64">
@@ -36,13 +36,13 @@ export default function TrendChart({ history }) {
               dataKey="t"
               tickFormatter={(t) => new Date(t).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}
               stroke="#1a6b3a"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#2a8b4a" }}
             />
             <YAxis
               yAxisId="usd"
               stroke="#1a6b3a"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#2a8b4a" }}
               tickFormatter={(v) => `$${+v.toFixed(2)}`}
               width={56}
@@ -55,7 +55,7 @@ export default function TrendChart({ history }) {
               orientation="right"
               domain={["auto", "auto"]}
               stroke="#22d3ee"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#22d3ee" }}
               tickFormatter={(v) => `$${+v.toFixed(4)}`}
               width={52}
@@ -63,11 +63,11 @@ export default function TrendChart({ history }) {
             <Tooltip
               labelFormatter={(t) => new Date(t).toLocaleString()}
               formatter={(v) => fmtUsd(v)}
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 11 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 13 }}
               labelStyle={{ color: "#22c55e" }}
               itemStyle={{ color: "#4ade80" }}
             />
-            <Legend wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
             <Line yAxisId="token" type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
             <Line yAxisId="usd" type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
             <Line yAxisId="usd" type="monotone" dataKey="diff" name="DIFF_USD" stroke="#22d3ee" dot={false} strokeWidth={1.5} strokeDasharray="4 3" />

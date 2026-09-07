@@ -43,13 +43,13 @@ export default function ContractsPanel() {
 
   if (error) {
     return (
-      <div className="border border-amber-500/40 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-400 break-all">
+      <div className="border border-amber-500/40 bg-amber-500/5 px-2 py-1 text-[12px] text-amber-400 break-all">
         ERR: {error}
       </div>
     );
   }
   if (!rows) {
-    return <div className="p-3 text-[10px] text-green-500/50">CONTRACT_MAP :: LOADING…</div>;
+    return <div className="p-3 text-[12px] text-green-500/50">CONTRACT_MAP :: LOADING…</div>;
   }
 
   const groups = KIND_ORDER.map((k) => ({ kind: k, items: rows.filter((r) => r.kind === k) })).filter(
@@ -60,7 +60,7 @@ export default function ContractsPanel() {
     <div className="space-y-2">
       {groups.map((g) => (
         <div key={g.kind} className="border border-green-500/20">
-          <div className="border-b border-green-500/20 px-2 py-1 text-[9px] uppercase tracking-widest text-green-500/50">
+          <div className="border-b border-green-500/20 px-2 py-1 text-[11px] uppercase tracking-widest text-green-500/50">
             {KIND_LABEL[g.kind]}
           </div>
           {g.items.map((r) => (
@@ -70,9 +70,9 @@ export default function ContractsPanel() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-[10px] font-bold text-green-300">{r.label}</span>
+                  <span className="text-[12px] font-bold text-green-300">{r.label}</span>
                   {r.slot != null && (
-                    <span className="border border-green-500/30 px-1 text-[8px] text-green-500/60">
+                    <span className="border border-green-500/30 px-1 text-[10px] text-green-500/60">
                       SLOT {r.slot}
                     </span>
                   )}
@@ -80,16 +80,16 @@ export default function ContractsPanel() {
                 {r.address && (
                   <button
                     onClick={() => copy(r.address)}
-                    className="mt-0.5 block max-w-full truncate text-left text-[9px] text-cyan-400/80 hover:text-cyan-300"
+                    className="mt-0.5 block max-w-full truncate text-left text-[11px] text-cyan-400/80 hover:text-cyan-300"
                     title={r.address}
                   >
                     {r.address}
                     {copied === r.address && <span className="ml-1 text-emerald-400">[COPIED]</span>}
                   </button>
                 )}
-                <p className="mt-0.5 text-[9px] leading-snug text-green-500/60">{r.description}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-green-500/60">{r.description}</p>
                 {r.data_flow && (
-                  <p className="mt-0.5 text-[9px] leading-snug text-emerald-500/60">
+                  <p className="mt-0.5 text-[11px] leading-snug text-emerald-500/60">
                     → {r.data_flow}
                   </p>
                 )}

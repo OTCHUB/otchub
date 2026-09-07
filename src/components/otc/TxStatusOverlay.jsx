@@ -80,7 +80,7 @@ export default function TxStatusOverlay({ phase, detail, onCancel }) {
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-x-2">
-              <span className="font-mono text-[11px] font-bold tracking-widest">
+              <span className="font-mono text-[13px] font-bold tracking-widest">
                 {p.label}
                 {detail ? <span className="text-green-500/60"> :: {detail}</span> : null}
               </span>
@@ -88,17 +88,17 @@ export default function TxStatusOverlay({ phase, detail, onCancel }) {
                 {onCancel && (
                   <button
                     onClick={onCancel}
-                    className="border border-red-500/50 px-2 py-0.5 font-mono text-[9px] text-red-400 hover:border-red-400 hover:text-red-300"
+                    className="border border-red-500/50 px-2 py-0.5 font-mono text-[11px] text-red-400 hover:border-red-400 hover:text-red-300"
                   >
                     [CANCEL]
                   </button>
                 )}
-                <span className="font-mono text-[10px] text-green-500/50">
+                <span className="font-mono text-[12px] text-green-500/50">
                   [{elapsed}s] <span className="animate-pulse">▋</span>
                 </span>
               </span>
             </div>
-            <div className="mt-0.5 font-mono text-[9px] leading-snug text-green-500/60">
+            <div className="mt-0.5 font-mono text-[11px] leading-snug text-green-500/60">
               {p.hint}
             </div>
           </div>

@@ -42,10 +42,10 @@ export default function PerDeskTrendChart({ latest }) {
     <div className="border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+          <div className="text-[12px] uppercase tracking-widest text-green-500/70">
             PER_DESK_EARN :: {unit}/DAY
           </div>
-          <div className="mt-1 text-[9px] text-green-500/40">
+          <div className="mt-1 text-[11px] text-green-500/40">
             daily earning per activated desk · dashed = 7d avg
           </div>
         </div>
@@ -54,7 +54,7 @@ export default function PerDeskTrendChart({ latest }) {
             <button
               key={u}
               onClick={() => setUnit(u)}
-              className={`border px-2 py-0.5 font-mono text-[10px] ${
+              className={`border px-2 py-0.5 font-mono text-[12px] ${
                 unit === u ? "border-emerald-500/50 text-emerald-400" : "border-green-500/30 text-green-500/60"
               }`}
             >
@@ -67,16 +67,16 @@ export default function PerDeskTrendChart({ latest }) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
             <YAxis
               stroke="#1a6b3a"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#2a8b4a" }}
               tickFormatter={(v) => (unit === "USD" ? `$${+v.toFixed(2)}` : `${+v.toFixed(4)}`)}
               width={56}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
               labelStyle={{ color: "#22c55e" }}
               formatter={(v) => [fmt(v), "PER_DESK"]}
             />
@@ -85,7 +85,7 @@ export default function PerDeskTrendChart({ latest }) {
                 y={avgVal}
                 stroke="#fbbf24"
                 strokeDasharray="4 3"
-                label={{ value: `7d ${fmt(avgVal)}`, fill: "#fbbf24", fontSize: 9, position: "insideTopRight" }}
+                label={{ value: `7d ${fmt(avgVal)}`, fill: "#fbbf24", fontSize: 13, position: "insideTopRight" }}
               />
             )}
             <Line type="monotone" dataKey="v" name="PER_DESK" stroke="#4ade80" dot={{ r: 2, fill: "#4ade80" }} strokeWidth={1.5} />

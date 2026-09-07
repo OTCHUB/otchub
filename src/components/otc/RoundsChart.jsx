@@ -27,32 +27,32 @@ export default function RoundsChart({ latest }) {
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         ROUND_VELOCITY :: ROUNDS / DAY
       </div>
-      <div className="mt-1 text-[9px] text-green-500/40">
+      <div className="mt-1 text-[11px] text-green-500/40">
         distribution rounds executed per day · tooltip also shows desk count
       </div>
       <div className="mt-2 grid grid-cols-3 gap-1 font-mono">
         <div className="border border-green-500/20 px-2 py-1">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">
             ROUNDS_TODAY
           </div>
           <div className="text-[12px] font-bold text-emerald-400">
             {today ? today.rounds : "—"}
-            <span className="ml-1 text-[8px] font-normal text-green-500/50">
+            <span className="ml-1 text-[10px] font-normal text-green-500/50">
               {prevDay ? `YEST ${prevDay.rounds} · ` : ""}7D_AVG {avg7}
             </span>
           </div>
         </div>
         <div className="border border-green-500/20 px-2 py-1">
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">
             POT_BAL (LIVE)
           </div>
           <div className="text-[12px] font-bold text-emerald-400">
             {potSol != null ? fmtSol(potSol, 3) : "—"}
             {potSol != null && solUsd != null && (
-              <span className="ml-1 text-[8px] font-normal text-green-500/50">
+              <span className="ml-1 text-[10px] font-normal text-green-500/50">
                 ≈ {fmtUsd(potSol * solUsd)}
               </span>
             )}
@@ -63,7 +63,7 @@ export default function RoundsChart({ latest }) {
             owedSol != null && owedSol > 1 ? "border-amber-500/50 bg-amber-500/5" : "border-green-500/20"
           }`}
         >
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">
             OWED_BACKLOG
           </div>
           <div
@@ -73,7 +73,7 @@ export default function RoundsChart({ latest }) {
           >
             {owedSol != null ? fmtSol(owedSol, 3) : "—"}
             {owedSol != null && solUsd != null && (
-              <span className="ml-1 text-[8px] font-normal text-green-500/50">
+              <span className="ml-1 text-[10px] font-normal text-green-500/50">
                 ≈ {fmtUsd(owedSol * solUsd)}
               </span>
             )}
@@ -89,16 +89,16 @@ export default function RoundsChart({ latest }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={10} tick={{ fill: "#2a8b4a" }} />
+            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
             <YAxis
               stroke="#1a6b3a"
-              fontSize={10}
+              fontSize={12}
               tick={{ fill: "#2a8b4a" }}
               tickFormatter={(v) => `${+v.toFixed(0)}`}
               width={56}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 11 }}
+              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
               labelStyle={{ color: "#22c55e" }}
               formatter={(v, n) => [fmtNum(v), n]}
             />

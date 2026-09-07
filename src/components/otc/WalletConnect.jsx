@@ -103,16 +103,16 @@ export default function WalletConnect({ onConnected }) {
         className="flex w-full items-center justify-between border border-green-500/30 bg-black px-3 py-2 text-left transition-opacity"
         title="reopen wallet connect"
       >
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">WALLET_CONNECT</span>
-        <span className="text-[11px] font-bold text-green-400">[ CONNECTED ✓ {short} ]</span>
-        <span className="text-[9px] text-green-500/40">▾</span>
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">WALLET_CONNECT</span>
+        <span className="text-[13px] font-bold text-green-400">[ CONNECTED ✓ {short} ]</span>
+        <span className="text-[11px] text-green-500/40">▾</span>
       </button>
     );
   }
 
   return (
     <div className="border border-green-500/30 bg-black p-3 transition-all duration-200">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         WALLET_CONNECT :: OTC_PORTFOLIO
       </div>
 
@@ -124,22 +124,22 @@ export default function WalletConnect({ onConnected }) {
         >
           {busy ? "[CONNECTING...]" : "[CONNECT_WALLET]"}
         </button>
-        <span className="text-[10px] text-green-500/40">
+        <span className="text-[12px] text-green-500/40">
           PHANTOM · SOLFLARE · BACKPACK · JUPITER · OTHERS
           {wallets.length > 0 && ` · ${wallets.length} DETECTED`}
         </span>
       </div>
 
       {status && (
-        <div className="mt-2 text-[11px] text-green-400 animate-pulse">&gt; {status}</div>
+        <div className="mt-2 text-[13px] text-green-400 animate-pulse">&gt; {status}</div>
       )}
 
       {wallets.length === 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-green-500/50">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-green-500/50">
           <span>MOBILE?</span>
           <a
             href={solflareDeepLink}
-            className="border border-green-500/50 px-2.5 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+            className="border border-green-500/50 px-2.5 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
           >
             [OPEN_IN_SOLFLARE ↗]
           </a>
@@ -160,7 +160,7 @@ export default function WalletConnect({ onConnected }) {
 
       {wallets.length > 0 && (
         <div className="mt-3 border border-green-500/30 p-2">
-          <span className="text-[10px] text-green-500/60">SELECT_WALLET:</span>
+          <span className="text-[12px] text-green-500/60">SELECT_WALLET:</span>
           <div className="mt-1.5 space-y-1.5">
             {wallets.map((p) => (
               <button
@@ -169,13 +169,13 @@ export default function WalletConnect({ onConnected }) {
                 disabled={busy}
                 className={`flex w-full items-center gap-2.5 border border-green-500/30 px-2.5 py-2 text-left text-[12px] text-green-400 hover:bg-green-500/10 disabled:opacity-50 ${connectingId === p.id ? "animate-pulse bg-green-500/10" : ""}`}
               >
-                <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center border border-green-500/35 bg-black text-[11px] font-bold text-green-400 overflow-hidden">
+                <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center border border-green-500/35 bg-black text-[13px] font-bold text-green-400 overflow-hidden">
                   {(p.wallet?.icon || BRAND_ICON[p.id])
                     ? <img src={p.wallet?.icon || BRAND_ICON[p.id]} alt="" className="h-full w-full object-contain p-[2px]" />
                     : (p.name || "?")[0].toUpperCase()}
                 </span>
                 <span className="flex-1">{p.name.toUpperCase()}</span>
-                <span className="text-[9px] text-green-500/40">{connectingId === p.id ? "CONNECTING…" : "DETECTED"}</span>
+                <span className="text-[11px] text-green-500/40">{connectingId === p.id ? "CONNECTING…" : "DETECTED"}</span>
               </button>
             ))}
           </div>
@@ -187,17 +187,17 @@ export default function WalletConnect({ onConnected }) {
           value={manual}
           onChange={(e) => setManual(e.target.value)}
           placeholder="OR PASTE WALLET ADDRESS..."
-          className="min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-[11px] text-green-400 placeholder:text-green-500/30 focus:outline-none"
+          className="min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-[13px] text-green-400 placeholder:text-green-500/30 focus:outline-none"
         />
         <button
           type="submit"
-          className="border border-green-500/50 px-3 py-1.5 text-[11px] text-green-400 hover:bg-green-500/10"
+          className="border border-green-500/50 px-3 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
         >
           [LOOKUP]
         </button>
       </form>
 
-      {error && <div className="mt-2 text-[11px] leading-relaxed text-amber-400">ERR: {error}</div>}
+      {error && <div className="mt-2 text-[13px] leading-relaxed text-amber-400">ERR: {error}</div>}
     </div>
   );
 }

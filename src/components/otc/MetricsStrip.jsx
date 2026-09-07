@@ -131,7 +131,7 @@ export default function MetricsStrip({ latest, history }) {
     <div className="mt-3 grid grid-cols-2 gap-px border border-green-500/30 bg-green-500/20 sm:grid-cols-4 lg:grid-cols-8">
       {cells.map((c) => (
         <div key={c.label} className="bg-black px-2 py-1.5" title={c.desc}>
-          <div className="text-[8px] uppercase tracking-widest text-green-500/50">
+          <div className="text-[10px] uppercase tracking-widest text-green-500/50">
             {c.label}
           </div>
           <div
@@ -141,7 +141,7 @@ export default function MetricsStrip({ latest, history }) {
           >
             {c.value}
           </div>
-          <div className="truncate font-mono text-[8px] text-green-500/50">
+          <div className="truncate font-mono text-[10px] text-green-500/50">
             <span className={c.changeCls}>{c.change}</span>
             {c.sub && <span> · {c.sub}</span>}
           </div>

@@ -92,7 +92,7 @@ export default function BootScreen({ onComplete }) {
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.75))]" />
 
       {/* Status bar frames the top of the screen */}
-      <div className="relative z-20 flex items-center justify-between border-b border-green-500/20 px-3 py-1.5 text-[9px] text-green-500/60 sm:px-6 sm:text-[10px]">
+      <div className="relative z-20 flex items-center justify-between border-b border-green-500/20 px-3 py-1.5 text-[11px] text-green-500/60 sm:px-6 sm:text-[12px]">
         <span>TTY1 :: OTC_HUB_BOOT_SEQUENCE</span>
         <span className="flex items-center gap-1.5 text-emerald-400">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -102,10 +102,10 @@ export default function BootScreen({ onComplete }) {
 
       <div className="relative z-20 flex flex-1 items-center justify-center overflow-y-auto px-4 py-6 sm:px-8 sm:py-10">
         <div className="w-full max-w-3xl xl:max-w-4xl">
-          <div className="whitespace-pre text-[8px] leading-tight text-green-500/70 sm:text-[11px] xl:text-[13px]">
+          <div className="whitespace-pre text-[10px] leading-tight text-green-500/70 sm:text-[13px] xl:text-[13px]">
             {HEADER.join("\n")}
           </div>
-          <div className="mt-3 space-y-0 text-[10px] leading-relaxed sm:text-xs xl:text-sm">
+          <div className="mt-3 space-y-0 text-[12px] leading-relaxed sm:text-xs xl:text-sm">
             {!data && (
               <div>
                 <span className="text-green-500/50">&gt; </span>
@@ -131,7 +131,7 @@ export default function BootScreen({ onComplete }) {
           )}
           {/* Boot progress bar */}
           <div className="mt-3 border border-green-500/30 p-1.5">
-            <div className="flex items-center justify-between text-[9px] text-green-500/60">
+            <div className="flex items-center justify-between text-[11px] text-green-500/60">
               <span>BOOT_SEQ</span>
               <span>{progress}%</span>
             </div>
@@ -146,7 +146,7 @@ export default function BootScreen({ onComplete }) {
       </div>
 
       {/* Status bar frames the bottom of the screen */}
-      <div className="relative z-20 border-t border-green-500/20 px-3 py-1.5 text-center text-[9px] text-green-500/40 sm:text-[10px]">
+      <div className="relative z-20 border-t border-green-500/20 px-3 py-1.5 text-center text-[11px] text-green-500/40 sm:text-[12px]">
         COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH
       </div>
     </div>

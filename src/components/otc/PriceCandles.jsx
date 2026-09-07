@@ -137,7 +137,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
     <div className="mt-2 border border-green-500/20">
       {/* Header: timeframe + unit controls */}
       <div className="flex flex-wrap items-center justify-between gap-1 border-b border-green-500/20 px-2 py-1">
-        <span className="text-[9px] uppercase tracking-widest text-green-500/50">
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">
           $OTC :: PRICE_CANDLES
         </span>
         <div className="flex items-center gap-1">
@@ -145,7 +145,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
             <button
               key={id}
               onClick={() => setTf(id)}
-              className={`border px-1.5 py-0.5 font-mono text-[9px] ${
+              className={`border px-1.5 py-0.5 font-mono text-[11px] ${
                 tf === id
                   ? "border-emerald-500/60 text-emerald-400"
                   : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
@@ -156,7 +156,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
           ))}
           <button
             onClick={() => onToggleUnit && onToggleUnit()}
-            className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[9px] text-cyan-300 hover:border-cyan-400/70"
+            className="border border-cyan-400/40 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 hover:border-cyan-400/70"
           >
             {unit === "USD" ? "$USD" : "◎SOL"}
           </button>
@@ -228,14 +228,14 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
               />
             </svg>
             {/* Price labels */}
-            <div className="pointer-events-none absolute left-1 top-0.5 font-mono text-[8px] text-green-500/50">
+            <div className="pointer-events-none absolute left-1 top-0.5 font-mono text-[10px] text-green-500/50">
               HI {fmt(scale.hi)}
             </div>
-            <div className="pointer-events-none absolute bottom-0.5 left-1 font-mono text-[8px] text-green-500/50">
+            <div className="pointer-events-none absolute bottom-0.5 left-1 font-mono text-[10px] text-green-500/50">
               LO {fmt(scale.lo)}
             </div>
             <div
-              className={`pointer-events-none absolute right-1 border px-1 font-mono text-[8px] ${
+              className={`pointer-events-none absolute right-1 border px-1 font-mono text-[10px] ${
                 up
                   ? "border-green-500/40 bg-black/80 text-green-400"
                   : "border-red-400/40 bg-black/80 text-red-400"
@@ -249,7 +249,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
               <div
                 key={m.i}
                 title={`LIQ ${m.add ? "ADD" : "REMOVE"} :: $${fmtCompact(Math.abs(m.delta))}`}
-                className={`absolute top-0 -translate-x-1/2 border bg-black/80 px-0.5 font-mono text-[7px] font-bold ${
+                className={`absolute top-0 -translate-x-1/2 border bg-black/80 px-0.5 font-mono text-[9px] font-bold ${
                   m.add
                     ? "border-cyan-400/60 text-cyan-300"
                     : "border-amber-400/60 text-amber-300"
@@ -261,7 +261,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
             ))}
           </>
         ) : (
-          <div className="flex h-full items-center justify-center font-mono text-[9px] text-green-500/40">
+          <div className="flex h-full items-center justify-center font-mono text-[11px] text-green-500/40">
             {src === "LOADING"
               ? "BOOTSTRAPPING :: FETCHING FULL OHLCV SERIES…"
               : "FEED OFFLINE :: WAITING FOR SNAPSHOT DATA…"}
@@ -270,7 +270,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
       </div>
 
       {/* Series + liq-marker note (single compact line) */}
-      <div className="border-t border-green-500/10 px-2 py-0.5 font-mono text-[8px] text-green-500/40">
+      <div className="border-t border-green-500/10 px-2 py-0.5 font-mono text-[10px] text-green-500/40">
         {candles.length} {tf} CANDLE(S) ·{" "}
         {src === "FULL"
           ? "FULL HISTORY :: GECKOTERMINAL"

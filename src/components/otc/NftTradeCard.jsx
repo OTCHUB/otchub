@@ -10,12 +10,12 @@ const ME_COLLECTION_URL = "https://magiceden.io/collections/otc_desks";
 const ME_PROFILE_URL = "https://magiceden.io/profile";
 
 const linkCls =
-  "flex items-center justify-between border border-green-500/40 px-2.5 py-2 font-mono text-[10px] text-green-300 hover:border-emerald-500/50 hover:bg-green-500/10";
+  "flex items-center justify-between border border-green-500/40 px-2.5 py-2 font-mono text-[12px] text-green-300 hover:border-emerald-500/50 hover:bg-green-500/10";
 
 export default function NftTradeCard() {
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <span className="text-[12px] uppercase tracking-widest text-green-500/70">
         DESK_TRADE :: NFT ROUTES
       </span>
 

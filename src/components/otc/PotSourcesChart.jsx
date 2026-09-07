@@ -37,7 +37,7 @@ export default function PotSourcesChart({ latest }) {
 
   return (
     <div className="border border-green-500/30 bg-black p-3">
-      <div className="text-[10px] uppercase tracking-widest text-green-500/70">
+      <div className="text-[12px] uppercase tracking-widest text-green-500/70">
         POT_INFLOW :: BY SOURCE (SOL/DAY · STACKED)
       </div>
       <HelpNote label="[?] SOURCE_LEGEND">
@@ -48,7 +48,7 @@ export default function PotSourcesChart({ latest }) {
         {ps?.since ? ` · tracking since ${ps.since}` : ""}
       </HelpNote>
       {rows.length === 0 ? (
-        <div className="py-6 text-center text-[11px] text-green-500/40">
+        <div className="py-6 text-center text-[13px] text-green-500/40">
           NO_DATA — source tracking begins with the next snapshot ingest
         </div>
       ) : (
@@ -60,14 +60,14 @@ export default function PotSourcesChart({ latest }) {
                 <XAxis
                   dataKey="day"
                   stroke="#1a6b3a"
-                  fontSize={10}
+                  fontSize={12}
                   tick={{ fill: "#2a8b4a" }}
                   interval="preserveStartEnd"
                   minTickGap={12}
                 />
                 <YAxis
                   stroke="#1a6b3a"
-                  fontSize={10}
+                  fontSize={12}
                   tick={{ fill: "#2a8b4a" }}
                   tickFormatter={(v) => `${v}`}
                   width={44}
@@ -78,13 +78,13 @@ export default function PotSourcesChart({ latest }) {
                     border: "1px solid #1a6b3a",
                     borderRadius: 0,
                     fontFamily: "monospace",
-                    fontSize: 11,
+                    fontSize: 13,
                   }}
                   labelStyle={{ color: "#22c55e" }}
                   formatter={(v, name) => [fmtSol(v, 3), name]}
                 />
                 <Legend
-                  wrapperStyle={{ fontFamily: "monospace", fontSize: 10, color: "#2a8b4a" }}
+                  wrapperStyle={{ fontFamily: "monospace", fontSize: 12, color: "#2a8b4a" }}
                 />
                 {SEGMENTS.map((s) => (
                   <Bar key={s.key} dataKey={s.key} name={s.name} stackId="pot" fill={s.fill} stroke="#1a6b3a" />
@@ -92,7 +92,7 @@ export default function PotSourcesChart({ latest }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[9px] text-green-500/60">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-green-500/60">
             {totals.map((t) => (
               <span key={t.key}>
                 <span style={{ color: t.fill }} className="font-bold">

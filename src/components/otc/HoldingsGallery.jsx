@@ -96,7 +96,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
       {/* Title and controls stack vertically so nothing overflows on narrow
           screens; buttons wrap and keep a comfortable 36px tap target. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
+        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           NFT_HOLDINGS :: {all.length} · LISTED {listed.length}
           {floorSol != null && (
             <span className="text-cyan-300">
@@ -108,7 +108,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
             </span>
           )}
         </span>
-        <span className="text-[9px] text-green-500/40">PRICES INCL. 2% FEE + 5% ROYALTY</span>
+        <span className="text-[11px] text-green-500/40">PRICES INCL. 2% FEE + 5% ROYALTY</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <div className="inline-flex overflow-hidden border border-green-500/30">
@@ -119,14 +119,14 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
                 setMode(m);
                 setPageNo(0);
               }}
-              className={`min-h-[36px] px-3 font-mono text-[10px] ${i > 0 ? "border-l border-green-500/30" : ""} ${mode === m ? "bg-emerald-500/15 text-emerald-400" : "text-green-500/60 hover:text-green-400"}`}
+              className={`min-h-[36px] px-3 font-mono text-[12px] ${i > 0 ? "border-l border-green-500/30" : ""} ${mode === m ? "bg-emerald-500/15 text-emerald-400" : "text-green-500/60 hover:text-green-400"}`}
             >
               {m}
             </button>
           ))}
         </div>
         <div className="inline-flex items-center gap-1 border border-green-500/30 px-1.5">
-          <span className="font-mono text-[10px] text-green-500/40">FIND</span>
+          <span className="font-mono text-[12px] text-green-500/40">FIND</span>
           <input
             value={query}
             onChange={(e) => {
@@ -135,7 +135,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
             }}
             placeholder="#1602"
             inputMode="numeric"
-            className="h-[36px] w-24 bg-transparent font-mono text-[10px] text-green-300 placeholder:text-green-500/30 focus:outline-none"
+            className="h-[36px] w-24 bg-transparent font-mono text-[12px] text-green-300 placeholder:text-green-500/30 focus:outline-none"
           />
           {query && (
             <button
@@ -143,7 +143,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
                 setQuery("");
                 setPageNo(0);
               }}
-              className="font-mono text-[10px] text-green-500/50 hover:text-green-300"
+              className="font-mono text-[12px] text-green-500/50 hover:text-green-300"
             >
               [x]
             </button>
@@ -152,7 +152,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
         <button
           onClick={() => rescan()}
           disabled={scanning || !listed.length}
-          className="ml-auto min-h-[36px] border border-cyan-500/40 px-3 font-mono text-[10px] text-cyan-400 hover:border-cyan-400 disabled:opacity-30"
+          className="ml-auto min-h-[36px] border border-cyan-500/40 px-3 font-mono text-[12px] text-cyan-400 hover:border-cyan-400 disabled:opacity-30"
           title="Re-read real on-chain vault balances for listed desks"
         >
           {scanning ? "[LIVE…]" : "[RESCAN_LIVE]"}
@@ -193,38 +193,38 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
               className={`border text-left hover:border-green-500/50 ${noStock ? "border-red-500/40 bg-red-500/5 cursor-pointer" : snipe ? "border-emerald-400 bg-emerald-500/10 cursor-pointer" : h.is_listed && h.listing_price_sol != null ? "border-green-500/40 bg-black cursor-pointer" : "border-green-500/20 bg-black cursor-pointer"}`}
             >
               <div className="relative aspect-square">
-                {h.image_url ? <Image src={h.image_url} fittingType="fill" className="h-full w-full" /> : <div className="flex h-full items-center justify-center font-mono text-[10px] text-green-500/30">NO_IMG</div>}
-                {h.is_listed && h.listing_price_sol != null && <span className="absolute right-1 top-1 bg-black/80 px-1 font-mono text-[9px] text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}</span>}
-                {snipe && <span className="absolute left-1 top-1 bg-emerald-500/90 px-1 font-mono text-[9px] font-bold text-black">SNIPE</span>}
-                {noStock && <span className="absolute left-1 top-1 bg-red-500/90 px-1 font-mono text-[9px] font-bold text-black">NO_STOCK</span>}
+                {h.image_url ? <Image src={h.image_url} fittingType="fill" className="h-full w-full" /> : <div className="flex h-full items-center justify-center font-mono text-[12px] text-green-500/30">NO_IMG</div>}
+                {h.is_listed && h.listing_price_sol != null && <span className="absolute right-1 top-1 bg-black/80 px-1 font-mono text-[11px] text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}</span>}
+                {snipe && <span className="absolute left-1 top-1 bg-emerald-500/90 px-1 font-mono text-[11px] font-bold text-black">SNIPE</span>}
+                {noStock && <span className="absolute left-1 top-1 bg-red-500/90 px-1 font-mono text-[11px] font-bold text-black">NO_STOCK</span>}
               </div>
               <div className="border-t border-green-500/20 p-1.5">
-                <div className="truncate font-mono text-[10px] text-green-300">{h.name}</div>
+                <div className="truncate font-mono text-[12px] text-green-300">{h.name}</div>
                 {walletOwned ? (
                   <>
                     {h.is_listed && h.listing_price_sol != null && (
-                      <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
+                      <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[11px] font-normal text-green-500/50">SOL</span></div>
                     )}
                     {cd ? (
-                      <div className={`font-mono text-[9px] ${cd.claimable.length ? "text-emerald-400" : "text-green-500/50"}`}>
+                      <div className={`font-mono text-[11px] ${cd.claimable.length ? "text-emerald-400" : "text-green-500/50"}`}>
                         CLAIM {fmtSol(cSol, 3)} · {fmtUsd(cUsd, 2)} · {cd.claimable.length}T{" "}
                         <span className="text-cyan-400/70">[LIVE]</span>
                       </div>
                     ) : (
-                      <div className="font-mono text-[9px] text-green-500/40">VAULT_SCAN…</div>
+                      <div className="font-mono text-[11px] text-green-500/40">VAULT_SCAN…</div>
                     )}
-                    <div className="font-mono text-[9px] text-amber-400/80">
+                    <div className="font-mono text-[11px] text-amber-400/80">
                       LT_CLAIMED {fmtSol(lt?.value_sol, 3)} · {fmtUsd(lt?.value_usd, 2)}
                     </div>
                   </>
                 ) : h.is_listed && h.listing_price_sol != null ? (
                   <>
-                    <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[9px] font-normal text-green-500/50">SOL</span></div>
-                    <div className={`font-mono text-[9px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
+                    <div className="font-mono text-sm font-bold text-emerald-400">LST {fmtSol(h.listing_price_sol, 2)}<span className="ml-1 text-[11px] font-normal text-green-500/50">SOL</span></div>
+                    <div className={`font-mono text-[11px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
                       STK_HLD {fmtSol(holdSol(h), 3)} · {fmtUsd(holdUsd(h), 2)}{" "}
                       <span className={live ? "text-cyan-400/70" : "text-amber-400/60"}>[{live ? "LIVE" : "EST"}]</span>
                     </div>
-                    <div className={`font-mono text-[9px] ${snipe ? "text-emerald-400" : noStock ? "text-red-400/80" : "text-amber-400/70"}`}>
+                    <div className={`font-mono text-[11px] ${snipe ? "text-emerald-400" : noStock ? "text-red-400/80" : "text-amber-400/70"}`}>
                       {noStock ? "VAULT_EMPTY — claimed out" : `NET(STK−LST) ${fmtSol(spread, 3)}`}
                     </div>
                     <a
@@ -232,13 +232,13 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className={`mt-1.5 block border px-1.5 py-1.5 text-center font-mono text-[9px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
+                      className={`mt-1.5 block border px-1.5 py-1.5 text-center font-mono text-[11px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
                     >
                       [BUY_ON_ME ↗]
                     </a>
                   </>
                 ) : (
-                  <div className={`font-mono text-[9px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
+                  <div className={`font-mono text-[11px] ${noStock ? "text-red-400/80" : "text-green-500/60"}`}>
                     STK_HLD {fmtSol(holdSol(h), 3)} · {fmtUsd(holdUsd(h), 2)}{" "}
                     <span className={live ? "text-cyan-400/70" : "text-amber-400/60"}>[{live ? "LIVE" : "EST"}]</span>
                   </div>
@@ -247,7 +247,7 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
             </div>
           );
         })}
-        {!list.length && <div className="col-span-full py-6 text-center font-mono text-[11px] text-green-500/40">{q ? `NO_MATCH :: "${query.trim()}"` : "NO_DATA"}</div>}
+        {!list.length && <div className="col-span-full py-6 text-center font-mono text-[13px] text-green-500/40">{q ? `NO_MATCH :: "${query.trim()}"` : "NO_DATA"}</div>}
       </div>
       <Pager page={page} pages={pages} onPage={setPageNo} total={filtered.length} label="DESKS" />
       <HoldingsDetail
