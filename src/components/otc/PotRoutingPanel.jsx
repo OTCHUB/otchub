@@ -2,6 +2,7 @@ import React from "react";
 import { fmtSol } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
 import PotMilestones from "@/components/otc/PotMilestones";
+import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
 
 // Fee-routing map verified on-chain 2026-09-06 by RPC account inspection.
 // Keep addresses in sync with ADDRESSES in base44/shared/otcSources.ts.
@@ -158,6 +159,9 @@ export default function PotRoutingPanel({ latest }) {
           LIVE · latest tracked day {dayLbl ?? "—"}
         </span>
       </div>
+
+      {/* horizontal flow diagram — last closed day at a glance */}
+      <PotFlowDiagram latest={latest} />
 
       {/* stage A — fee origins and where they land */}
       <FlowRow
