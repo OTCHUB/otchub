@@ -164,7 +164,7 @@ export default function PotMilestones({ latest }) {
           </li>
           <li>
             Why is the 10% desk share of launchpad swap fees no longer routed to the pot (per-swap deposits
-            −{cliff ? cliff.pct : 85}% vs peak) while launcher-coin holders received ≈53% of all distributed funds?
+            −{cliff ? cliff.pct : 85}% vs peak) while launcher-coin holders received ≈78% of all distributed funds?
           </li>
           <li>Are vault balances swept to the pot on a schedule — where is it announced and auditable?</li>
           <li>

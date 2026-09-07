@@ -23,7 +23,7 @@ export default function PotPumpTrace() {
         <a href={scan(PUMP_PROGRAM)} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">PGM ↗</a>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-red-400">
-        <span>REWARD_SPLIT :: LAUNCHER-COIN HOLDERS ≈2839 SOL = 53% OF 5323 DISTRIBUTED (GPRO 1402.8 · PUMP 979.6 · SPYx 395.6 · WBTC 61.2) — DESKS: 0.37 → 0.05 SOL/DESK/DAY</span>
+        <span>REWARD_SPLIT :: LAUNCHER-COIN HOLDERS ≈4186 SOL = 78% OF ALL DISTRIBUTED (GPRO 1403 · PUMP 982 · QQQx 616 · SPYx 413 …) — DESKS: 22% · 0.37 → 0.10 SOL/DESK/DAY</span>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-green-500/60">
         <span>POT STILL GETS PER-SWAP MICRO-DEPOSITS (97/100 LATEST POT TXS ≈0.03 EA) BUT −85% vs 09-01 PEAK 828 SOL · TROUGH 61 (09-05)</span>
@@ -51,8 +51,9 @@ export default function PotPumpTrace() {
           pool's own vault (pAMM PDA) or pump.fun's global vault; the coin creator vault accrued 0.00
           and both per-coin creators (parsed from pool account data) hold 0 SOL with only failed txs.
           So no creator-fee route reaches desks or coin creators — swap fees stay with pump.fun and
-          the LP, while fee-funded stock rewards flow to launcher-coin holders. Desk pot share
-          continues only as collapsed per-swap micro-deposits. Community tooling — verify on Solscan.
+          the LP, while fee-funded stock rewards flow overwhelmingly to launcher-coin holders
+          (≈78% of everything distributed vs ≈22% to desks). Desk pot share continues only as
+          collapsed per-swap micro-deposits. Community tooling — verify on Solscan.
         </p>
       </details>
     </div>

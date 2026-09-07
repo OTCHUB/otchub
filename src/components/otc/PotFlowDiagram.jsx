@@ -69,6 +69,19 @@ export default function PotFlowDiagram({ latest }) {
   const retained = Math.max(0, inflow - dist);
   const perDesk = (sameDayDesk || deskRows.at(-1) || {}).per_desk_sol;
 
+  // REWARD_SPLIT: who the protocol's distributions actually enrich. The
+  // otcdesks ledger (byStock) sums to the distributed headline; rows in the
+  // 13-stock desk rotation go to DESK holders, everything else (GPRO, PUMP,
+  // QQQx, SPYx, …) is the launchpad's launcher-coin-holder reward basket.
+  const deskLedgerSol = (latest?.by_stock?.items || []).reduce(
+    (a, r) => a + (r.distributed_sol || 0),
+    0
+  );
+  const totalDist = latest?.protocol_distributed_sol;
+  const launcherSol = totalDist != null ? Math.max(0, totalDist - deskLedgerSol) : null;
+  const launcherPct =
+    totalDist > 0 && launcherSol != null ? Math.round((launcherSol / totalDist) * 100) : null;
+
   return (
     <div className="space-y-1.5 border border-green-500/20 px-2 py-2">
       <div className="flex flex-wrap items-center justify-between gap-1">
@@ -108,6 +121,31 @@ export default function PotFlowDiagram({ latest }) {
       <div className="text-center font-mono text-[8px] text-red-400/80">
         ✖ CREATOR_FEES · 10% DESK SHARE OF LAUNCHPAD FEES NOT LANDING
       </div>
+
+      {/* who gets enriched: launcher-coin holders vs desk holders */}
+      {totalDist != null && deskLedgerSol > 0 && launcherSol != null && (
+        <div className="space-y-1 border border-fuchsia-500/30 bg-fuchsia-500/5 px-2 py-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-fuchsia-300/80">
+              REWARD_SPLIT :: WHO GETS ENRICHED
+            </span>
+            <span className="font-mono text-[9px] text-green-500/60">
+              {fmtSol(totalDist, 0)} SOL DISTRIBUTED · {launcherPct}/{100 - launcherPct} SPLIT
+            </span>
+          </div>
+          <Bar label="LAUNCH_HOLDERS" value={launcherSol} total={totalDist} color="#e879f9"
+            note={launcherPct != null ? `${launcherPct}%` : null} />
+          <Bar label="DESK_HOLDERS" value={deskLedgerSol} total={totalDist} color="#4ade80"
+            note={`${100 - launcherPct}%`} />
+          <div className="font-mono text-[8px] text-green-500/50">
+            LAUNCH_BASKETS: GPRO · PUMP · QQQx · SPYx · TTWO · HOODx … → LAUNCHER-COIN HOLDERS · DESKS: 13-STOCK ROTATION · LEDGER: otcdesks.cash
+          </div>
+          <div className="font-mono text-[9px] text-fuchsia-300/90">
+            ✦ LAUNCH HOLDERS OUT-EARN DESKS ≈{(deskLedgerSol > 0 ? (launcherSol / deskLedgerSol).toFixed(1) : "—")}:1
+            — LAUNCHPAD FEES ENRICH LAUNCHERS &amp; HOLDERS FIRST
+          </div>
+        </div>
+      )}
     </div>
   );
 }

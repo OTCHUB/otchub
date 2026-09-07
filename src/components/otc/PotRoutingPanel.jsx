@@ -150,7 +150,7 @@ export default function PotRoutingPanel({ latest }) {
           pump.fun keeps its protocol fee in the global vault (34.6 SOL) and the LP share in the pool
           vault — the coin creator fee is 0% on sampled pools and both per-coin creators hold 0 SOL.
           The pot still receives collapsed per-swap micro-deposits (−85% vs the 09-01 peak), while
-          fee-funded stock rewards flow overwhelmingly to launcher-coin holders (≈53% of everything
+          fee-funded stock rewards flow overwhelmingly to launcher-coin holders (≈78% of everything
           distributed) instead of desks. The old vault addresses recorded earlier are CLOSED on-chain
           and were never the real route. Community tooling — verify on Solscan before drawing
           conclusions.
