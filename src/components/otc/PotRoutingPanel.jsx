@@ -2,6 +2,7 @@ import React from "react";
 import { fmtSol } from "@/lib/format";
 import PotMilestones from "@/components/otc/PotMilestones";
 import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
+import PotWatchStrip from "@/components/otc/PotWatchStrip";
 
 // Fee-routing map verified on-chain 2026-09-06 by RPC account inspection.
 // Keep addresses in sync with ADDRESSES in base44/shared/otcSources.ts.
@@ -87,6 +88,9 @@ export default function PotRoutingPanel({ latest }) {
           LIVE
         </span>
       </div>
+
+      {/* live routing health: desks owed vs pot, config change detection */}
+      <PotWatchStrip />
 
       {/* sankey overview */}
       <PotFlowDiagram latest={latest} />
