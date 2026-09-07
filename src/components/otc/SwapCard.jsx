@@ -1,20 +1,29 @@
 import React, { useState } from "react";
-import { ArrowDown, Check, Copy, ExternalLink, Settings } from "lucide-react";
+import { ArrowDown, Check, Copy, ExternalLink, Settings, Zap } from "lucide-react";
 import PriceCandles from "@/components/otc/PriceCandles";
-import { fmtUsd } from "@/lib/format";
+import RecentSwaps from "@/components/otc/RecentSwaps";
+import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
+import HelpNote from "@/components/otc/HelpNote";
+import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
 
-// Simple swap card for phones: stacked YOU PAY / YOU RECEIVE cards, a flip
-// arrow between them, slippage presets and one full-width action button —
-// compact enough to fit a phone screen in the terminal aesthetic (sharp
-// corners, mono, green-on-black). The full terminal panel stays on sm+.
-// All state lives in the parent swap panel — this is presentation only.
+// Uniswap-style swap card for ALL screen sizes: stacked YOU PAY / YOU RECEIVE
+// cards, flip arrow, quick amounts, slippage settings, quote details and one
+// full-width action button — rendered in the terminal aesthetic (sharp
+// corners, mono fonts, green-on-black). Spacing and type step up on sm+ for
+// desktop sleekness; on phones the card trims down to fit the fold. All state
+// lives in the parent swap panel — this is presentation only.
 const SLIP_PRESETS = [
   { label: "0.5%", bps: 50 },
   { label: "1%", bps: 100 },
   { label: "3%", bps: 300 },
 ];
+const QUICK_AMOUNTS = [
+  ["25%", 0.25],
+  ["50%", 0.5],
+  ["MAX", 1],
+];
 
-export default function SwapMobile({
+export default function SwapCard({
   tokenLabel,
   mint,
   isOtc,
@@ -44,12 +53,19 @@ export default function SwapMobile({
   onCustomSlippage,
   onSwap,
   onResetToken,
-  onConnected,
   onGoConnect,
   latest,
   history,
   unit,
   onToggleUnit,
+  stats,
+  metricsAt,
+  txPhase,
+  txDetail,
+  balError,
+  onRetryBalances,
+  metadataError,
+  onRetryMetadata,
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -80,12 +96,24 @@ export default function SwapMobile({
         tone: "border-emerald-500/60 bg-emerald-500/10 text-emerald-300",
       };
 
+  const change = (v) =>
+    v == null || !Number.isFinite(v) ? "—" : `${v >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(v))}`;
+  const cells = [
+    ["MKT_CAP", stats?.mcap != null ? `$${fmtCompact(stats.mcap)}` : "—", null, "text-emerald-300"],
+    ...(isOtc
+      ? [["1H", change(stats?.ch1h), stats?.ch1h, stats?.ch1h >= 0 ? "text-emerald-400" : "text-red-400"]]
+      : []),
+    ["24H", change(stats?.ch24h), stats?.ch24h, stats?.ch24h >= 0 ? "text-emerald-400" : "text-red-400"],
+    ["LIQ", stats?.liq != null ? `$${fmtCompact(stats.liq)}` : "—", null, "text-cyan-300"],
+    ["VOL_24H", stats?.vol != null ? `$${fmtCompact(stats.vol)}` : "—", null, "text-cyan-300"],
+  ];
+
   return (
-    <div className="flex flex-col gap-2 border border-green-500/30 bg-black p-2.5">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-2 border border-green-500/30 bg-black p-2.5 sm:gap-2.5 sm:p-4">
       {/* Header: title + token tools */}
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-mono text-[12px] font-bold uppercase tracking-widest text-green-400">
+          <div className="font-mono text-[12px] font-bold uppercase tracking-widest text-green-400 sm:text-[13px]">
             SWAP :: {isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`}
           </div>
           <button
@@ -118,6 +146,16 @@ export default function SwapMobile({
           >
             <ExternalLink className="h-4 w-4" />
           </a>
+          <a
+            href="https://jup.ag"
+            target="_blank"
+            rel="noreferrer"
+            title="Routing & liquidity by the Jupiter aggregator"
+            className="hidden items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-1.5 py-1 font-mono text-[11px] text-amber-300 hover:border-amber-300/60 sm:inline-flex"
+          >
+            <Zap className="h-3 w-3" />
+            JUPITER
+          </a>
           <button
             type="button"
             onClick={() => setSettingsOpen((o) => !o)}
@@ -133,6 +171,38 @@ export default function SwapMobile({
             SLIP {customSlip ? `${customSlip}%` : SLIP_PRESETS.find((s) => s.bps === slippageBps)?.label ?? `${slippageBps / 100}%`}
           </button>
         </div>
+      </div>
+
+      {/* Selected-token snapshot freshness (non-OTC tokens only) */}
+      {!isOtc && (
+        <div className="font-mono text-[10px] text-green-500/50">
+          SNAPSHOT {metricsAt ? `${metricsAt} · NOT LIVE / MAY BE STALE` : "FRESHNESS UNKNOWN"}
+        </div>
+      )}
+      {metadataError && (
+        <div className="font-mono text-[10px] text-amber-400">
+          MINT_ERR: {metadataError}{" "}
+          <button type="button" onClick={onRetryMetadata} className="underline">
+            [RETRY]
+          </button>
+        </div>
+      )}
+
+      {/* Market stats: one-line wrap on phones, bordered grid on sm+ */}
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] text-green-500/60 sm:hidden">
+        {cells.map(([k, v, , cls]) => (
+          <span key={k}>
+            {k} <span className={cls}>{v}</span>
+          </span>
+        ))}
+      </div>
+      <div className={`hidden gap-1 sm:grid ${isOtc ? "grid-cols-5" : "grid-cols-4"}`}>
+        {cells.map(([k, v, , cls]) => (
+          <div key={k} className="border border-green-500/20 px-1.5 py-1 font-mono text-[11px]">
+            <div className="text-[10px] uppercase tracking-widest text-green-500/50">{k}</div>
+            <div className={cls}>{v}</div>
+          </div>
+        ))}
       </div>
 
       {/* Slippage settings */}
@@ -173,17 +243,23 @@ export default function SwapMobile({
       )}
 
       {/* You pay */}
-      <div className="border border-green-500/20 bg-green-500/5 p-2">
+      <div className="border border-green-500/20 bg-green-500/5 p-2 sm:p-3">
         <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-green-500/50">
           <span className="truncate">
             YOU PAY · BAL {payToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}
+            {balError && (
+              <button
+                type="button"
+                onClick={onRetryBalances}
+                className="ml-1 text-amber-400 underline"
+                title={`Balance read failed: ${balError}`}
+              >
+                [RETRY]
+              </button>
+            )}
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            {[
-              ["25%", 0.25],
-              ["50%", 0.5],
-              ["MAX", 1],
-            ].map(([label, frac]) => (
+            {QUICK_AMOUNTS.map(([label, frac]) => (
               <button
                 key={label}
                 type="button"
@@ -205,9 +281,9 @@ export default function SwapMobile({
             onChange={(e) => onChangeAmount(e.target.value)}
             disabled={busy}
             placeholder="0.0"
-            className="min-w-0 flex-1 bg-transparent font-mono text-xl font-bold text-green-200 outline-none placeholder:text-green-500/25 disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent font-mono text-xl font-bold text-green-200 outline-none placeholder:text-green-500/25 disabled:opacity-50 sm:text-2xl"
           />
-          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300">{payToken}</span>
+          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300 sm:text-base">{payToken}</span>
         </div>
         <div className="mt-0.5 font-mono text-[11px] text-green-500/50">
           ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
@@ -228,16 +304,16 @@ export default function SwapMobile({
       </div>
 
       {/* You receive */}
-      <div className="border border-green-500/20 bg-green-500/5 p-2">
+      <div className="border border-green-500/20 bg-green-500/5 p-2 sm:p-3">
         <div className="flex items-center justify-between font-mono text-[11px] text-green-500/50">
           <span>YOU RECEIVE</span>
           <span>BAL {recvToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}</span>
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2">
-          <span className="min-w-0 break-all font-mono text-xl font-bold text-green-200">
+          <span className="min-w-0 break-all font-mono text-xl font-bold text-green-200 sm:text-2xl">
             {quoteOut ?? (quoting ? "…" : "0.0")}
           </span>
-          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300">{recvToken}</span>
+          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300 sm:text-base">{recvToken}</span>
         </div>
         <div className="mt-0.5 font-mono text-[11px] text-green-500/50">
           ≈ {quoteUsd != null ? fmtUsd(quoteUsd) : quoting ? "finding route…" : "—"}
@@ -274,7 +350,7 @@ export default function SwapMobile({
         type="button"
         onClick={action.onClick}
         disabled={action.disabled}
-        className={`w-full border py-3 font-mono text-[14px] font-bold tracking-wide disabled:opacity-50 ${action.tone}`}
+        className={`w-full border py-3 font-mono text-[14px] font-bold tracking-wide disabled:opacity-50 sm:py-3.5 sm:text-[15px] ${action.tone}`}
       >
         {action.label}
       </button>
@@ -306,8 +382,18 @@ export default function SwapMobile({
         </div>
       )}
 
-      {/* Interactive candles below the essentials */}
+      {busy && <TxStatusOverlay phase={txPhase} detail={txDetail} />}
+
+      {/* Interactive candles + recent swaps feed below the essentials */}
       {isOtc && <PriceCandles latest={latest} history={history} unit={unit} onToggleUnit={onToggleUnit} />}
+      {isOtc && <RecentSwaps latest={latest} unit={unit} />}
+
+      <HelpNote label="[?] SWAP SAFETY">
+        Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with your connected wallet.
+        Balances cover only the standard associated token account. Token-2022 extensions (including fees or transfer
+        restrictions) can affect availability and execution. Jupiter routes depend on liquidity; a quote is not a
+        guarantee of execution.
+      </HelpNote>
     </div>
   );
 }

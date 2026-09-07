@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Copy, Zap } from "lucide-react";
 import {
   SOL_MINT,
   OTC_MINT,
@@ -13,21 +12,10 @@ import {
 import { formatRawAmount, parseAmountToRaw, parseSlippageBps } from "@/lib/swapAmounts";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd } from "@/lib/stockPrices";
-import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
-import HelpNote from "@/components/otc/HelpNote";
-import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
-import RecentSwaps from "@/components/otc/RecentSwaps";
-import PriceCandles from "@/components/otc/PriceCandles";
-import SwapMobile from "@/components/otc/SwapMobile";
-import WalletConnect from "@/components/otc/WalletConnect";
+import SwapCard from "@/components/otc/SwapCard";
 
 const DEFAULT_TOKEN = { mint: OTC_MINT, symbol: "OTC" };
 const SOL_FEE_RESERVE = 10_000_000n; // 0.01 SOL, not a guarantee of the final fee/rent.
-const SLIPPAGE_OPTIONS = [
-  { label: "0.5%", bps: 50 },
-  { label: "1%", bps: 100 },
-  { label: "3%", bps: 300 },
-];
 
 function snapshotTime(at) {
   const ms = typeof at === "number" ? at : Date.parse(at);
@@ -57,9 +45,6 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   const [priceState, setPrices] = useState(null);
   const [priceUnit, setPriceUnit] = useState("USD"); // shared USD/SOL toggle for candles + trades feed
   const [txPhase, setTxPhase] = useState(null); // live swap phase for the status overlay
-  // Phones (<640px) render the simple Uniswap-style swap card (SwapMobile)
-  // instead of the dense terminal column, which never fit the mobile fold.
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 639px)").matches);
   const mounted = useRef(false);
   const lifetime = useRef(0);
   const busyRef = useRef(false);
@@ -115,15 +100,6 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       timers.current.forEach(clearTimeout);
       timers.current.clear();
     };
-  }, []);
-
-  // Track the sm: breakpoint so phones mount the simple swap card.
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
   }, []);
 
   // Reset only on an actual mint change, not refreshed token props or wallets.
@@ -226,7 +202,6 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   const outputPrice = isBuy ? tokenUsd : solUsd;
   const amountUsd = !inputError && inputPrice != null ? Number(amount) * inputPrice : null;
   const outUsd = quote && outputPrice != null ? Number(formatRawAmount(quote.outAmount, outputDecimals)) * outputPrice : null;
-  const balUsd = tokenBal != null && tokenUsd != null ? Number(formatRawAmount(tokenBal, tokenInfo.decimals)) * tokenUsd : null;
   const mcap = isOtc ? latest?.token_market_cap : token?.mcap;
   const ch1h = isOtc ? latest?.token_price_change_1h : null;
   const ch24h = isOtc ? latest?.token_price_change_24h : token?.change24h;
@@ -368,437 +343,61 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
     } catch { /* ignore */ }
   };
 
-  // Phones: simple Uniswap-style swap card. The full terminal panel stays on
-  // desktop (sm+) where the dense multi-section layout fits the screen.
-  if (isMobile) {
-    return (
-      <SwapMobile
-        tokenLabel={tokenLabel}
-        mint={mint}
-        isOtc={isOtc}
-        wallet={wallet}
-        busy={busy}
-        quoting={quoting}
-        isBuy={isBuy}
-        amount={amount}
-        onChangeAmount={changeAmount}
-        onFlip={() => switchMode(isBuy ? "SELL" : "BUY")}
-        solBalLabel={solBalLabel}
-        tokenBalLabel={tokenBalLabel}
-        maxAvailable={maxAvailable}
-        onQuickAmount={onQuickAmount}
-        amountUsd={amountUsd}
-        quoteOut={quoteOutLabel}
-        quoteUsd={outUsd}
-        minRecvLabel={minRecvLabel}
-        priceImpactLabel={priceImpactLabel}
-        routeLabel={routeLabel}
-        inputError={inputError}
-        err={err}
-        logs={logs}
-        slippageBps={slippageBps}
-        customSlip={customSlip}
-        onSlippagePreset={(bps) => {
-          if (busyRef.current) return;
-          invalidate();
-          setSlippageBps(bps);
-          setCustomSlip("");
-        }}
-        onCustomSlippage={(v) => {
-          if (busyRef.current) return;
-          invalidate();
-          setCustomSlip(v);
-        }}
-        onSwap={doSwap}
-        onResetToken={onResetToken}
-        onConnected={onConnected}
-        onGoConnect={onGoConnect}
-        latest={latest}
-        history={history}
-        unit={priceUnit}
-        onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
-      />
-    );
-  }
-
+  // One sleek Uniswap-style card for every screen size; SwapCard handles the
+  // responsive sizing steps internally (trims to fit the phone fold).
   return (
-    <div className="flex flex-col border border-green-500/30 bg-black p-3">
-      <div className="order-1 flex flex-wrap items-center justify-between gap-2 sm:order-none">
-        <span className="text-[12px] uppercase tracking-widest text-green-500/70">
-          SWAP :: {isBuy ? `SOL → ${tokenLabel}` : `${tokenLabel} → SOL`}
-        </span>
-        <a
-          href={`https://dexscreener.com/solana/${encodeURIComponent(mint)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 border border-cyan-400/40 bg-cyan-400/5 px-2 py-1 font-mono text-[12px] text-cyan-300 hover:border-cyan-300/60"
-          title={`${tokenLabel} chart and available pair data on DexScreener`}
-        >
-          [DEXSCREENER ↗]
-        </a>
-        <a
-          href="https://jup.ag"
-          target="_blank"
-          rel="noreferrer"
-          className="hidden items-center gap-1 border border-amber-400/40 bg-amber-400/5 px-2 py-1 font-mono text-[12px] text-amber-300 hover:border-amber-300/60 sm:inline-flex"
-          title="Routing & liquidity by the Jupiter aggregator"
-        >
-          <Zap className="h-3 w-3" />
-          POWERED BY JUPITER
-        </a>
-        <button
-          onClick={copyCa}
-          className="inline-flex items-center gap-1 border border-green-500/40 px-2 py-1 font-mono text-[12px] text-green-300 hover:bg-green-500/10"
-          title={`Copy ${tokenLabel} contract address`}
-        >
-          {copied === generation ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-          {copied === generation ? "COPIED" : "COPY CA"}
-        </button>
-        {!isOtc && onResetToken && (
-          <button disabled={busy} onClick={() => { if (!busyRef.current) { invalidate(); onResetToken(); } }}
-            className="border border-green-500/40 px-2 py-1 font-mono text-[12px] text-green-300 disabled:opacity-30">
-            [RESET TO $OTC]
-          </button>
-        )}
-      </div>
-
-      <div
-        className="order-2 mt-2 truncate border border-green-500/20 bg-black px-2 py-1 font-mono text-[12px] text-emerald-400 sm:order-none"
-        title={mint}
-      >
-        {tokenLabel}{token?.name ? ` · ${token.name}` : ""} :: <a href={`https://solscan.io/token/${encodeURIComponent(mint)}`} target="_blank" rel="noreferrer" className="text-green-300 underline"><span className="sm:hidden">{mint.slice(0, 4)}…{mint.slice(-4)}</span><span className="hidden sm:inline">{mint}</span></a>
-      </div>
-      {!isOtc && (
-        <div className="order-3 mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
-          SELECTED-TOKEN SNAPSHOT :: {metricsAt ? `AS OF ${metricsAt} · NOT LIVE / MAY BE STALE` : "FRESHNESS UNKNOWN"}
-        </div>
-      )}
-
-      {/* Market stats: mcap + 1h/24h change + liquidity + volume */}
-      <div className={`order-12 mt-2 grid grid-cols-2 gap-1 sm:order-none ${isOtc ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/50">MKT_CAP</div>
-          <div className="text-emerald-300">
-            {mcap != null ? `$${fmtCompact(mcap)}` : "—"}
-          </div>
-        </div>
-        {isOtc && <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/50">1H</div>
-          <div className={ch1h == null ? "text-green-500/40" : ch1h >= 0 ? "text-emerald-400" : "text-red-400"}>
-            {ch1h != null ? `${ch1h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch1h))}` : "—"}
-          </div>
-        </div>}
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/50">24H</div>
-          <div className={ch24h == null ? "text-green-500/40" : ch24h >= 0 ? "text-emerald-400" : "text-red-400"}>
-            {ch24h != null ? `${ch24h >= 0 ? "▲" : "▼"} ${fmtPct(Math.abs(ch24h))}` : "—"}
-          </div>
-        </div>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/50">LIQ</div>
-          <div className="text-cyan-300">
-            {liq != null ? `$${fmtCompact(liq)}` : "—"}
-          </div>
-        </div>
-        <div className="border border-green-500/20 px-1.5 py-0.5 font-mono text-[11px]">
-          <div className="text-[10px] uppercase tracking-widest text-green-500/50">VOL_24H</div>
-          <div className="text-cyan-300">
-            {vol != null ? `$${fmtCompact(vol)}` : "—"}
-          </div>
-        </div>
-      </div>
-
-      {/* Mini price candles (bootstrap from snapshot history). On mobile the
-          chart rides right under the token bar (order 3.5) instead of being
-          buried below the swap button at the panel bottom — the fold cut the
-          panel mid-way and the chart was unreachable without a long scroll. */}
-      {isOtc && <div className="order-[3.5] sm:order-none">
-        <PriceCandles
-          latest={latest}
-          history={history}
-          unit={priceUnit}
-          onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
-        />
-      </div>}
-
-      {/* Direction toggle */}
-      <div className="order-4 mt-2 flex gap-1 sm:order-none">
-        <button
-          onClick={() => switchMode("BUY")}
-          disabled={busy}
-          className={`flex-1 border py-2 font-mono text-[12px] font-bold disabled:opacity-30 sm:py-1 ${
-            isBuy
-              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
-              : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
-          }`}
-        >
-          [BUY {tokenLabel}]
-        </button>
-        <button
-          onClick={() => switchMode("SELL")}
-          disabled={busy}
-          className={`flex-1 border py-2 font-mono text-[12px] font-bold disabled:opacity-30 sm:py-1 ${
-            !isBuy
-              ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300"
-              : "border-green-500/30 text-green-500/60 hover:border-cyan-400/40"
-          }`}
-        >
-          [SELL {tokenLabel}]
-        </button>
-      </div>
-
-      {!wallet ? (
-        <div className="order-5 mt-3 sm:order-none">
-          <div className="mb-2 text-center font-mono text-[12px] text-green-500/50">
-            CONNECT A WALLET TO ENABLE SWAP :: ALSO UNLOCKS PORTFOLIO + BULK CLAIM
-          </div>
-          {/* Inline connect: no jump needed — connect right here and the swap
-              panel activates immediately (same wallet state as the app's
-              wallet view, so bulk claim unlocks too). */}
-          <WalletConnect onConnected={onConnected} />
-          <button
-            onClick={() => onGoConnect?.()}
-            className="mt-2 w-full border border-amber-500/50 bg-amber-500/5 px-2 py-2 text-center font-mono text-[13px] font-bold text-amber-300 hover:border-amber-400 hover:bg-amber-500/10"
-            title="Open the wallet panel (portfolio + bulk claim)"
-          >
-            [▲ GO TO WALLET PANEL :: PORTFOLIO + BULK CLAIM]
-          </button>
-        </div>
-      ) : null}
-        <>
-          {/* Native SOL and standard ATA only, displayed without rounding. */}
-          {wallet && <div className="order-6 mt-2 grid grid-cols-2 gap-1 sm:order-none">
-            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[12px]">
-              <span className="text-green-500/50">SOL_BAL</span>
-              <span className="min-w-0 break-all text-emerald-300">
-                {solBal == null ? (currentBalances?.solError ? "UNAVAILABLE" : "READING…") : formatRawAmount(solBal, 9)}
-                {solBal != null && solUsd != null && (
-                  <span className="ml-1 text-green-500/50">≈ {fmtUsd(Number(formatRawAmount(solBal, 9)) * solUsd)}</span>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border border-green-500/20 px-2 py-1 font-mono text-[12px]">
-              <span className="text-green-500/50">{tokenLabel}_ATA_BAL</span>
-              <span className="min-w-0 break-all text-emerald-300">
-                {tokenBal == null ? (currentBalances?.tokenError ? "UNAVAILABLE" : "READING…") : formatRawAmount(tokenBal, tokenInfo.decimals)}
-                {balUsd != null && <span className="ml-1 text-green-500/50">≈ {fmtUsd(balUsd)}</span>}
-              </span>
-            </div>
-          </div>}
-          {wallet && <div className="order-[14] mt-1 break-all font-mono text-[11px] text-green-500/60 sm:order-none">
-            TOKEN BALANCE: STANDARD ATA ONLY (other token accounts excluded).
-            {(currentBalances?.tokenError || currentBalances?.solError) && (
-              <span className="text-amber-400"> Balance read failed: {currentBalances.tokenError || currentBalances.solError}</span>
-            )}
-            <button disabled={busy || !tokenInfo} onClick={() => { if (!busyRef.current) loadBalance(lifetime.current); }} className="ml-2 underline disabled:opacity-30">[RETRY BALANCES]</button>
-          </div>}
-          <div className="order-[15] mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
-            {tokenInfo ? `ON-CHAIN DECIMALS: ${tokenInfo.decimals}` : metadataError || "VERIFYING MINT…"}
-            {metadataError && <button disabled={busy} onClick={() => { if (!busyRef.current) loadMetadata(); }} className="ml-2 underline disabled:opacity-30">[RETRY MINT METADATA]</button>}
-          </div>
-
-          {/* Amount input */}
-          <div className="order-7 mt-2 border border-green-500/20 p-2 sm:order-none">
-            <div className="flex items-center justify-between">
-              <label className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
-                YOU PAY ({isBuy ? "SOL" : tokenLabel})
-              </label>
-              {(isBuy ? solBal > SOL_FEE_RESERVE : tokenBal > 0n) && (
-                <button
-                  onClick={() => {
-                    changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
-                  }}
-                  disabled={busy}
-                  className="border border-cyan-400/40 px-2.5 py-1.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30 sm:px-1.5 sm:py-0.5"
-                >
-                  [MAX]
-                </button>
-              )}
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <input
-                type="text"
-                inputMode="decimal"
-                aria-label="Swap amount"
-                value={amount}
-                onChange={(e) => changeAmount(e.target.value)}
-                disabled={busy}
-                className="w-full min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-sm text-green-300 outline-none focus:border-emerald-500/60 disabled:opacity-40"
-                placeholder="0.0"
-              />
-              <span className="shrink-0 font-mono text-[12px] text-green-500/60">
-                {isBuy ? "SOL" : tokenLabel}
-              </span>
-            </div>
-            <div className="mt-1 text-right font-mono text-[12px] text-cyan-400/80">
-              ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
-            </div>
-            {isBuy && <div className="font-mono text-[11px] text-green-500/50">SOL MAX leaves 0.01 SOL for fees/rent; actual requirements may be higher.</div>}
-            {inputError && <div className="font-mono text-[12px] text-amber-400">{inputError}</div>}
-
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-y-1">
-              <span className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
-                SLIPPAGE
-              </span>
-              <div className="flex min-w-0 flex-wrap gap-1">
-                {SLIPPAGE_OPTIONS.map((s) => (
-                  <button
-                    key={s.bps}
-                    onClick={() => {
-                      if (busyRef.current) return;
-                      invalidate();
-                      setSlippageBps(s.bps);
-                      setCustomSlip("");
-                    }}
-                    disabled={busy}
-                    className={`border px-2 py-1.5 font-mono text-[11px] disabled:opacity-30 sm:px-1.5 sm:py-0.5 ${
-                      slippageBps === s.bps && !customSlip
-                        ? "border-emerald-500/60 text-emerald-400"
-                        : "border-green-500/30 text-green-500/60 hover:border-emerald-500/40"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="cust %"
-                  value={customSlip}
-                  onChange={(e) => {
-                    if (busyRef.current) return;
-                    invalidate();
-                    setCustomSlip(e.target.value);
-                  }}
-                  disabled={busy}
-                  title="Custom slippage in %"
-                  className={`w-16 min-w-0 flex-1 border bg-black px-2 py-1.5 font-mono text-[11px] outline-none disabled:opacity-30 sm:px-1.5 sm:py-0.5 ${
-                    customSlip
-                      ? "border-cyan-400/60 text-cyan-300"
-                      : "border-green-500/30 text-green-500/60 focus:border-cyan-400/60"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Quote */}
-          <div className="order-8 mt-2 border border-green-500/20 p-2 sm:order-none">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-widest text-green-500/50">
-                YOU RECEIVE ({isBuy ? tokenLabel : "SOL"})
-              </span>
-              <button
-                onClick={fetchQuote}
-                disabled={quoting || busy || !!inputError}
-                className="border border-green-500/40 px-2.5 py-1.5 font-mono text-[11px] text-green-300 hover:bg-green-500/10 disabled:opacity-30 sm:px-2 sm:py-0.5"
-              >
-                {quoting ? "QUOTING..." : "[QUOTE]"}
-              </button>
-            </div>
-            <div className="mt-1 break-all font-mono text-sm font-bold text-emerald-400">
-              {quote ? formatRawAmount(quote.outAmount, outputDecimals) : "—"}{" "}
-              <span className="text-[11px] font-normal text-green-500/50">
-                {isBuy ? tokenLabel : "SOL"}
-              </span>
-            </div>
-            {quote && (
-              <div className="mt-0.5 font-mono text-[12px] text-cyan-400/80">
-                ≈ {outUsd != null ? fmtUsd(outUsd) : "—"}
-              </div>
-            )}
-            {quote && (
-              <div className="mt-1 space-y-0.5 break-all font-mono text-[11px] text-green-500/60">
-                <div>
-                  MIN_RECV {formatRawAmount(quote.otherAmountThreshold, outputDecimals)}{" "}
-                  {isBuy ? tokenLabel : "SOL"}
-                </div>
-                <div>PRICE_IMPACT {(Number(quote.priceImpactPct || 0) * 100).toFixed(3)}%</div>
-                <div className="text-green-500/40">
-                  ROUTE {quote.routePlan?.map((r) => r.swapInfo?.label).join(" → ") || "—"}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="order-[16] mt-1 font-mono text-[11px] text-green-500/60 sm:order-none">
-            Jupiter routes depend on liquidity, amount and token support. Some tokens have no route; a quote is not a guarantee of execution.
-          </div>
-
-          {/* Swap action */}
-          <button
-            onClick={doSwap}
-            disabled={busy || !wallet || !!inputError || (isBuy ? solBal : tokenBal) == null}
-            className={`order-9 mt-2 w-full border py-2.5 font-mono text-[13px] font-bold hover:bg-emerald-500/10 disabled:opacity-30 sm:order-none sm:py-1.5 ${
-              isBuy
-                ? "border-emerald-500/60 text-emerald-300"
-                : "border-cyan-400/60 text-cyan-300"
-            }`}
-          >
-            {busy
-              ? "SWAPPING..."
-              : isBuy
-              ? `[SWAP SOL → ${tokenLabel}]`
-              : `[SWAP ${tokenLabel} → SOL]`}
-          </button>
-          <div className="order-[17] sm:order-none">
-            <HelpNote label="[?] SWAP SAFETY">
-              Tx is simulated first; a failing sim aborts before signing (no fee spent). Signs with
-              your connected wallet. Token balances above cover only the standard associated token account.
-              Token-2022 extensions (including fees or transfer restrictions) can affect availability and execution.
-            </HelpNote>
-          </div>
-
-          {err && (
-            <div className="order-10 mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1 font-mono text-[12px] text-amber-400 sm:order-none">
-              ERR: {err}
-            </div>
-          )}
-
-          {busy && (
-            <TxStatusOverlay
-              phase={txPhase || "prep"}
-              detail={activeSwapDetail.current}
-              onCancel={undefined}
-            />
-          )}
-
-          {/* Log */}
-          {logs.length > 0 && (
-            <div className="order-11 mt-2 max-h-40 overflow-y-auto border border-green-500/20 bg-black p-2 sm:order-none">
-              {logs.map((l, i) => (
-                <div
-                  key={i}
-                  className={`break-all font-mono text-[11px] leading-snug ${
-                    l.type === "ok"
-                      ? "text-emerald-400"
-                      : l.type === "err"
-                      ? "text-red-400"
-                      : l.type === "sim"
-                      ? "text-cyan-400"
-                      : "text-green-500/60"
-                  }`}
-                >
-                  {l.msg}
-                  {l.sig && (
-                    <a
-                      href={`https://solscan.io/tx/${l.sig}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-1 underline hover:text-emerald-300"
-                    >
-                      [SCAN]
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-
-      {/* Recent on-chain swaps feed (public — shown even without a wallet) */}
-      {isOtc && <div className="order-[18] sm:order-none">
-        <RecentSwaps latest={latest} unit={priceUnit} />
-      </div>}
-    </div>
+    <SwapCard
+      tokenLabel={tokenLabel}
+      mint={mint}
+      isOtc={isOtc}
+      wallet={wallet}
+      busy={busy}
+      quoting={quoting}
+      isBuy={isBuy}
+      amount={amount}
+      onChangeAmount={changeAmount}
+      onFlip={() => switchMode(isBuy ? "SELL" : "BUY")}
+      solBalLabel={solBalLabel}
+      tokenBalLabel={tokenBalLabel}
+      maxAvailable={maxAvailable}
+      onQuickAmount={onQuickAmount}
+      amountUsd={amountUsd}
+      quoteOut={quoteOutLabel}
+      quoteUsd={outUsd}
+      minRecvLabel={minRecvLabel}
+      priceImpactLabel={priceImpactLabel}
+      routeLabel={routeLabel}
+      inputError={inputError}
+      err={err}
+      logs={logs}
+      slippageBps={slippageBps}
+      customSlip={customSlip}
+      onSlippagePreset={(bps) => {
+        if (busyRef.current) return;
+        invalidate();
+        setSlippageBps(bps);
+        setCustomSlip("");
+      }}
+      onCustomSlippage={(v) => {
+        if (busyRef.current) return;
+        invalidate();
+        setCustomSlip(v);
+      }}
+      onSwap={doSwap}
+      onResetToken={onResetToken}
+      onGoConnect={onGoConnect}
+      latest={latest}
+      history={history}
+      unit={priceUnit}
+      onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
+      stats={{ mcap, ch1h, ch24h, liq, vol }}
+      metricsAt={metricsAt}
+      txPhase={txPhase || "prep"}
+      txDetail={busy ? activeSwapDetail.current : undefined}
+      balError={currentBalances?.tokenError || currentBalances?.solError || null}
+      onRetryBalances={() => { if (!busyRef.current) loadBalance(lifetime.current); }}
+      metadataError={metadataError}
+      onRetryMetadata={() => { if (!busyRef.current) loadMetadata(); }}
+    />
   );
 }
