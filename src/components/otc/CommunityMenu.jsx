@@ -2,7 +2,7 @@
 // on mobile (this header has no hamburger; the menu opens in place). Modular:
 // add entries to LINKS. Terminal aesthetic matches the header links.
 import { useEffect, useRef, useState } from "react";
-import { MessagesSquare, Users, Send } from "lucide-react";
+import { MessagesSquare, Users, Send, Eye, Globe } from "lucide-react";
 
 const LINKS = [
   {
@@ -34,6 +34,20 @@ const LINKS = [
     icon: Send,
     badge: "NEW",
   },
+  {
+    id: "observer",
+    label: "OTC Observer",
+    hint: "community desk charts + holder stats",
+    href: "https://otcdesks.observer/",
+    icon: Eye,
+  },
+  {
+    id: "ath-otc",
+    label: "All Things OTC",
+    hint: "community OTC resource site",
+    href: "https://all-things-otc.replit.app/",
+    icon: Globe,
+  },
 ];
 
 export default function CommunityMenu() {
@@ -60,7 +74,7 @@ export default function CommunityMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="true"
-        title="OTC community links + RU_FOMO console"
+        title="OTC community links + community tool sites"
         className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
       >
         [COMMUNITY {open ? "▴" : "▾"}]
