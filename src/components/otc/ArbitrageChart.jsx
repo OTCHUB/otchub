@@ -35,8 +35,8 @@ export default function ArbitrageChart({ history }) {
   };
 
   return (
-    <div className="border border-green-500/30 bg-black p-3">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
+      <div className="flex shrink-0 items-center justify-between">
         <span className="text-[12px] uppercase tracking-widest text-green-500/70">
           ARBITRAGE :: MINT vs SECONDARY (USD)
         </span>
@@ -45,7 +45,9 @@ export default function ArbitrageChart({ history }) {
         </span>
       </div>
 
-      <div className="mt-3 h-44 sm:h-52">
+      {/* fills the card height on desktop so the panel matches EARNINGS;
+          fixed heights below lg keep the mobile stacked layout compact */}
+      <div className="mt-3 h-44 shrink-0 sm:h-52 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
@@ -59,10 +61,10 @@ export default function ArbitrageChart({ history }) {
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-2 text-[11px] uppercase tracking-widest text-green-500/50">
+      <div className="mt-2 shrink-0 text-[11px] uppercase tracking-widest text-green-500/50">
         SPREAD (MINT − SECONDARY) :: OPPORTUNITY
       </div>
-      <div className="mt-1 h-24">
+      <div className="mt-1 h-24 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />

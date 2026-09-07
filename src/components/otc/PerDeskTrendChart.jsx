@@ -23,7 +23,12 @@ export default function PerDeskTrendChart({ latest }) {
   // Only CLOSED (completed) UTC days: the newest feed day is the in-progress
   // working day whose partial numbers would distort the trend and the 7d avg.
   const todayKey = new Date().toISOString().slice(0, 10);
-  const closed = raw.filter((d) => String(d.day || "") < todayKey);
+  // 2026-08-28 is a one-off bootstrap outlier (massive sweep dwarfing all later
+  // days, flattening the whole trend): excluded from the chart and the 7d avg.
+  const OUTLIER_DAY = "2026-08-28";
+  const closed = raw.filter(
+    (d) => String(d.day || "") < todayKey && String(d.day) !== OUTLIER_DAY
+  );
   const data = closed
     .slice()
     .sort((a, b) => String(a.day).localeCompare(String(b.day)))
