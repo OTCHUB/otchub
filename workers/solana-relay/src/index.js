@@ -18,9 +18,14 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:3000",
 ]);
 
+// Base44 hosts the app (published + preview) under *.base44.app — allow any
+// of them so the browser's direct relay calls pass CORS from this app too.
+const isAllowedOrigin = (origin) =>
+  ALLOWED_ORIGINS.has(origin) || /^https:\/\/[a-z0-9-]+\.base44\.app$/.test(origin);
+
 function corsHeaders(origin) {
   return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin) ? origin : "https://otchub.dev",
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://otchub.dev",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     Vary: "Origin",
