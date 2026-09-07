@@ -2,13 +2,22 @@
 import React, { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
+import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
+import { getSignerForAddress } from "@/lib/walletSigner";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import { EnvBadge, HubProvider, HubRoutes, rpcHost, useHub } from "@/hub";
 
 // $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/" so the
 // hub module's relative routes resolve to /treasury, /deployments, /desk/:asset.
-// Read-only: no wallet signer, separate devnet RPC from the mainnet relay.
+// Signing reuses the wallet connected on /otc (walletSigner); swaps go through
+// the jupiterSwapRelay backend function like the OTC swap panel.
+const hubSwapTransport = {
+  quote: ({ inputMint, outputMint, amount, slippageBps }) =>
+    getQuote(inputMint, outputMint, amount, slippageBps),
+  swapTransaction: async (quote, userPublicKey) =>
+    (await getSwapTx(quote, userPublicKey)).swapTransaction,
+};
 const CLUSTERS = ["devnet", "mainnet-beta", "localnet"];
 const envCluster = import.meta.env.VITE_HUB_CLUSTER ?? "devnet";
 export const HUB_CONFIG = {
@@ -93,6 +102,8 @@ export default function Hub() {
       programId={HUB_CONFIG.programId}
       cluster={HUB_CONFIG.cluster}
       queryClient={queryClientInstance}
+      resolveSigner={getSignerForAddress}
+      swapTransport={hubSwapTransport}
     >
       <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black font-mono text-green-400">
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
