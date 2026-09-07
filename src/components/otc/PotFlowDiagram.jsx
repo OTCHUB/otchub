@@ -1,99 +1,55 @@
 import React from "react";
-import { Rectangle, ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import { fmtSol } from "@/lib/format";
 
-// Horizontal one-day flow diagram, styled after the dark Sankey reference:
-// colored node bars, labels above (POT gets a badge), values below, and
-// semi-transparent slate ribbons. Left → right: inflow sources → POT → desk
-// distribution + retained balance, sized by SOL of the last CLOSED tracked day
-// (inflow segments from the on-chain pot scan; outflow = that day's desk
-// distribution).
+// One-day fee flow, drawn as proportional CSS bars instead of a Sankey:
+// inflow sources → POT node → outflows. Scales cleanly to any screen width,
+// every stage sized against the same SOL total so widths are comparable.
 
-const SOURCE_COLORS = {
-  DESK_MINTS: "#3b82f6",
-  ME_SALES: "#22d3ee",
-  "SWEEPS·MISC": "#fbbf24",
+const COLORS = {
+  mint: "#3b82f6",
+  royalty: "#22d3ee",
+  other: "#fbbf24",
+  dist: "#4ade80",
+  retained: "#f59e0b",
+  broken: "#f43f5e",
 };
-const OUT_COLORS = {
-  DESK_HOLDERS: "#4ade80",
-  RETAINED: "#f59e0b",
-};
-const POT_COLOR = "#34d399";
 
-function DiagramNode({ x, y, width, height, index, payload, colors, badges }) {
-  const name = payload?.name ?? "";
-  const value = Number.isFinite(payload?.value) ? payload.value : null;
-  const color = colors[index] || "#4ade80";
-  const cx = x + width / 2;
+function Bar({ label, value, total, color, broken = false, note }) {
+  const pct = !broken && total > 0 ? Math.min(100, (value / total) * 100) : 0;
   return (
-    <g>
-      <Rectangle x={x} y={y} width={width} height={height} fill={color} fillOpacity={0.9} />
-      {badges[index] ? (
-        <>
-          <rect
-            x={cx - (name.length * 3.6 + 6)}
-            y={y - 26}
-            width={name.length * 7.2 + 12}
-            height={13}
-            fill={color}
-            fillOpacity={0.22}
-            stroke={color}
-            strokeWidth={0.5}
+    <div className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] sm:gap-2">
+      <span className="w-[70px] shrink-0 truncate uppercase tracking-wide text-green-500/70 sm:w-24">
+        {label}
+      </span>
+      <span
+        className={`relative h-4 min-w-0 flex-1 overflow-hidden border ${
+          broken ? "border-dashed border-red-500/60 bg-red-500/5" : "border-green-500/15 bg-green-500/5"
+        }`}
+      >
+        {!broken && pct > 0 && (
+          <span
+            className="absolute inset-y-0 left-0 transition-[width] duration-500"
+            style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
           />
-          <text
-            x={cx}
-            y={y - 19.5}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#e2e8f0"
-            fontSize="8"
-            fontFamily="ui-monospace, monospace"
-            letterSpacing="1"
-          >
-            {name}
-          </text>
-        </>
-      ) : (
-        <text
-          x={cx}
-          y={y - 9}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#e2e8f0"
-          fontSize="9"
-          fontFamily="ui-monospace, monospace"
-          letterSpacing="1"
-        >
-          {name}
-        </text>
-      )}
-      {value != null && value > 0 && (
-        <text
-          x={cx}
-          y={y + height + 11}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={color}
-          fontSize="8"
-          fontFamily="ui-monospace, monospace"
-        >
-          {fmtSol(value, 2)} SOL
-        </text>
-      )}
-    </g>
+        )}
+      </span>
+      <span
+        className={`w-[64px] shrink-0 text-right sm:w-16 ${broken ? "text-red-400" : ""}`}
+        style={!broken ? { color } : undefined}
+      >
+        {broken ? "✖ 0.00" : `+${fmtSol(value, 2)}`}
+      </span>
+      {note && <span className="hidden shrink-0 text-[8px] text-green-500/40 sm:block">{note}</span>}
+    </div>
   );
 }
 
-function DiagramLink({ sourceX, sourceY, sourceControlX, targetControlX, targetX, targetY, targetControlY, linkWidth }) {
-  return (
-    <path
-      d={`M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY} L${targetX},${targetY + linkWidth} C${targetControlX},${targetY + linkWidth} ${sourceControlX},${sourceY + linkWidth} ${sourceX},${sourceY + linkWidth} Z`}
-      fill="rgba(71,85,105,0.45)"
-      stroke="rgba(148,163,184,0.25)"
-      strokeWidth={0.5}
-    />
-  );
-}
+const Arrow = ({ label, value }) => (
+  <div className="flex items-center justify-center gap-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-green-500/60">
+    <span className="h-3 w-0.5 pot-flow-y" />
+    <span>▼ {label} {value != null ? `+${fmtSol(value, 2)} SOL` : ""}</span>
+  </div>
+);
 
 export default function PotFlowDiagram({ latest }) {
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -102,91 +58,56 @@ export default function PotFlowDiagram({ latest }) {
   const [day, seg] = closedRows.at(-1) || dayRows.at(-1) || [];
   const mint = seg?.mint || 0;
   const royalty = seg?.royalty || 0;
-  const launchpad = seg?.launchpad || 0;
   const other = seg?.other || 0;
+  const inflow = mint + royalty + other;
 
   const deskRows = (latest?.per_desk?.items || [])
     .filter((r) => String(r.day || "") < todayKey)
     .sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const sameDayDesk = deskRows.find((r) => r.day === day);
   const dist = (sameDayDesk || deskRows.at(-1) || {}).total_earned_sol || 0;
-
-  const inflow = mint + royalty + launchpad + other;
   const retained = Math.max(0, inflow - dist);
-
-  const sources = [
-    ["DESK_MINTS", mint],
-    ["ME_SALES", royalty],
-    ["SWEEPS·MISC", other],
-  ].filter(([, v]) => v > 0);
-
-  const nodes = sources.map(([name]) => ({ name }));
-  const potIndex = nodes.length;
-  nodes.push({ name: "POT" });
-  const links = sources.map(([, value], i) => ({ source: i, target: potIndex, value }));
-  let outIndex = potIndex + 1;
-  if (dist > 0) {
-    nodes.push({ name: "DESK_HOLDERS" });
-    links.push({ source: potIndex, target: outIndex++, value: dist });
-  }
-  if (retained > 0.005) {
-    nodes.push({ name: "RETAINED" });
-    links.push({ source: potIndex, target: outIndex, value: retained });
-  }
-
-  const colors = nodes.map((n, i) =>
-    i === potIndex ? POT_COLOR : SOURCE_COLORS[n.name] || OUT_COLORS[n.name] || "#4ade80"
-  );
-  const badges = nodes.map((n, i) => i === potIndex || n.name === "DESK_HOLDERS");
-
-  const names = nodes.map((n) => n.name);
-  const FlowTip = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const l = payload[0]?.payload;
-    if (l == null || !Number.isFinite(l.value)) return null;
-    return (
-      <div className="border border-green-500/40 bg-black px-2 py-1 font-mono text-[9px] text-green-300">
-        {names[l.source]} → {names[l.target]} · {fmtSol(l.value, 3)} SOL
-      </div>
-    );
-  };
+  const perDesk = (sameDayDesk || deskRows.at(-1) || {}).per_desk_sol;
 
   return (
-    <div className="border border-green-500/20 px-2 py-1.5">
+    <div className="space-y-1.5 border border-green-500/20 px-2 py-2">
       <div className="flex flex-wrap items-center justify-between gap-1">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          FLOW DIAGRAM :: {day ? day.slice(5) : "—"} (CLOSED DAY · RIBBON = SOL)
+        <span className="font-mono text-[10px] uppercase tracking-widest text-green-500/70">
+          FLOW :: {day ? day.slice(5) : "—"} · CLOSED DAY · BAR = SOL
         </span>
         <span className="font-mono text-[9px] text-green-500/60">
-          IN {fmtSol(inflow, 1)} · DIST {fmtSol(dist, 1)} · RETAINED {fmtSol(retained, 1)}
+          IN {fmtSol(inflow, 1)} · DIST {fmtSol(dist, 1)} · KEPT {fmtSol(retained, 1)}
         </span>
       </div>
-      {links.length ? (
-        <div className="mt-1 h-56 w-full sm:h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <Sankey
-              data={{ nodes, links }}
-              nodeWidth={10}
-              nodePadding={30}
-              margin={{ top: 34, right: 8, left: 8, bottom: 22 }}
-              node={<DiagramNode colors={colors} badges={badges} />}
-              link={<DiagramLink />}
-            >
-              <Tooltip content={FlowTip} />
-            </Sankey>
-          </ResponsiveContainer>
-        </div>
+
+      {inflow > 0 || day ? (
+        <>
+          <Bar label="DESK_MINTS" value={mint} total={inflow} color={COLORS.mint} note="0.45/mint" />
+          <Bar label="ME_SALES" value={royalty} total={inflow} color={COLORS.royalty} note="5% royalty" />
+          <Bar label="SWEEPS" value={other} total={inflow} color={COLORS.other} note="unattrib" />
+          <Bar label="CREATOR_FEES" value={0} total={inflow} color={COLORS.broken} broken note="vaults ≠ pot" />
+
+          <Arrow label="IN" value={inflow} />
+
+          <div className="mx-auto max-w-[200px] border-2 border-emerald-400 bg-emerald-400/10 px-3 py-1 text-center">
+            <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-emerald-300">POT</div>
+            <div className="font-mono text-[9px] text-green-500/70">{fmtSol(latest?.pot_sol_balance ?? null, 1)} SOL</div>
+          </div>
+
+          <Arrow label="OUT" />
+          <Bar label="DESK_HOLDERS" value={dist} total={inflow} color={COLORS.dist}
+            note={perDesk != null ? `${fmtSol(perDesk, 3)}/desk` : null} />
+          <Bar label="RETAINED" value={retained} total={inflow} color={COLORS.retained} note="in pot" />
+        </>
       ) : (
-        <div className="py-4 text-center text-[10px] text-green-500/50">
+        <div className="py-3 text-center font-mono text-[10px] text-green-500/50">
           NO FLOW DATA FOR THE LAST CLOSED DAY
         </div>
       )}
-      {launchpad <= 0 && (
-        <div className="mt-0.5 text-center font-mono text-[9px] text-red-400">
-          ✖ CREATOR_FEES :: 0.00 SOL reached the pot this day — the 10% desk share of launchpad fees is
-          not landing (see VAULT → POT below)
-        </div>
-      )}
+
+      <div className="text-center font-mono text-[8px] text-red-400/80">
+        ✖ CREATOR_FEES · 10% DESK SHARE OF LAUNCHPAD FEES NOT LANDING
+      </div>
     </div>
   );
 }
