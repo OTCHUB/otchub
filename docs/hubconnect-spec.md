@@ -180,17 +180,20 @@ the owner stays long the desk.
 curve seeds the $HUB/SOL pool automatically at launch — the treasury does not
 hand-seed day-one liquidity. The LP program then deepens beyond the curve:
 
-- **Phase 1 — $HUB/SOL to target**: `LP_TARGET_SOL_DEPTH = 100–200 SOL-side`
-  (≈ $10–21k at SOL ≈ $105). Sizing: with constant-product depth R, a trade of
-  x SOL moves price ≈ x/R — 200 SOL-side absorbs a 5-SOL entry/exit at ~2.5%
-  impact and keeps the hourly-TWAP'd 10% buyback-burn (base case ≈ 0.8 SOL/hr)
-  under 1% impact per chunk. Seed by pairing **founding $HUB allocation +
-  treasury SOL** — never market-buy HUB just to add LP.
-- **Phase 2 — $HUB/OTC**: opens only after the SOL pool is at target AND $HUB
-  price has been stable ≥ 14 days post-launch. Seed ≈ **25–50 SOL-equivalent
-  per side**, pairing treasury OTC (from source C claims) with treasury HUB
-  float. Rationale: OTC is the reward stock — stakers rotate OTC ↔ HUB without
-  two SOL hops, tightening the flywheel.
+- **Phase 1 — $HUB/SOL: graduation IS the bootstrap.** When the bonding curve
+  graduates, the curve's accumulated SOL + $HUB migrate into the AMM pool —
+  day-one LP already exists at market depth and the treasury seeds **nothing**.
+  The LP manager only tops up if measured live impact degrades (reference
+  ceiling `LP_TARGET_SOL_DEPTH = 100–200 SOL-side`: keep a 5-SOL trade under
+  ~5% impact and the hourly-TWAP'd 10% buyback-burn chunk under ~1%). If
+  graduation depth already clears those bars — likely — the LP manager stays
+  passive: harvest fees (source F) and monitor. Any top-up pairs **founding
+  $HUB allocation + treasury SOL (ops surplus)** — never market-buy HUB for LP.
+- **Phase 2 — $HUB/OTC**: opens only after $HUB price has been stable ≥ 14
+  days post-launch. Seed ≈ **25–50 SOL-equivalent per side**, pairing treasury
+  OTC (from source C claims) with treasury HUB float. Rationale: OTC is the
+  reward stock — stakers rotate OTC ↔ HUB without two SOL hops, tightening the
+  flywheel.
 - **Funding**: ops surplus (the 10% ops share beyond running costs) + explicit
   treasury allocations; harvested **swap fees → pot (source F)**, compounding
   staker yield.
@@ -438,7 +441,7 @@ The program is deployed **upgradeable** on purpose:
 | CONSIGNMENT_ENABLED | true (config-gated) |
 | CONSIGNOR_SHARE | 0% of consigned desk yield (parameterized; see A9.5) |
 | UPGRADE_TIMELOCK | 48h, multisig-held upgrade authority (not immutable) |
-| LP_TARGET_SOL_DEPTH ($HUB/SOL) | 100–200 SOL-side (≈$10–21k) — seeded by founding HUB + treasury SOL |
+| LP_TARGET_SOL_DEPTH ($HUB/SOL) | 100–200 SOL-side — conditional top-up ceiling only; curve graduation already seeds the pool |
 | HUB_OTC_LP_SEED | 25–50 SOL-eq per side, phase-2 gated (SOL pool at target + ≥14d stable) |
 | LP_CUSTODY | LP tokens in treasury PDA vault · HODL both legs · fees → pot (source F) |
 | `f` (creator fee rate) | TBD at launch (checklist item 3) |
