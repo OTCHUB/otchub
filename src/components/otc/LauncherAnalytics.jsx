@@ -287,7 +287,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-80 lg:max-h-none">
         {ranked.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
-            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[12px] last:border-0 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 hover:border-green-500/40 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
             {/* line 1 — identity: rank, logo, symbol, status, age */}
             <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
               <span className="text-green-500/40">#{(page - 1) * (feed?.pageSize ?? 50) + i + 1}</span>
