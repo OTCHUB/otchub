@@ -70,12 +70,32 @@ function conn() {
   return _conn;
 }
 
-// Route all client-side Solana RPC (blockhash / simulate / send) through the
-// backend solanaRelay function, which uses the app's Helius key server-side.
-// The public api.mainnet-beta endpoint rate-limits / 403s from the browser,
-// which broke packing and sending. The wallet still signs locally; only the
+// Route all client-side Solana RPC (blockhash / simulate / send) through a
+// dedicated relay, which uses the app's Helius key server-side. The public
+// api.mainnet-beta endpoint rate-limits / 403s from the browser, which broke
+// packing and sending. The wallet still signs locally; only the
 // already-signed bytes are relayed.
+//
+// Prefers the Cloudflare Worker at VITE_SOLANA_RELAY_URL (workers/solana-relay)
+// — this traffic is high-volume (a single claim run fires dozens of relay
+// calls: blockhash, simulate x N, send x N, confirm polled every 4-8s) and
+// sharing Base44's function-invocation pool with it is what was causing
+// wallet-connect/transaction failures under load. Falls back to the Base44
+// solanaRelay function when the Worker URL isn't configured yet, so this is
+// a no-op until the env var is set + Worker deployed.
+const RELAY_URL = import.meta.env.VITE_SOLANA_RELAY_URL || null;
+
 export async function relay(mode, payload = {}) {
+  if (RELAY_URL) {
+    const res = await fetch(RELAY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, ...payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `relay ${mode} failed (${res.status})`);
+    return data;
+  }
   const res = await base44.functions.invoke("solanaRelay", { mode, ...payload });
   const data = res?.data || {};
   if (data.error) throw new Error(data.error);

@@ -9,7 +9,9 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "relay:dev": "wrangler dev --config workers/solana-relay/wrangler.jsonc",
+    "relay:deploy": "wrangler deploy --config workers/solana-relay/wrangler.jsonc"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

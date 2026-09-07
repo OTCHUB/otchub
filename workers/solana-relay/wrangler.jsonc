@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "otchub-solana-relay",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "observability": {
+    "enabled": true
+  }
+  // Secret (not in this file): wrangler secret put HELIUS_API_KEY --config workers/solana-relay/wrangler.jsonc
+}
