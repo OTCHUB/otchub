@@ -438,7 +438,7 @@ export default function ClaimPanel({
 
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <span className="text-[12px] uppercase tracking-widest text-emerald-400/80">
           CLAIM_TOOL :: STOCK → WALLET
         </span>
@@ -447,21 +447,21 @@ export default function ClaimPanel({
             onClick={selectRecommended}
             disabled={busy || !plan}
             title="Select the top 3 desks by claimable value — recommended batch size"
-            className="border border-amber-500/40 px-2 py-0.5 text-[12px] text-amber-400 hover:border-amber-400/60 disabled:opacity-30"
+            className="border border-amber-500/40 px-2 py-1.5 text-[12px] sm:py-0.5 text-amber-400 hover:border-amber-400/60 disabled:opacity-30"
           >
             [REC_TOP3]
           </button>
           <button
             onClick={selectAll}
             disabled={!desks.length || busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[12px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+            className="border border-green-500/30 px-2 py-1.5 text-[12px] sm:py-0.5 text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
           >
             [SELECT_ALL]
           </button>
           <button
             onClick={clearAll}
             disabled={busy}
-            className="border border-green-500/30 px-2 py-0.5 text-[12px] text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
+            className="border border-green-500/30 px-2 py-1.5 text-[12px] sm:py-0.5 text-green-500/70 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-30"
           >
             [CLEAR]
           </button>
@@ -684,7 +684,7 @@ export default function ClaimPanel({
           how many wallet signatures remain. */}
       {busy && progress && (
         <div className="mt-2 border border-emerald-500/40 bg-emerald-500/5 p-2">
-          <div className="flex items-center justify-between font-mono text-[12px]">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 font-mono text-[12px]">
             <span className="text-emerald-300">
               {progress.phase === "resolve"
                 ? "RESOLVING TICKERS…"

@@ -30,7 +30,7 @@ const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
 
 function RouteRow({ mark, markCls, label, value, valueCls, href, note }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 border border-green-500/15 px-2 py-1 font-mono text-[11px]">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 border border-green-500/15 px-2 py-1 font-mono text-[11px]">
       <span className={`shrink-0 ${markCls}`}>{mark}</span>
       <span className="min-w-0 flex-1 truncate uppercase text-green-400/80">{label}</span>
       {note && <span className="shrink-0 text-green-500/50">{note}</span>}
