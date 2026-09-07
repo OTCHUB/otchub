@@ -300,7 +300,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
         // touch-pan-y: vertical swipes still scroll the page (the chart never
         // traps scroll on mobile); horizontal drag pans and two-finger pinch
         // stays ours to zoom.
-        className="relative h-32 w-full touch-pan-y select-none cursor-crosshair"
+        className="relative h-24 w-full touch-pan-y select-none cursor-crosshair sm:h-32"
       >
         {scale && view.length >= 2 ? (
           <>
