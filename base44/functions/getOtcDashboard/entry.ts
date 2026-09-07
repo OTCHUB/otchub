@@ -1,13 +1,22 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-import { ADDRESSES, fetchDasTokenInfo } from "../../shared/otcSources.ts";
+import {
+  buildDashboard,
+  DASH_AGGREGATE_FRESH_MS,
+  readDashboardAggregate,
+} from "../../shared/dashboardAggregate.ts";
 
 /* QUOTA FIX: this handler used to read up to 3,500 entity rows (1,000
-   OtcSnapshot + 2,500 NftHolding) on EVERY page load — under traffic that
+   OtcSnapshot + 2,500 NftHolding) on EVERY rebuild — under traffic that
    exhausted the app's Base44 entity read quota and the whole dashboard 500'd
    ("App entity read traffic volume limit exceeded") — blank NFT floor,
    NET_SECONDARY, LISTED. The payload is identical for every visitor, so:
-     - 60s in-isolate cache collapses bursts to ~1 read-set per minute
-     - single-flight dedupes concurrent refreshes behind one rebuild
+     - the snapshot ingest (shared/otcSnapshot.ts) now pre-aggregates the
+       payload into two compact OtcDashboardCache records once per 5-min
+       ingest; this handler serves that with a single tiny read and only
+       falls back to the full direct build while the aggregate is missing
+       or stale (e.g. right after a deploy, before the first ingest)
+     - 60s in-isolate cache collapses bursts; single-flight dedupes
+       concurrent refreshes behind one rebuild
      - stale-while-revalidate serves the last good payload for up to 30 min
        when a refresh fails (quota/DB hiccup) instead of erroring the page
      - CDN hint lets the edge cache across isolates between cold starts */
@@ -19,7 +28,10 @@ let inflight = null;
 const jsonOut = (body, cacheState) =>
   Response.json(body, {
     headers: {
-      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+      // The payload changes at most once per 5-min ingest; 60s edge caching
+      // keeps the 60s client poll from reaching this isolate at all in
+      // steady state.
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
       "X-Dash-Cache": cacheState,
     },
   });
@@ -28,154 +40,35 @@ export default async function (req) {
   const now = Date.now();
   if (mem.body && now - mem.at < FRESH_MS) return jsonOut(mem.body, "hit");
   if (!inflight) {
-    const base44 = createClientFromRequest(req);
-    inflight = buildDashboard(base44)
-      .then((body) => { mem = { at: Date.now(), body }; return body; })
+    inflight = build(req)
+      .then(({ body, src }) => {
+        mem = { at: Date.now(), body };
+        return { body, src };
+      })
       .finally(() => { inflight = null; });
   }
   try {
-    return jsonOut(await inflight, "miss");
+    const { body, src } = await inflight;
+    return jsonOut(body, `miss:${src}`);
   } catch (e) {
     if (mem.body && now - mem.at < STALE_MS) return jsonOut({ ...mem.body, stale: true }, "stale");
     return Response.json({ error: e.message }, { status: 500 });
   }
 }
 
-async function buildDashboard(base44) {
-  {
-    // Public read-only analytics — no auth required; service role reads shared data.
-
-    const [snapshots, holdings] = await Promise.all([
-      base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1000),
-      base44.asServiceRole.entities.NftHolding.list("-created_date", 2500),
-    ]);
-
-    const list = snapshots || [];
-    const latest = list.length ? list[0] : null;
-
-    // Bootstrap the full historical supply/burn series from the protocol's
-    // daily per-desk history (stored on every snapshot). Each desk mint burns
-    // exactly 100,000 OTC, so cumulative burn = cumulative desks × 100k and
-    // circulating supply = TGE(1B) − burn. This reconstructs the on-chain
-    // mint↔burn relationship across the protocol's entire life (≈5 days),
-    // before live snapshots existed.
-    // Accurate on-chain-grounded bootstrap of the full supply/burn history.
-    // Mint deposit started at 1,000,000 OTC/desk and was later cut to
-    // 100,000 OTC/desk, so a flat 100k/desk assumption understates early
-    // burns. We anchor to the real on-chain current supply (live RPC, falling
-    // back to the latest snapshot) to derive the migration point D_mig — the
-    // cumulative desk count at which the deposit changed — analytically:
-    //   currentBurnt = D_mig*1M + (D_total - D_mig)*100k
-    // Then each day's cumulative burn is reconstructed with the correct
-    // per-desk deposit before/after the migration.
-    const OTC_TGE_SUPPLY = 1_000_000_000;
-    const DEPOSIT_OLD = 1_000_000;
-    const DEPOSIT_NEW = 100_000;
-
-    // Exact on-chain supply via Helius DAS (keyed RPC). This used to call
-    // fetchTokenSupply, which hit DexScreener on EVERY dashboard load — a
-    // major driver of the intermittent rate-limit gaps on the price ticker.
-    let liveSupply = latest?.token_total_supply ?? null;
-    try {
-      const das = await fetchDasTokenInfo(ADDRESSES.OTC_TOKEN_MINT);
-      if (das?.supply != null) liveSupply = das.supply;
-    } catch (e) {
-      /* keep snapshot/null anchor */
+async function build(req) {
+  const base44 = createClientFromRequest(req);
+  // Pre-aggregated path first: one tiny read of the ingest-built records.
+  try {
+    const agg = await readDashboardAggregate(base44);
+    if (agg && Date.now() - agg.at < DASH_AGGREGATE_FRESH_MS) {
+      return { body: agg.body, src: "agg" };
     }
-    const currentBurnt = liveSupply != null ? OTC_TGE_SUPPLY - liveSupply : null;
-    const perDeskItems = latest?.per_desk?.items || [];
-    const D_total =
-      latest?.desks_minted ?? perDeskItems[perDeskItems.length - 1]?.desks ?? null;
-
-    let D_mig = null;
-    if (currentBurnt != null && D_total != null) {
-      D_mig = (currentBurnt - D_total * DEPOSIT_NEW) / (DEPOSIT_OLD - DEPOSIT_NEW);
-      if (D_mig < 0) D_mig = 0;
-      if (D_mig > D_total) D_mig = D_total;
-    }
-
-    // Cumulative burnt OTC from a desk count, applying the 1M→100k deposit
-    // migration at D_mig (falls back to flat 100k/desk when migration unknown).
-    const burntFromDesks = (D) => {
-      if (D == null) return null;
-      if (D_mig == null) return D * DEPOSIT_NEW;
-      if (D <= D_mig) return D * DEPOSIT_OLD;
-      return D_mig * DEPOSIT_OLD + (D - D_mig) * DEPOSIT_NEW;
-    };
-
-    const bootstrap = perDeskItems
-      .filter((d) => d.day && d.desks != null)
-      .map((d) => {
-        const burnt = burntFromDesks(d.desks);
-        return {
-          t: d.day,
-          desks_minted: d.desks,
-          token_burnt: burnt,
-          token_total_supply: burnt != null ? OTC_TGE_SUPPLY - burnt : null,
-        };
-      });
-
-    const snapshotHistory = list
-      .slice()
-      .reverse()
-      .map((s) => {
-        // Backfill supply/burn from desks for snapshots that predate supply
-        // fetching (or where a run failed mid-field), so the chart series is
-        // complete — same migration logic as the daily bootstrap.
-        let supply = s.token_total_supply;
-        let burnt = s.token_burnt;
-        if (supply == null && s.desks_minted != null) {
-          burnt = burntFromDesks(s.desks_minted);
-          if (burnt != null) supply = OTC_TGE_SUPPLY - burnt;
-        }
-        return {
-          t: s.created_date,
-          token_price_usd: s.token_price_usd,
-          token_price_sol: s.token_price_sol,
-          sol_price_usd: s.sol_price_usd,
-          nft_floor_sol: s.nft_floor_sol,
-          nft_floor_usd: s.nft_floor_usd,
-          pot_sol_balance: s.pot_sol_balance,
-          protocol_distributed_sol: s.protocol_distributed_sol,
-          protocol_buyback_sol: s.protocol_buyback_sol,
-          desks_minted: s.desks_minted,
-          token_market_cap: s.token_market_cap,
-          token_volume_24h: s.token_volume_24h,
-          token_liquidity_usd: s.token_liquidity_usd,
-          nft_listed_count: s.nft_listed_count,
-          token_total_supply: supply,
-          token_burnt: burnt,
-          rounds_total: s.rounds_total,
-          mint_cost_usd: s.mint_cost_usd,
-          secondary_cost_usd: s.secondary_cost_usd,
-          spread_usd: s.spread_usd,
-          spread_pct: s.spread_pct,
-          nft_total_supply: s.nft_total_supply,
-        };
-      });
-
-    // Merge the daily bootstrap (full history) with live snapshot points
-    // (recent granularity), sorted chronologically. The supply/desks chart
-    // connects nulls so partial series render cleanly.
-    const history = [...bootstrap, ...snapshotHistory].sort((a, b) =>
-      String(a.t || "").localeCompare(String(b.t || ""))
-    );
-
-    // Inject true on-chain supply/burn into the served latest so the protocol
-    // panel always reflects real on-chain state, even if the stored snapshot
-    // predates the supply-fetch addition or a run failed mid-field.
-    if (latest && liveSupply != null) {
-      latest.token_total_supply = liveSupply;
-      latest.token_burnt = OTC_TGE_SUPPLY - liveSupply;
-      latest.token_tge_supply = OTC_TGE_SUPPLY;
-    }
-
-    return {
-      addresses: ADDRESSES,
-      latest,
-      history,
-      holdings: holdings || [],
-      snapshot_count: list.length,
-    };
+  } catch {
+    /* aggregate unavailable — fall back to the direct build below */
   }
+  // Legacy direct build: full 1,000 + 2,500 row read. Only runs before the
+  // first ingest-built aggregate exists, or while one stays stale.
+  const { body } = await buildDashboard(base44);
+  return { body, src: "direct" };
 }

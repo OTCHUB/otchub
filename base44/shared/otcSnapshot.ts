@@ -12,6 +12,7 @@ import {
   fetchProtocolStats,
 } from "./otcSources.ts";
 import { acquireLock, releaseLock } from "./dataLock.ts";
+import { rebuildDashboardAggregate } from "./dashboardAggregate.ts";
 import { STOCKS } from "./otcIdl.ts";
 import { scanPotSources } from "./potSources.ts";
 import { readVaultStock } from "./vaultBalances.ts";
@@ -208,9 +209,6 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // (fetched above) — no direct DexScreener/RPC supply call needed. Fall back
   // to the previous snapshot's supply on the rare DAS gap.
   let tokenSupply = dasInfo?.supply ?? null;
-  if (tokenSupply == null) {
-    tokenSupply = prevSnap?.token_total_supply ?? null;
-  }
 
   const potSol = potLamports != null ? potLamports / LAMPORTS_PER_SOL : null;
 
@@ -229,6 +227,11 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // case (e.g. Helius DAS 500) still falls back to its NFT counts and KEEPS
   // the existing holdings — a transient outage never wipes the gallery.
   const prevSnap = await latestSnapshot(base44);
+  // Fall back to the previous snapshot's supply on a rare DAS gap (deferred
+  // to here so the fallback runs after prevSnap is read).
+  if (tokenSupply == null) {
+    tokenSupply = prevSnap?.token_total_supply ?? null;
+  }
   const totalSupply = assetsOk ? assetList.length : (prevSnap?.nft_total_supply ?? 0);
   const perDeskHistory = stats?.perDesk || [];
   // AUTHORITATIVE desk supply: the Helius DAS collection scan counts every
@@ -545,6 +548,21 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   }
 
   await releaseLock(base44, lock);
+
+  // QUOTA FIX: rebuild the pre-aggregated dashboard cache right after the
+  // data changed (new snapshot + fresh holdings), reusing the in-memory
+  // holdings so the aggregate costs one snapshot-history read per ingest
+  // instead of the dashboard re-reading 3,500 rows every minute per
+  // isolate. Best-effort: a failed rebuild never fails the ingest — the
+  // dashboard falls back to its direct build until the next good one.
+  try {
+    await rebuildDashboardAggregate(
+      base44,
+      assetsOk && holdings.length ? { holdings } : {}
+    );
+  } catch (e) {
+    console.warn("dashboard aggregate rebuild failed:", e?.message || e);
+  }
 
   return {
     ok: true,

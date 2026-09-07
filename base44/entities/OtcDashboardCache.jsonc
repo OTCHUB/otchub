@@ -1,0 +1,34 @@
+{
+  "name": "OtcDashboardCache",
+  "type": "object",
+  "description": "Pre-aggregated dashboard payload cache (entity read quota fix): rebuilt once per snapshot ingest (every 5 min) by shared/otcSnapshot.ts and served by getOtcDashboard with a single tiny read instead of re-reading 1,000 OtcSnapshot + 2,500 NftHolding rows per rebuild. One record per key: 'otc_dash_core' (latest + history + addresses + counts), 'otc_dash_holdings' (NFT holdings rows).",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": null,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
