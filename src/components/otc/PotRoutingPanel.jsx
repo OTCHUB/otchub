@@ -3,6 +3,7 @@ import { fmtSol } from "@/lib/format";
 import PotMilestones from "@/components/otc/PotMilestones";
 import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
 import PotWatchStrip from "@/components/otc/PotWatchStrip";
+import PotPumpTrace from "@/components/otc/PotPumpTrace";
 
 // Fee-routing map verified on-chain 2026-09-06 by RPC account inspection.
 // Keep addresses in sync with ADDRESSES in base44/shared/otcSources.ts.
@@ -11,10 +12,10 @@ const scan = (addr) => `https://solscan.io/account/${addr}`;
 const short = (addr) => `${addr.slice(0, 4)}…${addr.slice(-4)}`;
 const potTxs = () => `${scan(POT)}#transfers`;
 
-// pump.fun creator-fee vaults: per-swap creator fees accrue here. The vault
-// authorities are neither the pot nor the protocol wallet, and the pot is not
-// referenced in the pool/vault accounts — no on-chain vault→pot route exists.
-const FEE_VAULTS = [
+// Live-traced pump.fun fee path (see PotPumpTrace): swap fees stay with the
+// pump.fun global vault + pool vaults; the previously recorded per-coin fee
+// vaults (14fL…, GQr…) are CLOSED on-chain and were never the pot's route.
+const DEAD_VAULTS = [
   { src: "$OTC", key: "14fL3h2oe5VKk7Jkh77ML2UFMKQeKGPxZy14ZLcqkQUd" },
   { src: "LAUNCHER", key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ" },
 ];
@@ -109,7 +110,7 @@ export default function PotRoutingPanel({ latest }) {
 
       {/* broken route — single red line */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 border border-red-500/40 bg-red-500/5 px-2 py-1 font-mono text-[9px] text-red-400">
-        <span>✖ CREATOR_FEES ($OTC·LAUNCHER) → FEE VAULTS ≠ POT · SPLIT 75/10/15</span>
+        <span>✖ CREATOR_FEES ($OTC·LAUNCHER) → PUMP GLOBAL/POOL VAULTS ≠ POT · DESK SHARE COLLAPSED</span>
         {dropPct != null && dropPct > 0 && (
           <span className="text-red-400/80">−{dropPct}% vs peak {peak.day?.slice(5)}</span>
         )}
@@ -118,23 +119,8 @@ export default function PotRoutingPanel({ latest }) {
         </a>
       </div>
 
-      {/* pump.fun fee fate — verified on-chain 2026-09-07 */}
-      <div className="space-y-0.5 border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[9px]">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-amber-300">
-          <span>PUMP.FUN :: PROTOCOL_FEE → PUMP VAULT · CREATOR_FEE → COIN CREATOR VAULT (claim-only) · 0% → POT</span>
-          <a href={scan(PUMPFUN_PROGRAM)} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">
-            PGM:PUMP_FUN ↗
-          </a>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-green-500/60">
-          <span>VERIFIED 09-07 :: recorded vaults CLOSED on-chain (0 bal · 0 txs) · $OTC pool swaps inactive (bot dust only) — 10% desk share needs a manual sweep</span>
-          {FEE_VAULTS.map((v) => (
-            <a key={v.key} href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-amber-300/70 underline hover:text-amber-300">
-              {short(v.key)} ↗
-            </a>
-          ))}
-        </div>
-      </div>
+      {/* pump.fun fee path — traced live on-chain 2026-09-07 */}
+      <PotPumpTrace />
 
       {/* everything else collapsed */}
       <Detail label="[+] EVIDENCE">
@@ -153,18 +139,20 @@ export default function PotRoutingPanel({ latest }) {
               {label} ↗
             </a>
           ))}
-          {FEE_VAULTS.map((v) => (
+          {DEAD_VAULTS.map((v) => (
             <a key={v.key} href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-amber-300/80 underline hover:text-amber-300">
-              VAULT:{v.src} {short(v.key)} ↗
+              OLD_VAULT:{v.src} {short(v.key)} ↗
             </a>
           ))}
         </div>
         <p className="mt-1 leading-snug text-green-500/50">
-          Green routes land directly in the pot. pump.fun sends its protocol fee to the pump vault and
-          creator fees to claim-only coin-creator vaults — neither references the pot. The vault
-          addresses previously recorded here are now CLOSED on-chain (0 balance, 0 history, verified
-          2026-09-07) and $OTC pool activity is bot dust only, so the 10% desk share of launchpad fees
-          reaches desks only if manually swept. Community tooling — verify on Solscan before drawing
+          Green routes land directly in the pot. Live-traced 2026-09-07 on the $401jk launcher pool:
+          pump.fun keeps its protocol fee in the global vault (34.6 SOL) and the LP share in the pool
+          vault — the coin creator fee is 0% on sampled pools and both per-coin creators hold 0 SOL.
+          The pot still receives collapsed per-swap micro-deposits (−85% vs the 09-01 peak), while
+          fee-funded stock rewards flow overwhelmingly to launcher-coin holders (≈53% of everything
+          distributed) instead of desks. The old vault addresses recorded earlier are CLOSED on-chain
+          and were never the real route. Community tooling — verify on Solscan before drawing
           conclusions.
         </p>
       </Detail>
