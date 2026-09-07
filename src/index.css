@@ -110,6 +110,22 @@ body {
   }
 }
 
+/* Mobile typography scale: every size level steps one notch tighter on
+   phones (<640px) so the dense terminal panels read clean with a clear
+   Apple-style hierarchy — distinct size steps, generous relative spacing.
+   10px/9px are the dense-data floors and are not reduced further.
+   Inputs keep their 16px zoom guard above. */
+@media (max-width: 639px) {
+  .text-base { font-size: 15px; }
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 11px; }
+  .text-\[15px\] { font-size: 14px; }
+  .text-\[14px\] { font-size: 13px; }
+  .text-\[13px\] { font-size: 12px; }
+  .text-\[12px\] { font-size: 11px; }
+  .text-\[11px\] { font-size: 10px; }
+}
+
 /* Launcher tape: one-shot blink + slide when a launch moves in the ranking
    between polls. Green slide for rank gains, red for rank losses. */
 @keyframes launcher-flip-up {

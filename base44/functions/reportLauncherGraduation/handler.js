@@ -34,6 +34,10 @@ export function createGraduationReportHandler({ verifyComplete, store, createCli
       }
       return Response.json({ at: clock(), verified: accepted.length, saved,
         rejected: mints.length - accepted.length }, { headers });
-    } catch (error) { return errorResponse(error, headers); }
+    } catch (error) {
+      // Internal diagnostic only: the sanitized errorResponse never leaks this.
+      console.error("launcher graduation report failed:", error?.message);
+      return errorResponse(error, headers);
+    }
   };
 }
