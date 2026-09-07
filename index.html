@@ -36,6 +36,10 @@
         "isAccessibleForFree": true
       }
     </script>
+    <!-- Apply the stored theme before CSS/JS loads so light users get no dark flash -->
+    <script>
+      try { if (localStorage.getItem("otc_theme") === "light") document.documentElement.classList.add("light"); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

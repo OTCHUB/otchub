@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
+import ThemeToggle from "@/components/otc/ThemeToggle";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import LauncherAnalytics from "@/components/otc/LauncherAnalytics";
@@ -246,6 +247,7 @@ export default function Home() {
               >
                 [ATH_OTC ↗]
               </a>
+              <ThemeToggle />
               <button
                 onClick={refresh}
                 disabled={refreshing}
