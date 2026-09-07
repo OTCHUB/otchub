@@ -53,6 +53,25 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+## $HUB Protocol Dashboard (landing page)
+
+The domain root (`/`, plus `/treasury`, `/deployments`, `/desk/:asset`) is the read-only
+$HUB protocol dashboard (treasury, burn, pot, per-tier yield). The OTC_DESK analytics
+dashboard lives at `/otc`; `/hub/*` links from the former standalone shell redirect.
+
+- `src/hub/` — UI module vendored from `hubconnect/web/src/hub` (TypeScript; Vite compiles it as-is).
+- `src/hub-sdk/` — read-only SDK + IDL vendored from `hubconnect/sdk`, aliased as `@hub-sdk`
+  (`vite.config.js`, `jsconfig.json`). Decodes accounts with `@anchor-lang/core` 1.2.0 to match
+  the program's Anchor 1.2.0 / Agave toolchain. Re-copy both directories when `hubconnect` changes.
+- Env (all optional, read at build time; `.env*` is gitignored so hosted builds use the defaults):
+  `VITE_HUB_RPC_URL` (default `https://api.devnet.solana.com`; put the Helius devnet URL in
+  `.env.production.local` for local production builds — the key ships in the bundle),
+  `VITE_HUB_CLUSTER` (`devnet` | `mainnet-beta` | `localnet`, default `devnet`),
+  `VITE_HUB_PROGRAM_ID` (default: the address baked into `src/hub-sdk/idl/hub.json`,
+  devnet `5tCDEazUAkRjrkasup1uWcYo3t1C2ht76LmQva5rewQv`).
+- Spec: `src/docs/hubconnect-spec.md` (mirror of `hubconnect/docs/hubconnect-spec.md`).
+
+
 ## Public Analytics and RU_FOMO
 
 - [API contracts and security boundaries](docs/ru-fomo-implementation-contract.md)

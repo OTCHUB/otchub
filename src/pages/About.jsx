@@ -21,7 +21,7 @@ export default function About() {
               </p>
             </div>
             <Link
-              to="/"
+              to="/otc"
               className="inline-flex items-center border border-green-500/50 px-2.5 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
             >
               [← DASHBOARD]

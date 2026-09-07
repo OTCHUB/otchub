@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
@@ -210,6 +211,13 @@ export default function Home() {
             {/* actions row: wraps + shrinks on narrow screens so the header
                 never overflows horizontally on mobile */}
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-emerald-500/70 px-2 py-1 text-[12px] font-bold text-emerald-400 hover:bg-emerald-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
+                title="$HUB protocol: treasury, burn, pot and yield tracker"
+              >
+                [$HUB →]
+              </Link>
               <CommunityMenu />
               <a
                 href="https://otcdesks.cash"

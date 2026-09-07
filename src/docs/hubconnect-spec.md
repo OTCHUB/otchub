@@ -53,6 +53,23 @@ parameterized and re-verified on-chain.
 **Desk pot** (source: otcdesks.cash stats + on-chain pot account):
 - Distributes a 13-stock desk rotation per desk, per round. Lifetime desk-channel
   distribution ≈ 2,570 SOL over 2,487 rounds.
+- **OTC is itself one of the 13 rotation stocks** (slot 10, verified on-chain
+  2026-09-07: OTC mint `MukLD…pump` sits in `ConfigExt` slot 10; lifetime OTC
+  distributed to desks 98.1 SOL ≈ 0.044 SOL/desk, 6th of 13 by volume). So a
+  treasury-owned desk accrues OTC directly (source B), independent of the
+  launcher's reward-stock channel (source C).
+- Rotation layout (verified by scanning the OTC `Config` / `ConfigExt` PDAs):
+  `Config["config"]` = `9b5V…REU4` holds slots 0–9 as 32-byte mints from offset
+  216 (AAPLx, MSFTx, NVDAx, AMZNx, CRCLx, SPCXx, ANTHROPIC, POLYMARKET, KALSHI,
+  NEURALINK); `ConfigExt["config_ext"]` = `78rNUh8esjSWLhH8zPB5UNsx7uKbRygKQg1G2XgeqFUz`
+  holds slots 10–12 (OTC, ANDURIL, OPENAI). `claim(index)` / `distribute(index)`
+  for slots 10–12 additionally require `config_ext` + the desk's
+  `["vault_ext", vault]` PDA. 12 of 13 mints are Token-2022 (OTC is classic SPL);
+  stock ATAs use the custom seed order `[owner, tokenProgram, mint]`.
+- Pot inflow channels reported by the OTC_HUB snapshot (`pot_sources`): `mint`,
+  `royalty`, `launchpad`, `other`. The `launchpad` leg (launched coins' 10% →
+  desk pot) is live and material — e.g. 272.8 SOL on 2026-09-07 vs 23.0 mint /
+  28.8 royalty — so desk-pot yield now scales with launcher volume.
 - Latest closed day take: **0.1443 SOL/desk/day**; 7-day average 0.1464.
 - Desk mint surcharge: 0.5 SOL (0.45 to pot, 0.05 to protocol) + 100,000 OTC burned.
 - Magic Eden buyer cost model: list price × (1 + 2% taker fee + 5% creator royalty).
@@ -68,6 +85,11 @@ parameterized and re-verified on-chain.
 - Desk pot: `BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR`
 - NFT collection & desk stock rotation list: resolve from OTC program config /
   IDL (reference implementation exists in the OTC Hub dashboard's shared sources).
+- Read-only mainnet data feed for keepers/dashboard: **OTC_HUB MCP**
+  `https://otchub.dev/api/mcp` (tools `query_otcsnapshot` — 5-min snapshots with
+  `by_stock`, `per_desk`, `pot_sources`, `buybacks`; `query_nftholding` —
+  per-desk owner/listing/accrued value; `query_claimlog`; `query_contractmap`).
+  Sort `-created_date`, `limit ≤ 500`; response shape `{count, records[]}`.
 
 ### A3. $HUB launch configuration
 
@@ -103,10 +125,13 @@ conflict.
 
 | Tier | Weight | Cumulative cost | To pot (90%) | To ops (10%) |
 |---|---|---|---|---|
-| T1 BRONZE | 1.00x | 0.5 SOL | 0.45 | 0.05 |
-| T2 SILVER | 1.25x | 1.0 SOL | 0.90 | 0.10 |
-| T3 GOLD | 1.60x | 1.5 SOL | 1.35 | 0.15 |
-| T4 DIAMOND | 2.00x | 2.0 SOL | 1.80 | 0.20 |
+| T1 TRADER | 1.00x | 0.5 SOL | 0.45 | 0.05 |
+| T2 BROKER | 1.25x | 1.0 SOL | 0.90 | 0.10 |
+| T3 DEALER | 1.60x | 1.5 SOL | 1.35 | 0.15 |
+| T4 MARKET MAKER | 2.00x | 2.0 SOL | 1.80 | 0.20 |
+
+Display names are UI-only (`sdk/src/constants.ts` `TIER_NAMES`); the program
+stores tier indices 1–4 and weights in basis points.
 
 ### A5. Yield engine
 
@@ -122,12 +147,28 @@ Pot inflow sources:
 - **F — LP swap fees**: $HUB/SOL and $HUB/OTC LP positions held by the treasury
   (§A6.2); harvested swap fees → pot.
 
-Per epoch (`EPOCH_HOURS = 24`; unclaimed rolls forward):
+Distribution is **threshold-gated, not clocked** — the same mechanic as the OTC desk
+pot ("the moment the pot clears 0.1 SOL it is spent"). Inflow accumulates in the
+open *round* (`Epoch` account); `finalize_epoch` is rejected until the round's
+inflow (plus whole lamports of dust carried from earlier rounds) reaches
+`MIN_POT_THRESHOLD = 0.1 SOL`, and succeeds the moment it does. A round can be
+seconds or days long depending on flow.
 
 ```text
-epoch_yield_i = (w_i / Σ w_j) × 0.90 × pot_inflow_epoch
-burn          =             0.10 × pot_inflow_epoch   [buy $HUB → burn]
+burn           = ⌊0.10 × round_inflow⌋                 [buy $HUB → burn]
+distributable  = round_inflow − burn
+per_weight     = ⌊distributable × 10¹² / Σ w_j⌋          [scaled, u128]
+acc_per_weight += per_weight                            [Config, lifetime]
+yield_i        = ⌊(acc_per_weight − stamp_i) × w_i / 10¹²⌋
 ```
+
+Each `DeskTier` stores `stamp_acc_per_weight` (set at activation and on every
+claim), so one `claim_yield` pays everything a desk earned across **every round
+closed since its stamp** in a single transaction — there is no per-round claiming
+and nothing to catch up. Sub-lamport fractions (from the ⌊⌋ floors) accumulate in
+`Config.dust_scaled`; whole lamports of dust re-enter the next round as inflow,
+so the accounting is exactly zero-sum. Desks activated after a round closed do
+not share in it (their stamp is already past it).
 
 Direct-to-holder stream (no tier needed, per wallet, pro-rata on HUB held):
 `0.70 × f × V_HUB_volume` of OTC bought daily, where `f` = creator-fee rate
@@ -169,17 +210,18 @@ Any desk owner can **consign** their desk to the treasury instead of selling it:
 - `consign_desk` transfers the desk NFT into the **treasury vault** and records a
   `ConsignedDesk` entry (asset_id → consignor). The owner keeps the withdrawal
   right; the desk is off the market while consigned.
-- From the consignment epoch onward, the treasury claims that desk's desk-pot
+- From the consignment round onward, the treasury claims that desk's desk-pot
   rounds exactly like its owned desks (same OTC claim instruction). Proceeds are
   pot inflow **(source E)** and are distributed to **connected (activated) desks**
-  per the normal epoch formula.
+  per the normal round formula.
 - Optional contributor reward: `CONSIGNOR_SHARE` (default **0%** — all yield goes
   to the pool, per the community-first ethos) can later be raised via config to
-  credit a share directly to the consignor's accrual. Consigned-desk claim
-  proceeds are tracked separately so the split is always auditable.
-- `unconsign_desk` returns the desk to the consignor after the current epoch
-  finalizes (no epoch is double-counted); yield earned through the withdrawal
-  epoch is credited as normal.
+  credit a share directly to the consignor's per-wallet `StakerAccrual`
+  (`owed_lamports`), claimable any time in one `claim_accrual` tx. Consigned-desk
+  claim proceeds are tracked separately so the split is always auditable.
+- `unconsign_desk` returns the desk to the consignor once the round it was
+  consigned in has closed (no round is double-counted); any accrued consignor
+  share stays claimable.
 - Guardrails: consigned desks are **never eligible for discount exits** (the exit
   pool is treasury-*owned* desks only); the program-enforced `ConsignedDesk`
   record blocks any treasury transfer/sale of a consigned desk; a
@@ -280,26 +322,37 @@ hubconnect/
 │   ├── sweeper/               # desk sweep + vault verification
 │   └── treasury/              # exit listing + multisig tx builder
 ├── sdk/                       # typed client SDK (activation, claims, read APIs)
+│   ├── idl/                   # hub.json / hub.ts copied from target/ (scripts/copy-idl.mjs)
+│   └── src/constants.ts       # mirror of programs/hub/src/constants.rs + HUB_PROGRAM_ID
+├── web/                       # treasury dashboard (Vite); app.otchub.dev
 ├── docs/                      # this spec + verification evidence
-└── scripts/                   # launch checklist automation, config resolution
+└── scripts/                   # devnet-deploy.sh · verify-build.sh · devnet-*.ts · hub-authority.ts
 ```
 
-Stack: Anchor 0.30.x, solana 1.18.x, @solana/web3.js, TypeScript, vitest or
-anchor-ts tests, `solana-bankrun` for fast integration tests, **Helius devnet RPC
-for the devnet test stage (§B5.1)**.
+Stack (as built — see README "Toolchain"): Anchor 1.2.0 (`anchor-lang` 1.2.0,
+TS client `@anchor-lang/core`), Agave 4.2.2, `solana` crate 4.0.3 pinned for the
+verifiable Docker build, @solana/web3.js, TypeScript, anchor-ts (ts-mocha)
+tests, **Helius devnet RPC for the devnet test stage (§B5.1)**. Program id,
+IDL account and singleton PDAs are listed in **Appendix — Deployment addresses**.
 
 ### B2. On-chain program — accounts
 
 | Account | Seeds (all under program id) | Key fields |
 |---|---|---|
-| `Config` | `["config"]` | authority, pot PDA, ops wallet, tier weights[4], step_fee_lamports, epoch_hours, burn_pct_bp (1000), ops_pct_bp, consignment_enabled, consignor_share_bp, lp_enabled, lp_target_sol_lamports, paused |
-| `Epoch` | `["epoch", epoch_index u64]` | index, start_ts, end_ts, inflow_lamports, distributed_lamports, burned_lamports, finalized |
-| `DeskTier` | `["tier", asset_id]` | asset_id, tier 1–4, activated_epoch, last_claimed_epoch, voided |
+| `Config` | `["config"]` | authority, pot PDA, ops_wallet, treasury, **OTC-side refs** (otc_program, otc_desk_pot, desk_collection, hub_mint, otc_mint — runtime-set, §A2), tier_weights_bp[4], step_fee_lamports, min_pot_threshold_lamports (0.1 SOL), burn_pct_bp (1000), ops_pct_bp (1000), consignment_enabled, consignor_share_bp, lp_enabled, lp_target_sol_lamports, lp_phase2_open_ts, paused, current_epoch, genesis_ts, total_weight_bp, pot_liability_lamports, **acc_per_weight (u128, lifetime)**, **dust_scaled (u128)**, bumps |
+| `Epoch` (one round) | `["epoch", epoch_index u64]` | index, start_ts, finalized_ts, inflow_lamports, distributed_lamports (credited), burn_pending_lamports, rolled_forward_lamports (floor remainder), total_weight_bp (Σw at close), per_weight_scaled, acc_per_weight_after, finalized |
+| `DeskTier` | `["tier", asset_id]` | asset_id, owner_at_activation, tier 1–4, activated_epoch, **stamp_acc_per_weight**, total_claimed_lamports, voided |
 | `ConsignedDesk` | `["consign", asset_id]` | asset_id, consignor, consigned_epoch, active |
-| `StakerAccrual` | `["accrual", wallet, epoch_index]` | owed_lamports (rolled forward at finalize) |
-| `Pot` (SOL escrow) | `["pot"]` | balance via system PDA lamports |
-| `Burn` | `["burn"]` | total_hub_burned, last_burn_tx, authority |
-| `TreasuryState` | `["treasury"]` | multisig set, desks owned count, sweep budget caps, exit params (discount 900 bp, hub leg 5000 bp) |
+| `StakerAccrual` | `["accrual", wallet]` | per-wallet consignor credits: owed_lamports, total_claimed_lamports |
+| `Pot` (SOL escrow) | `["pot"]` | system-owned PDA; balance via lamports (no data) |
+| `BurnState` | `["burn"]` | authority, total_hub_burned, burn_pending_lamports, last_burn_tx[64] |
+| `TreasuryState` | `["treasury"]` | multisig, vault (PDA below), desks_owned, desks_consigned, sweep_budget_cap_bp (1000), sweep_payback_cap_lamports (4.2 SOL), exit_discount_bp (1000), exit_hub_leg_bp (5000), floor_staleness_bp (500), hub_float_cap_bp (200), total_exits, total_sweeps |
+| `Vault` (NFT custody) | `["vault"]` | program-signed PDA that owns consigned desks; no data account (created lazily by Core on first transfer) |
+
+**Singletons created at M1 (`initialize_config`, one tx):** `Config`, `BurnState`,
+`TreasuryState` and `Epoch[0]` are `init`-ed together; `Pot` and `Vault` are
+derived only. All four seeds live under the program id and are exposed by the
+SDK (`configPda`, `potPda`, `burnPda`, `treasuryPda`, `vaultPda`, `epochPda`).
 
 All amounts in lamports; all rates in basis points. Every OTC-side address
 (pot target verification, royalty rates, rotation list) is a **Config field
@@ -310,15 +363,16 @@ the OTC program config on-chain and proposes updates.
 
 | # | Instruction | Accounts | Constraints |
 |---|---|---|---|
-| 1 | `initialize_config` | payer, Config | once; sets constants from §A4/A5 |
+| 1 | `initialize_config` | payer, Config, Pot, BurnState, TreasuryState, Vault, Epoch[0] | once; args = ops_wallet, treasury, otc_program, otc_desk_pot, desk_collection, hub_mint, otc_mint, tier weights, step fee, `min_pot_threshold_lamports`; payer becomes `Config.authority` and `BurnState.authority`; opens round 0 |
 | 2 | `activate_tier` | payer, desk NFT (Metaplex Core asset), Config, Pot, ops wallet, DeskTier | verify payer owns desk asset via Core plugin/DAS **inside the instruction**; tier = current+1 (or 1); pay 0.5 SOL: 90% → Pot, 10% → ops; mark 10% of inflow as burn-pending |
 | 3 | `upgrade_tier` | payer, desk NFT, Config, Pot, ops, DeskTier | pay step difference; same ownership check |
-| 4 | `finalize_epoch` | keeper, Config, Epoch, treasury SOL source | epoch boundary; compute per-weight distribution; 10% of epoch inflow → burn-pending; roll unclaimed into next epoch accruals |
-| 5 | `claim_yield` | claimer, desk NFT, DeskTier, StakerAccrual, Pot | **lazy revocation**: re-verify desk ownership on-chain NOW; if caller ≠ owner → void tier (voided = true, no refund) and revert; pay owed_lamports |
-| 6 | `register_treasury_inflow` | treasury multisig, Config, Pot | record source B/C/D/E inflows from treasury ops; same 10% burn-pending marking; for consigned-desk (E) proceeds, credit `consignor_share_bp` directly to the consignor's StakerAccrual, remainder → pot |
-| 7 | `record_burn` | keeper, Config, Burn, Pot | after the keeper buys HUB and burns it: mark burn executed, decrement burn-pending |
+| 4 | `finalize_epoch` | keeper (permissionless), Config, Epoch, next Epoch, Pot, BurnState | **threshold gate**: rejected (`PotBelowThreshold`) until inflow + dust carry ≥ `min_pot_threshold_lamports`; Σw > 0; 10% → burn-pending; `acc_per_weight += ⌊distributable × 10¹² / Σw⌋`; opens the next round with the floor remainder |
+| 5 | `claim_yield` | claimer, desk NFT, DeskTier, Config, Pot | **lazy revocation**: re-verify desk ownership on-chain NOW; if caller ≠ owner → void tier (voided = true, no refund) and revert; pay `⌊(acc − stamp) × w / 10¹²⌋` for every round since the stamp in one tx; stamp := acc; `NothingToClaim` when zero |
+| 5b | `claim_accrual` | wallet, StakerAccrual, Config, Pot | pay the wallet's consignor credits (`owed_lamports`) in one tx; `AccrualEmpty` when zero |
+| 6 | `register_treasury_inflow` / `register_consigned_inflow` | treasury multisig, Config, Epoch, Pot (+ ConsignedDesk, consignor StakerAccrual) | record source B/C/D/F (or E) inflows into the open round; for consigned-desk (E) proceeds, credit `consignor_share_bp` to the consignor's StakerAccrual, remainder → round inflow |
+| 7 | `record_burn` | keeper, Config, BurnState, Pot | after the keeper buys HUB and burns it: mark burn executed, decrement burn-pending |
 | 8 | `void_tier` (internal path in 3/5) | — | ownership change discovered at claim/upgrade voids the tier |
-| 9 | `update_config` | authority (multisig), Config | only whitelisted fields; rate changes apply to future epochs |
+| 9 | `update_config` | authority (multisig), Config | only whitelisted fields (incl. `min_pot_threshold_lamports`, must be > 0); rate changes apply to rounds finalized afterwards |
 | 10 | `pause` / `unpause` | authority | halts activate/claim on anomaly |
 | 11 | `consign_desk` | owner, desk NFT, treasury vault, ConsignedDesk, Config | verify owner holds the desk asset (Core/DAS); `consignment_enabled` must be true; transfer NFT to vault; record consignor + epoch |
 | 12 | `unconsign_desk` | consignor, desk NFT, treasury vault, ConsignedDesk, Config | only after the current epoch finalizes (no double-count); return NFT; set `active = false`; accrued consignor share (if any) stays claimable |
@@ -336,7 +390,8 @@ consignor share split). Consigned desks are claimed but never sold (§A6.1).
 
 ### B4. Keeper services (off-chain, TypeScript)
 
-1. **Keeper (buyback-burn)** — per epoch finalize: (a) call `finalize_epoch`;
+1. **Keeper (buyback-burn)** — whenever the open round is at threshold (poll
+   `Epoch.inflow + dust carry ≥ min_pot_threshold`; anyone may call): (a) call `finalize_epoch`;
    (b) route burn-pending SOL through a public AMM (Jupiter) with slippage caps
    to buy HUB; (c) burn HUB (send to a published burn address); (d) call
    `record_burn`. Publishes every tx. Idempotent: resume-safe journal, no
@@ -345,7 +400,15 @@ consignor share split). Consigned desks are claimed but never sold (§A6.1).
    stock on-chain (non-empty required); applies §A6 formula (resolve OTC-side
    constants from config first); proposes sweeps within budget/payback caps;
    executes via treasury multisig; claims desk-pot rounds for owned and
-   consigned desks and registers inflow.
+   consigned desks and registers inflow. **Harvest mechanics (source B/E):**
+   per desk, for each of the 13 slots with a non-zero `["vault", asset_id]`
+   stock ATA balance, call OTC `claim(index)` (slots 10–12 with `config_ext` +
+   `vault_ext`) to the treasury's stock ATA (custom `[owner, tokenProgram, mint]`
+   ATA order; Token-2022 for all but OTC), sell each stock for SOL via Jupiter
+   with slippage caps, then `register_treasury_inflow` (or
+   `register_consigned_inflow` for E) with the net SOL. OTC claimed from desks
+   (slot 10) is sold like any other rotation stock — it is not added to the
+   treasury float (§A3.1).
 3. **Treasury (exit)** — claims all accrued yield, lists at 90% of verified
    floor, escrow enforces 50% HUB burn + 50% SOL → pot in the same tx; floor
    staleness guard 5%.
@@ -370,11 +433,16 @@ keeper-anyone with a small reward? — start permissioned, open later).
 **Integration (bankrun + devnet):**
 - Happy path: initialize → activate 4 desks across tiers → finalize → claim →
   verify exact lamports per weight and the 10% burn-pending.
-- **Lazy revocation**: transfer the desk NFT mid-epoch → old owner's claim
+- **Threshold gate**: `finalize_epoch` rejected below `min_pot_threshold`;
+  allowed immediately once reached (no clock); `claim_yield` with nothing closed
+  since the stamp → `NothingToClaim`.
+- **Lazy revocation**: transfer the desk NFT mid-round → old owner's claim
   reverts and voids the tier; new owner cannot claim without re-activating; no
   refund emitted.
 - Upgrade path T1→T4 pays exactly the difference; double-upgrade rejected.
-- Rollover: unclaimed epoch-1 yield is claimable in epoch 3 after finalize.
+- Multi-round catch-up: a desk that skips rounds 1–2 claims both in one tx in
+  round 3; Σ payouts + dust == credited exactly (zero-sum, ≤ 1 lamport floor per
+  claim); whole-lamport dust re-enters the next round as inflow.
 - Reentrancy/negative scenarios: claim with wrong desk, claim twice, finalize
   twice, inflow/liability invariant after every instruction (assert program
   panic if violated).
@@ -403,9 +471,15 @@ blockhash expiry, priority fees, keepers reconnecting, and wallet UX. Helius
 provides a devnet RPC endpoint (`https://devnet.helius-rpc.com/?api-key=<key>`,
 same key infrastructure as mainnet) with airdrop-limited test SOL.
 
-- **Environment split**: `RPC_DEVNET` / `RPC_MAINNET` config; identical code,
-  only the endpoint + program id + Config values differ. Never branch logic on
-  cluster beyond that.
+- **Environment split**: identical code, only the endpoint + program id + Config
+  values differ. Never branch logic on cluster beyond that. Concretely:
+  `Anchor.toml` `[programs.devnet]` / `[programs.localnet]` and
+  `sdk/src/constants.ts` `HUB_PROGRAM_ID` carry the program id; the dashboard
+  reads `VITE_HUB_CLUSTER`, `VITE_HUB_PROGRAM_ID`, `VITE_HUB_RPC_URL` from
+  `web/.env.production.local` (RPC URL carries the Helius key — never commit it;
+  `web/.env.example` documents the keys). Tests select the cluster with
+  `HUB_CLUSTER=devnet`. All three must agree with the Appendix — Deployment
+  addresses table.
 - **OTC-side accounts do not exist on devnet** (the OTC program, desk pot, and
   desk collection are mainnet-only). All OTC-side references in devnet tests
   are **mock accounts deployed by the test harness**: a stub Metaplex-Core-style
@@ -459,8 +533,9 @@ The program is deployed **upgradeable** on purpose:
 
 ### B7. Deliverables & milestones
 
-1. **M1 — scaffold**: repo layout, program with Config + all instructions as
-   stubs, bankrun harness, CI (fmt, clippy, test).
+1. **M1 — scaffold** ✅ (devnet, 2026-09-07): repo layout, program with Config +
+   all instructions, test harness, CI (fmt, clippy, test); `initialize_config`
+   executed on devnet — singleton addresses in Appendix — Deployment addresses.
 2. **M2 — program complete**: all instructions + invariants; unit tests green.
 3. **M3 — integration green**: B5 integration + adversarial suites pass on
    bankrun; devnet smoke.
@@ -513,26 +588,42 @@ The OTC Hub dashboard app (this repo's sibling) already ingests most inputs on a
 5-minute cadence (OtcSnapshot: per-desk take history, pot sources, spot prices,
 desk counts) and has the Helius RPC path — so the yield tracker is added **there**
 as a new panel, reading hubconnect program accounts (Config, Pot, Epoch,
-TreasuryState, Burn) via the same RPC connection. hubconnect exposes only
+TreasuryState, BurnState) via the same RPC connection. hubconnect exposes only
 read-only account decoders in its SDK (`sdk`); no privileged endpoints exist.
+The interim standalone dashboard (`web/`, deployed at app.otchub.dev) reads the
+same accounts and lists every address below in its registry view
+(`web/src/hub/lib/deployments.ts`).
+
+**Merge status (2026-09-07):** `web/src/hub` and `sdk/` are vendored into the
+otchub repo (`otchub/src/hub`, `otchub/src/hub-sdk`, alias `@hub-sdk`) and the
+module is mounted at the otchub domain root — `/` (dashboard), `/treasury`,
+`/deployments`, `/desk/:asset`; the OTC_DESK analytics moved to `/otc` and
+`/hub/*` redirects. otchub supplies `rpcUrl` / `cluster` / `programId` via
+`VITE_HUB_*` (defaults: public devnet RPC, IDL program id). `web/` remains the
+standalone shell for app.otchub.dev until the domains are consolidated;
+`hubconnect` stays the source of truth — re-copy on change.
 
 ### C3. Live metrics strip (top of panel)
 
 | Metric | Source |
 |---|---|
-| Pot balance + liability (unclaimed accruals) | Pot PDA lamports vs Σ StakerAccrual |
-| Current epoch: inflow-so-far, time remaining | Epoch account |
+| Pot balance + liability | Pot PDA lamports vs `Config.pot_liability_lamports` |
+| Open round: inflow + dust carry vs `min_pot_threshold`, % to threshold, READY flag | Epoch + Config (no countdown — rounds have no clock) |
+| Last closed round: how long it took, credited, per-tier payout | previous Epoch |
 | Activated cohort: desks by tier, Σw | DeskTier accounts (index/scan) |
-| Treasury: desks owned / consigned, exit history, burns executed, HUB float vs ≤2% cap | TreasuryState, Burn, published treasury wallet |
+| Treasury: desks owned / consigned, exit history, burns executed, HUB float vs ≤2% cap | TreasuryState, BurnState, published treasury wallet |
 | Raw desk-pot take D (trailing 7d and latest day) | OtcSnapshot per_desk history (already ingested) |
 
 ### C4. Yield comparison table (the core view)
 
-For each tier T1–T4, recomputed live from current epoch data:
+For each tier T1–T4, recomputed live from the open round + config:
 
 ```text
-proj_daily_i   = (w_i / Σw_live) × 0.90 × pot_inflow_per_day_live
-breakeven_days = cumulative_cost_i / proj_daily_i
+round_size     = max(min_pot_threshold, effective_inflow_live)
+proj_round_i   = (w_i / Σw_live) × 0.90 × round_size
+rounds_per_day = 86400 / (last_round.finalized_ts − last_round.start_ts)   # null before first close
+proj_daily_i   = proj_round_i × rounds_per_day
+breakeven      = cumulative_cost_i / proj_round_i                          # in rounds
 vs_raw         = proj_daily_i / D_live              # multiplier vs raw desk take
 ```
 
@@ -572,7 +663,8 @@ existing DOS-aesthetic conventions.
 |---|---|
 | TIER_STEPS / WEIGHTS | 4 / [1.00, 1.25, 1.60, 2.00] |
 | STEP_FEE | 0.5 SOL (90% pot / 10% ops) |
-| EPOCH_HOURS | 24 |
+| MIN_POT_THRESHOLD | 0.1 SOL per round (no clock; `update_config`-adjustable) |
+| ACC_SCALE | 10¹² (accumulator precision) |
 | BUYBACK_BURN_PCT | 10% of every pot inflow |
 | REWARD_STOCK ($HUB launch) | OTC |
 | LAUNCHER_SHARE | 0% |
@@ -589,7 +681,48 @@ existing DOS-aesthetic conventions.
 | HUB_OTC_LP_SEED | 25–50 SOL-eq per side, phase-2 gated (SOL pool at target + ≥14d stable) |
 | LP_CUSTODY | LP tokens in treasury PDA vault · HODL both legs · fees → pot (source F) |
 | RPC_DEVNET | Helius devnet RPC (`devnet.helius-rpc.com`, same API key); OTC-side accounts mocked by the test harness |
+| MPL_CORE_PROGRAM_ID | `CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d` (`sdk/src/constants.ts`) |
+| HUB_PROGRAM_ID | `5tCDEazUAkRjrkasup1uWcYo3t1C2ht76LmQva5rewQv` (devnet; mainnet TBD) |
 | `f` (creator fee rate) | TBD at launch (checklist item 3) |
+
+## Appendix — Deployment addresses (verified on-chain 2026-09-07)
+
+Source of truth for ids: `Anchor.toml`, `sdk/src/constants.ts`,
+`web/.env.production.local`, `web/src/hub/lib/deployments.ts`. The previous
+devnet program `DPEioLagahMiVy4xfSzeKLWjWho8GZhbvK85BgTkY8qW` was **closed** on
+2026-09-07 (Config layout change for the threshold-round model; PDAs cannot be
+re-initialized under the same id) — do not reference it anywhere.
+
+| Item | Cluster | Address | Status |
+|---|---|---|---|
+| Hub program | devnet | `5tCDEazUAkRjrkasup1uWcYo3t1C2ht76LmQva5rewQv` | live (upgradeable; authority `FRsH…wJZz`, deploy slot 494579757; on-chain hash matches the pinned Docker build) |
+| Hub IDL / program metadata | devnet | `CnSKvxwKb3eNS6oF6GaAyAn8m3B8axXSCQYeBYrjdQfS` | live (Anchor 1.x metadata program `ProgM6JC…nk7S`) |
+| Hub program | mainnet-beta | — | pending (after M3.5 devnet suite + verified build) |
+| Metaplex Core program | devnet + mainnet | `CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d` | external |
+| OTC Desk program | mainnet-beta | `AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW` | external, mainnet-only (mocked on devnet) |
+| OTC Desks collection | mainnet-beta | `D7sLW9uKZG3G7bNbWfMHvKSgVhU9nXdv7huTfepF5Jrh` | external (mirrored on devnet by `devnet-mock-desks.ts`) |
+| Pump.fun (launch dry-run) | devnet + mainnet | `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P` | external test venue only |
+
+**Devnet singleton PDAs (M1 `initialize_config`, all under the hub program id):**
+
+| PDA | Seed | Address | State |
+|---|---|---|---|
+| `Config` | `["config"]` | `AfLMF6N7mYg9ooTEevqHMriakgH1AQADefhbbcjQeTS6` | initialized (411 B) |
+| `Pot` | `["pot"]` | `HHKCcd2WYff9BieUyC6QM9sWAacXmhFkrUFxYguBsSsp` | system-owned, holds pot lamports |
+| `BurnState` | `["burn"]` | `FAABfc8eYsBe95hzws7pCj7U67zA7aQ28BnffADjekfz` | initialized (121 B) |
+| `TreasuryState` | `["treasury"]` | `7ePonUQ85jb4PHsUHaLFGYK4UCFRD1WEh1P7Wrv8pJH3` | initialized (126 B) |
+| `Vault` | `["vault"]` | `3kokfoqWuPhfHEbrPiPaQa6ADtmTtcavh8BdGv1M2NgQ` | derived only (no account until first consignment) |
+| `Epoch[0]` | `["epoch", 0u64]` | `3mSdteiDJxagm38mxmDc2e2q4KCwV61k9CMKMXU8cSwv` | initialized (106 B) |
+
+**Devnet `Config` values (M1 + `devnet-config-reuse.ts`):** authority = ops_wallet
+= treasury = deployer `FRsHGMKByp1EdckJVFU87i9FCf73NcbfMXcTZC71wJZz`;
+`hub_mint` `HWBPrRKgVRetz6Sa7p2aHLwDgapKpzkeZkyhKd9nDwaj` (SPL, 1B × 10⁶);
+`desk_collection` `25Qj1haczTkNNhmVdMdZmegn6kSj9WTwkhckgMUTQeMU` (mock Core
+collection); `otc_program`, `otc_desk_pot`, `otc_mint` = harness placeholders
+(replaced on mainnet by the §A2 resolution script); step fee 0.5 SOL,
+`min_pot_threshold_lamports` 0.1 SOL, burn 1000 bp, ops 1000 bp, consignment
+enabled, consignor share 0 bp, LP disabled (target 100 SOL), not paused. Current
+state at verification: round 3 open, Σw 38,500 bp (three activated tiers).
 
 *Community tooling. Not affiliated with the OTC protocol. Verify everything
 on-chain. DYOR.*
