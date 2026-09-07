@@ -102,6 +102,8 @@ Pot inflow sources:
 - **C — Treasury OTC-stock claims**: treasury HUB float claims its pro-rata
   launcher 70% leg (paid in OTC) like any holder; OTC sold → pot.
 - **D — Discount-exit SOL leg**: 50% SOL half of every treasury desk sale → pot.
+- **E — Consigned desks**: owner-sent desks (§A6.1) whose desk-pot rounds the
+  treasury claims for the pool and distributes to activated desks.
 
 Per epoch (`EPOCH_HOURS = 24`; unclaimed rolls forward):
 
@@ -143,6 +145,33 @@ SOL leg    = 0.50 × sale_value           → pot, in the sale tx
 - Exit economics (live example): buy 6.86, exit 5.77 → break-even after ≈ 8
   desk-days of yield. Exits are optional liquidity, not the business model.
 
+### A6.1 Desk consignment — owner-sent desks
+
+Any desk owner can **consign** their desk to the treasury instead of selling it:
+
+- `consign_desk` transfers the desk NFT into the **treasury vault** and records a
+  `ConsignedDesk` entry (asset_id → consignor). The owner keeps the withdrawal
+  right; the desk is off the market while consigned.
+- From the consignment epoch onward, the treasury claims that desk's desk-pot
+  rounds exactly like its owned desks (same OTC claim instruction). Proceeds are
+  pot inflow **(source E)** and are distributed to **connected (activated) desks**
+  per the normal epoch formula.
+- Optional contributor reward: `CONSIGNOR_SHARE` (default **0%** — all yield goes
+  to the pool, per the community-first ethos) can later be raised via config to
+  credit a share directly to the consignor's accrual. Consigned-desk claim
+  proceeds are tracked separately so the split is always auditable.
+- `unconsign_desk` returns the desk to the consignor after the current epoch
+  finalizes (no epoch is double-counted); yield earned through the withdrawal
+  epoch is credited as normal.
+- Guardrails: consigned desks are **never eligible for discount exits** (the exit
+  pool is treasury-*owned* desks only); the program-enforced `ConsignedDesk`
+  record blocks any treasury transfer/sale of a consigned desk; a
+  claim-before-consign UI flag warns owners of unclaimed vault yield ≥ 0.02 SOL.
+
+Why: owners who believe in $HUB can put idle desks' yield to work for stakers
+without selling the desk — desk-pot take is turned into $HUB staker yield while
+the owner stays long the desk.
+
 ### A7. Buyback-burn sinks
 
 | Event | HUB burned |
@@ -179,6 +208,9 @@ cliff) — hence the sweep payback cap and treating sources A/C as uncorrelated 
 3. Ops share: **10% of activation fees** (covers RPC/relay/hosting).
 4. Treasury minting when spread inverts: **never** (default) — minting burns 100k
    OTC and dilutes per-desk rounds, cutting against the not-greedy principle.
+5. Consignor reward: `CONSIGNOR_SHARE` default **0%** (pure community
+   contribution) vs a direct credit (e.g. 25–50%) to attract consignments —
+   revisit after launch once real consignment demand is observable.
 
 ---
 
@@ -207,9 +239,10 @@ anchor-ts tests, `solana-bankrun` for fast integration tests.
 
 | Account | Seeds (all under program id) | Key fields |
 |---|---|---|
-| `Config` | `["config"]` | authority, pot PDA, ops wallet, tier weights[4], step_fee_lamports, epoch_hours, burn_pct_bp (1000), ops_pct_bp, paused |
+| `Config` | `["config"]` | authority, pot PDA, ops wallet, tier weights[4], step_fee_lamports, epoch_hours, burn_pct_bp (1000), ops_pct_bp, consignment_enabled, consignor_share_bp, paused |
 | `Epoch` | `["epoch", epoch_index u64]` | index, start_ts, end_ts, inflow_lamports, distributed_lamports, burned_lamports, finalized |
 | `DeskTier` | `["tier", asset_id]` | asset_id, tier 1–4, activated_epoch, last_claimed_epoch, voided |
+| `ConsignedDesk` | `["consign", asset_id]` | asset_id, consignor, consigned_epoch, active |
 | `StakerAccrual` | `["accrual", wallet, epoch_index]` | owed_lamports (rolled forward at finalize) |
 | `Pot` (SOL escrow) | `["pot"]` | balance via system PDA lamports |
 | `Burn` | `["burn"]` | total_hub_burned, last_burn_tx, authority |
@@ -229,20 +262,23 @@ the OTC program config on-chain and proposes updates.
 | 3 | `upgrade_tier` | payer, desk NFT, Config, Pot, ops, DeskTier | pay step difference; same ownership check |
 | 4 | `finalize_epoch` | keeper, Config, Epoch, treasury SOL source | epoch boundary; compute per-weight distribution; 10% of epoch inflow → burn-pending; roll unclaimed into next epoch accruals |
 | 5 | `claim_yield` | claimer, desk NFT, DeskTier, StakerAccrual, Pot | **lazy revocation**: re-verify desk ownership on-chain NOW; if caller ≠ owner → void tier (voided = true, no refund) and revert; pay owed_lamports |
-| 6 | `register_treasury_inflow` | treasury multisig, Config, Pot | record source B/C/D inflows from treasury ops; same 10% burn-pending marking |
+| 6 | `register_treasury_inflow` | treasury multisig, Config, Pot | record source B/C/D/E inflows from treasury ops; same 10% burn-pending marking; for consigned-desk (E) proceeds, credit `consignor_share_bp` directly to the consignor's StakerAccrual, remainder → pot |
 | 7 | `record_burn` | keeper, Config, Burn, Pot | after the keeper buys HUB and burns it: mark burn executed, decrement burn-pending |
 | 8 | `void_tier` (internal path in 3/5) | — | ownership change discovered at claim/upgrade voids the tier |
 | 9 | `update_config` | authority (multisig), Config | only whitelisted fields; rate changes apply to future epochs |
 | 10 | `pause` / `unpause` | authority | halts activate/claim on anomaly |
+| 11 | `consign_desk` | owner, desk NFT, treasury vault, ConsignedDesk, Config | verify owner holds the desk asset (Core/DAS); `consignment_enabled` must be true; transfer NFT to vault; record consignor + epoch |
+| 12 | `unconsign_desk` | consignor, desk NFT, treasury vault, ConsignedDesk, Config | only after the current epoch finalizes (no double-count); return NFT; set `active = false`; accrued consignor share (if any) stays claimable |
 
 Program-level invariants to assert everywhere: `inflow_lamports ==
 distributed + burn_pending + rolled_forward`; pot lamports ≥ liability; DeskTier
 weight lookup only for `voided == false`.
 
-**Desk-pot desk-yield claim** (source B): the treasury claims OTC desk-pot
-rounds for its owned desks using the OTC protocol's own claim instruction —
-hubconnect does not wrap it; the keeper just performs it with treasury keys and
-then `register_treasury_inflow`.
+**Desk-pot desk-yield claim** (sources B + E): the treasury claims OTC desk-pot
+rounds for its owned **and consigned** desks using the OTC protocol's own claim
+instruction — hubconnect does not wrap it; the keeper just performs it with
+treasury keys and then `register_treasury_inflow` (consigned proceeds apply the
+consignor share split). Consigned desks are claimed but never sold (§A6.1).
 
 ### B4. Keeper services (off-chain, TypeScript)
 
@@ -254,8 +290,8 @@ then `register_treasury_inflow`.
 2. **Sweeper** — watches Magic Eden listings + reads each listed desk's vault
    stock on-chain (non-empty required); applies §A6 formula (resolve OTC-side
    constants from config first); proposes sweeps within budget/payback caps;
-   executes via treasury multisig; claims desk-pot rounds for owned desks and
-   registers inflow.
+   executes via treasury multisig; claims desk-pot rounds for owned and
+   consigned desks and registers inflow.
 3. **Treasury (exit)** — claims all accrued yield, lists at 90% of verified
    floor, escrow enforces 50% HUB burn + 50% SOL → pot in the same tx; floor
    staleness guard 5%.
@@ -287,6 +323,10 @@ keeper-anyone with a small reward? — start permissioned, open later).
   record_burn is idempotent across restarts (kill and resume).
 - Sweeper: stub ME + vault reads; verify it never sweeps above payback cap,
   never sweeps empty-vault desks, and resolves OTC constants from config.
+- Consignment: consign → treasury claims a round → consignor-share credit
+  (at 0% and at 50% config) → unconsign after finalize returns the desk;
+  treasury exit of a consigned desk is rejected; double-claim of one consigned
+  desk rejected; unconsign before finalize reverts.
 
 **Adversarial:**
 - Floor spoof: exit tx with stale floor > 5% delta must revert.
@@ -307,7 +347,26 @@ keeper-anyone with a small reward? — start permissioned, open later).
 5. Re-verify the 2% taker + 5% royalty buyer-cost model against live Magic
    Eden policy.
 
-### B6. Deliverables & milestones
+### B6. Upgradability — explicitly NOT immutable yet
+
+The program is deployed **upgradeable** on purpose:
+
+- Upgrade authority is retained and held by a **multisig** with a **timelock**
+  (default 48h) before any upgrade takes effect; every upgrade is announced with
+  a diff/changelog and the program is `pause`d during the swap.
+- Storage layout compatibility is asserted on every upgrade build (no account
+  field reinterpreted); the full B5 suite must pass against the new build
+  before authority signs.
+- Rationale: the OTC protocol itself may change under us (fee splits, rotation,
+  claim mechanics, marketplace royalties) — hubconnect must be able to adapt.
+  Immutability can be revisited post-launch (e.g., freeze authority once the
+  verification checklist is stable and the design is audited), but v1 ships
+  upgradeable.
+- The `Config` account is the first-line adaptation path (rates, shares, caps
+  change without a program upgrade); program upgrades are reserved for logic
+  changes only.
+
+### B7. Deliverables & milestones
 
 1. **M1 — scaffold**: repo layout, program with Config + all instructions as
    stubs, bankrun harness, CI (fmt, clippy, test).
@@ -337,6 +396,9 @@ keeper-anyone with a small reward? — start permissioned, open later).
 | SWEEP_PAYBACK_CAP | ≤60 desk-days at D=0.07 (≈4.2 SOL/desk) |
 | UNCLAIMED_YIELD_WARN | 0.02 SOL (claim-before-list UI flag) |
 | FLOOR_STALENESS_GUARD | 5% |
+| CONSIGNMENT_ENABLED | true (config-gated) |
+| CONSIGNOR_SHARE | 0% of consigned desk yield (parameterized; see A9.5) |
+| UPGRADE_TIMELOCK | 48h, multisig-held upgrade authority (not immutable) |
 | `f` (creator fee rate) | TBD at launch (checklist item 3) |
 
 *Community tooling. Not affiliated with the OTC protocol. Verify everything
