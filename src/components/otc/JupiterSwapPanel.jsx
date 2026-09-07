@@ -18,6 +18,7 @@ import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 import RecentSwaps from "@/components/otc/RecentSwaps";
 import PriceCandles from "@/components/otc/PriceCandles";
+import SwapMobile from "@/components/otc/SwapMobile";
 import WalletConnect from "@/components/otc/WalletConnect";
 
 const DEFAULT_TOKEN = { mint: OTC_MINT, symbol: "OTC" };
@@ -56,6 +57,9 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   const [priceState, setPrices] = useState(null);
   const [priceUnit, setPriceUnit] = useState("USD"); // shared USD/SOL toggle for candles + trades feed
   const [txPhase, setTxPhase] = useState(null); // live swap phase for the status overlay
+  // Phones (<640px) render the simple Uniswap-style swap card (SwapMobile)
+  // instead of the dense terminal column, which never fit the mobile fold.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 639px)").matches);
   const mounted = useRef(false);
   const lifetime = useRef(0);
   const busyRef = useRef(false);
@@ -111,6 +115,15 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       timers.current.forEach(clearTimeout);
       timers.current.clear();
     };
+  }, []);
+
+  // Track the sm: breakpoint so phones mount the simple swap card.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
 
   // Reset only on an actual mint change, not refreshed token props or wallets.
@@ -220,6 +233,19 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   const liq = isOtc ? latest?.token_liquidity_usd : token?.liquidity;
   const vol = isOtc ? latest?.token_volume_24h : token?.vol24;
   const metricsAt = snapshotTime(token?.metricsAt);
+
+  // Pre-formatted labels for the mobile swap card (desktop keeps inline fmt).
+  const quoteOutLabel = quote ? formatRawAmount(quote.outAmount, outputDecimals) : null;
+  const minRecvLabel = quote ? formatRawAmount(quote.otherAmountThreshold, outputDecimals) : null;
+  const priceImpactLabel = quote ? `${(Number(quote.priceImpactPct || 0) * 100).toFixed(3)}%` : null;
+  const routeLabel = quote ? quote.routePlan?.map((r) => r.swapInfo?.label).join(" → ") || null : null;
+  const solBalLabel = solBal != null ? formatRawAmount(solBal, 9) : null;
+  const tokenBalLabel = tokenBal != null && tokenInfo ? formatRawAmount(tokenBal, tokenInfo.decimals) : null;
+  const maxAvailable = !busy && (isBuy ? solBal > SOL_FEE_RESERVE : tokenBal > 0n);
+  const onMax = () => {
+    if (busyRef.current || !tokenInfo) return;
+    changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
+  };
 
   // Event-time invalidation closes the window before React's next render.
   const invalidate = () => {
@@ -334,6 +360,59 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       later(() => { if (isCurrent(life)) setCopied(null); }, 1400);
     } catch { /* ignore */ }
   };
+
+  // Phones: simple Uniswap-style swap card. The full terminal panel stays on
+  // desktop (sm+) where the dense multi-section layout fits the screen.
+  if (isMobile) {
+    return (
+      <SwapMobile
+        tokenLabel={tokenLabel}
+        mint={mint}
+        isOtc={isOtc}
+        wallet={wallet}
+        busy={busy}
+        quoting={quoting}
+        isBuy={isBuy}
+        amount={amount}
+        onChangeAmount={changeAmount}
+        onFlip={() => switchMode(isBuy ? "SELL" : "BUY")}
+        solBalLabel={solBalLabel}
+        tokenBalLabel={tokenBalLabel}
+        maxAvailable={maxAvailable}
+        onMax={onMax}
+        amountUsd={amountUsd}
+        quoteOut={quoteOutLabel}
+        quoteUsd={outUsd}
+        minRecvLabel={minRecvLabel}
+        priceImpactLabel={priceImpactLabel}
+        routeLabel={routeLabel}
+        inputError={inputError}
+        err={err}
+        logs={logs}
+        slippageBps={slippageBps}
+        customSlip={customSlip}
+        onSlippagePreset={(bps) => {
+          if (busyRef.current) return;
+          invalidate();
+          setSlippageBps(bps);
+          setCustomSlip("");
+        }}
+        onCustomSlippage={(v) => {
+          if (busyRef.current) return;
+          invalidate();
+          setCustomSlip(v);
+        }}
+        onSwap={doSwap}
+        onResetToken={onResetToken}
+        onConnected={onConnected}
+        onGoConnect={onGoConnect}
+        latest={latest}
+        history={history}
+        unit={priceUnit}
+        onToggleUnit={() => setPriceUnit((u) => (u === "USD" ? "SOL" : "USD"))}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col border border-green-500/30 bg-black p-3">
