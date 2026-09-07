@@ -227,6 +227,13 @@ export default function PotRoutingPanel({ latest }) {
             {fmtSol(launchToday, 1)} SOL/day)
           </div>
         )}
+        <div className="mt-0.5 font-mono text-[9px] text-green-500/70">
+          LAUNCHPAD FEE_SPLIT :: 75% launchpad holders · 10% desk pot · 15% unverified — the 10% desk
+          share is the route that went dark ·{" "}
+          <a href="https://otcdesks.cash/analytics" target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
+            OFFICIAL FEE_MAP ↗
+          </a>
+        </div>
       </div>
 
       {/* milestones, verified fee config, and the desk-owner ask */}

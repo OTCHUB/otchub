@@ -139,7 +139,8 @@ export default function PotFlowDiagram({ latest }) {
       )}
       {launchpad <= 0 && (
         <div className="mt-0.5 text-center font-mono text-[9px] text-red-400">
-          ✖ CREATOR_FEES :: 0.00 SOL reached the pot this day — route broken (see VAULT → POT below)
+          ✖ CREATOR_FEES :: 0.00 SOL reached the pot this day — the 10% desk share of launchpad fees is
+          not landing (see VAULT → POT below)
         </div>
       )}
     </div>
