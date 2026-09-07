@@ -114,6 +114,24 @@ export default function PotRoutingPanel({ latest }) {
         </a>
       </div>
 
+      {/* pump.fun fee fate — verified on-chain 2026-09-07 */}
+      <div className="space-y-0.5 border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[9px]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-amber-300">
+          <span>PUMP.FUN :: PROTOCOL_FEE → PUMP VAULT · CREATOR_FEE → COIN CREATOR VAULT (claim-only) · 0% → POT</span>
+          <a href={scan(PUMPFUN_PROGRAM)} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">
+            PGM:PUMP_FUN ↗
+          </a>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-green-500/60">
+          <span>VERIFIED 09-07 :: recorded vaults CLOSED on-chain (0 bal · 0 txs) · $OTC pool swaps inactive (bot dust only) — 10% desk share needs a manual sweep</span>
+          {FEE_VAULTS.map((v) => (
+            <a key={v.key} href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-amber-300/70 underline hover:text-amber-300">
+              {short(v.key)} ↗
+            </a>
+          ))}
+        </div>
+      </div>
+
       {/* everything else collapsed */}
       <Detail label="[+] EVIDENCE">
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-green-500/60">
@@ -138,10 +156,12 @@ export default function PotRoutingPanel({ latest }) {
           ))}
         </div>
         <p className="mt-1 leading-snug text-green-500/50">
-          Green routes land directly in the pot. Creator fees accrue inside pump.fun vaults whose keys
-          are neither the pot nor the protocol wallet — no on-chain vault→pot route exists, so balances
-          reach desks only if manually swept. Verified by account inspection 2026-09-06 · community
-          tooling — verify on Solscan before drawing conclusions.
+          Green routes land directly in the pot. pump.fun sends its protocol fee to the pump vault and
+          creator fees to claim-only coin-creator vaults — neither references the pot. The vault
+          addresses previously recorded here are now CLOSED on-chain (0 balance, 0 history, verified
+          2026-09-07) and $OTC pool activity is bot dust only, so the 10% desk share of launchpad fees
+          reaches desks only if manually swept. Community tooling — verify on Solscan before drawing
+          conclusions.
         </p>
       </Detail>
       <Detail label="[+] HISTORY & CONFIG">
