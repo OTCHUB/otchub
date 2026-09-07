@@ -3,12 +3,14 @@ import React, { useState, useEffect } from "react";
 // All panels open by default; click anywhere on the header bar to toggle.
 // `openSignal` lets other panels force this card open: bump the counter and
 // the card re-expands (used by the swap panel's "connect wallet" shortcut).
-export default function CollapsibleCard({ title, children, defaultOpen = true, mobileOpen = false, id = undefined, right = undefined, openSignal = 0, locked = false }) {
-  // Mobile declutter: on small screens only essential panels (mobileOpen)
-  // start open; everything else begins collapsed to keep the page lean.
-  const [open, setOpen] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth < 768 ? mobileOpen : defaultOpen
-  );
+export default function CollapsibleCard({ title, children, defaultOpen = true, mobileOpen = null, id = undefined, right = undefined, openSignal = 0, locked = false }) {
+  // Panels auto-expand by default on every screen size; mobileOpen lets a
+  // call site override the small-screen starting state when it differs from
+  // the desktop defaultOpen.
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined" || window.innerWidth >= 768) return defaultOpen;
+    return mobileOpen !== null ? mobileOpen : defaultOpen;
+  });
   const toggle = () => { if (!locked) setOpen((o) => !o); };
 
   useEffect(() => {

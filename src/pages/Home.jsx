@@ -269,7 +269,7 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          <CollapsibleCard title="WALLET" id="otc-wallet" mobileOpen openSignal={walletOpenSignal}>
+          <CollapsibleCard title="WALLET" id="otc-wallet" openSignal={walletOpenSignal}>
             {wallet ? (
               <WalletPortfolio
                 address={wallet}
@@ -289,7 +289,7 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
           <div className="h-full lg:col-span-2">
-            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage" mobileOpen>
+            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage">
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>
           </div>
@@ -300,7 +300,7 @@ export default function Home() {
 
         {/* Live launch rankings select a mint in the shared SOL swap panel. */}
         <div className="mt-3">
-          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" mobileOpen right={null} openSignal={0}>
+          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" right={null} openSignal={0}>
             <LauncherAnalytics onTrade={tradeLauncher} selectedMint={selectedToken?.mint}
               tradingDisabled={swapBusy} onSnapshot={updateLauncherSnapshot} />
           </CollapsibleCard>
@@ -342,7 +342,7 @@ export default function Home() {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2" id="otc-swap">
             <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
-              mobileOpen openSignal={swapOpenSignal} locked={swapBusy}>
+              openSignal={swapOpenSignal} locked={swapBusy}>
               <JupiterSwapPanel
                 wallet={wallet}
                 latest={latest}
