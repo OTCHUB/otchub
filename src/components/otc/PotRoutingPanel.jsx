@@ -16,6 +16,18 @@ const FEE_VAULTS = [
   { src: "LAUNCHER COINS", key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ" },
 ];
 
+// Revenue-classification programs (mirror base44/shared/potSources.ts) and the
+// $OTC pool — every routing row links its backing program and the pot's
+// transfer history (the actual inflow txs the amounts are measured from).
+const OTC_PROGRAM = "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW";
+const PUMPFUN_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+const PUMPAMM_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+const ME_V1_PROGRAM = "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K";
+const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc";
+const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
+const potTxs = () => `${scan(POT)}#transfers`;
+const prog = (id) => scan(id);
+
 function Node({ title, sub, href, tone = "src" }) {
   const toneCls =
     tone === "pot"
@@ -67,12 +79,33 @@ function FlowEdge({ label, live, broken = false, amber = false }) {
   );
 }
 
-function FlowRow({ src, edge, dst }) {
+function Evidence({ links }) {
+  if (!links?.length) return null;
+  return (
+    <div className="col-span-full flex flex-wrap items-center gap-x-2 gap-y-0.5 px-1 text-[9px] text-green-500/50">
+      <span className="uppercase tracking-widest text-green-500/40">EVIDENCE</span>
+      {links.map(({ label, url }) => (
+        <a
+          key={label + url}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-cyan-300/80 underline hover:text-cyan-300"
+        >
+          {label} ↗
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function FlowRow({ src, edge, dst, evidence }) {
   return (
     <div className="grid grid-cols-1 items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(130px,auto)_minmax(0,1.15fr)]">
       <div>{src}</div>
       <div className="flex justify-center">{edge}</div>
       <div>{dst}</div>
+      <Evidence links={evidence} />
     </div>
   );
 }
@@ -130,16 +163,27 @@ export default function PotRoutingPanel({ latest }) {
         src={<Node title="DESK_MINTS" sub="0.45 SOL surcharge/mint" />}
         edge={<FlowEdge label="MINT_SURCHARGE" live={live(last.mint)} />}
         dst={potChip}
+        evidence={[
+          { label: "PGM:OTC_MINT", url: prog(OTC_PROGRAM) },
+          { label: "PGM:PUMP_AMM", url: prog(PUMPAMM_PROGRAM) },
+          { label: "TXS:POT_TRANSFERS", url: potTxs() },
+        ]}
       />
       <FlowRow
         src={<Node title="ME_DESK_SALES" sub="5% creator royalty" />}
         edge={<FlowEdge label="ME_ROYALTY" live={live(last.royalty)} />}
         dst={potChip}
+        evidence={[
+          { label: "PGM:ME_V1", url: prog(ME_V1_PROGRAM) },
+          { label: "PGM:ME_V2", url: prog(ME_V2_PROGRAM) },
+          { label: "TXS:POT_TRANSFERS", url: potTxs() },
+        ]}
       />
       <FlowRow
         src={<Node title="SWEEPS · MISC" sub="$OTC tax sweeps, unattributed" />}
         edge={<FlowEdge label="UNATTRIB" amber live={live(last.other)} />}
         dst={potChip}
+        evidence={[{ label: "TXS:POT_TRANSFERS", url: potTxs() }]}
       />
       {FEE_VAULTS.map((v) => (
         <FlowRow
@@ -154,13 +198,23 @@ export default function PotRoutingPanel({ latest }) {
               tone="warn"
             />
           }
+          evidence={[
+            { label: "PGM:PUMP_FUN", url: prog(PUMPFUN_PROGRAM) },
+            { label: "PGM:PUMP_AMM", url: prog(PUMPAMM_PROGRAM) },
+            ...(v.src === "$OTC SWAPS"
+              ? [{ label: "POOL:$OTC_SWAP", url: scan(OTC_POOL) }]
+              : []),
+          ]}
         />
       ))}
 
       {/* broken bridge — vaults to pot */}
       <div className="border border-red-500/40 bg-red-500/5 px-2 py-1.5 text-center">
         <span className="font-mono text-[9px] text-red-400">
-          ✖ VAULT → POT :: NO ON-CHAIN ROUTE — vault authorities ≠ POT ≠ PROTOCOL_WALLET
+          ✖ VAULT → POT :: NO ON-CHAIN ROUTE — vault authorities ≠ POT ≠ PROTOCOL_WALLET ·{" "}
+          <a href={potTxs()} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
+            TXS:POT_TRANSFERS ↗
+          </a>
         </span>
         {dropPct != null && dropPct > 0 && (
           <div className="mt-0.5 font-mono text-[9px] text-red-400/80">
@@ -184,6 +238,10 @@ export default function PotRoutingPanel({ latest }) {
           />
         }
         dst={<Node title="DESK HOLDERS" sub={`${latest?.desks_minted ?? "—"} desks · ${fmtSol(latest?.protocol_distributed_sol ?? null, 1)} distributed total`} />}
+        evidence={[
+          { label: "PGM:OTC_DISTRIBUTE", url: prog(OTC_PROGRAM) },
+          { label: "TXS:PROGRAM_TXS", url: prog(OTC_PROGRAM) },
+        ]}
       />
 
       <HelpNote label="[?] ROUTE_LEGEND">
