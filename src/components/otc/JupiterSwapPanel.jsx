@@ -242,9 +242,16 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   const solBalLabel = solBal != null ? formatRawAmount(solBal, 9) : null;
   const tokenBalLabel = tokenBal != null && tokenInfo ? formatRawAmount(tokenBal, tokenInfo.decimals) : null;
   const maxAvailable = !busy && (isBuy ? solBal > SOL_FEE_RESERVE : tokenBal > 0n);
-  const onMax = () => {
+  // Quick amount fractions (25% / 50% / MAX) of the pay-side balance; buy
+  // keeps the 0.01 SOL fee/rent reserve out of the spendable amount.
+  const onQuickAmount = (frac) => {
     if (busyRef.current || !tokenInfo) return;
-    changeAmount(isBuy ? formatRawAmount(solBal - SOL_FEE_RESERVE, 9) : formatRawAmount(tokenBal, tokenInfo.decimals));
+    const avail = isBuy
+      ? solBal != null && solBal > SOL_FEE_RESERVE ? solBal - SOL_FEE_RESERVE : null
+      : tokenBal;
+    if (avail == null || avail <= 0n) return;
+    const rawAmt = frac >= 1 ? avail : (avail * BigInt(Math.round(frac * 100))) / 100n;
+    changeAmount(formatRawAmount(rawAmt, isBuy ? 9 : tokenInfo.decimals));
   };
 
   // Event-time invalidation closes the window before React's next render.
@@ -379,7 +386,7 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         solBalLabel={solBalLabel}
         tokenBalLabel={tokenBalLabel}
         maxAvailable={maxAvailable}
-        onMax={onMax}
+        onQuickAmount={onQuickAmount}
         amountUsd={amountUsd}
         quoteOut={quoteOutLabel}
         quoteUsd={outUsd}

@@ -28,7 +28,7 @@ export default function SwapMobile({
   solBalLabel,
   tokenBalLabel,
   maxAvailable,
-  onMax,
+  onQuickAmount,
   amountUsd,
   quoteOut,
   quoteUsd,
@@ -123,9 +123,14 @@ export default function SwapMobile({
             onClick={() => setSettingsOpen((o) => !o)}
             aria-label="Slippage settings"
             aria-expanded={settingsOpen}
-            className={`border p-1.5 ${settingsOpen ? "border-emerald-500/60 text-emerald-300" : "border-green-500/40 text-green-500/60 hover:bg-green-500/10"}`}
+            className={`flex items-center gap-1 border px-1.5 py-1 font-mono text-[11px] ${
+              settingsOpen
+                ? "border-emerald-500/60 text-emerald-300"
+                : "border-green-500/40 text-green-500/60 hover:bg-green-500/10"
+            }`}
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-3.5 w-3.5" />
+            SLIP {customSlip ? `${customSlip}%` : SLIP_PRESETS.find((s) => s.bps === slippageBps)?.label ?? `${slippageBps / 100}%`}
           </button>
         </div>
       </div>
@@ -168,20 +173,27 @@ export default function SwapMobile({
       )}
 
       {/* You pay */}
-      <div className="border border-green-500/20 bg-green-500/5 p-2.5">
-        <div className="flex items-center justify-between font-mono text-[11px] text-green-500/50">
-          <span>YOU PAY</span>
-          <span className="flex items-center gap-1.5">
-            BAL {payToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}
-            {maxAvailable && (
+      <div className="border border-green-500/20 bg-green-500/5 p-2">
+        <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-green-500/50">
+          <span className="truncate">
+            YOU PAY · BAL {payToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            {[
+              ["25%", 0.25],
+              ["50%", 0.5],
+              ["MAX", 1],
+            ].map(([label, frac]) => (
               <button
+                key={label}
                 type="button"
-                onClick={onMax}
-                className="border border-cyan-400/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10"
+                onClick={() => onQuickAmount(frac)}
+                disabled={busy || !maxAvailable}
+                className="border border-cyan-400/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-30"
               >
-                [MAX]
+                [{label}]
               </button>
-            )}
+            ))}
           </span>
         </div>
         <div className="mt-1.5 flex items-center gap-2">
@@ -209,14 +221,14 @@ export default function SwapMobile({
           onClick={onFlip}
           disabled={busy}
           aria-label="Switch swap direction"
-          className="border border-green-500/50 bg-black p-2 text-green-400 transition-transform active:rotate-180 disabled:opacity-40"
+          className="border border-green-500/50 bg-black p-1.5 text-green-400 transition-transform active:rotate-180 disabled:opacity-40"
         >
           <ArrowDown className="h-4 w-4" />
         </button>
       </div>
 
       {/* You receive */}
-      <div className="border border-green-500/20 bg-green-500/5 p-2.5">
+      <div className="border border-green-500/20 bg-green-500/5 p-2">
         <div className="flex items-center justify-between font-mono text-[11px] text-green-500/50">
           <span>YOU RECEIVE</span>
           <span>BAL {recvToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}</span>

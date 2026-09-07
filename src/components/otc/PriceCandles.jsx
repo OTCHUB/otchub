@@ -300,7 +300,7 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
         // touch-pan-y: vertical swipes still scroll the page (the chart never
         // traps scroll on mobile); horizontal drag pans and two-finger pinch
         // stays ours to zoom.
-        className="relative h-24 w-full touch-pan-y select-none cursor-crosshair sm:h-32"
+        className="relative h-20 w-full touch-pan-y select-none cursor-crosshair sm:h-32"
       >
         {scale && view.length >= 2 ? (
           <>
@@ -420,8 +420,9 @@ export default function PriceCandles({ latest, history, unit = "USD", onToggleUn
         )}
       </div>
 
-      {/* Series + interaction note (single compact line) */}
-      <div className="border-t border-green-500/10 px-2 py-0.5 font-mono text-[10px] text-green-500/40">
+      {/* Series + interaction note (single compact line; hidden on phones
+          so the chart block stays short and the swap card fits the fold) */}
+      <div className="hidden border-t border-green-500/10 px-2 py-0.5 font-mono text-[10px] text-green-500/40 sm:block">
         {view.length}/{total} {tf} CANDLE(S) IN VIEW ·{" "}
         {src === "FULL"
           ? "FULL HISTORY :: GECKOTERMINAL"
