@@ -12,6 +12,7 @@ import RoundsChart from "@/components/otc/RoundsChart";
 import ByStockChart from "@/components/otc/ByStockChart";
 import PotSourcesChart from "@/components/otc/PotSourcesChart";
 import PerDeskTrendChart from "@/components/otc/PerDeskTrendChart";
+import PotRoutingPanel from "@/components/otc/PotRoutingPanel";
 import SupplyChart from "@/components/otc/SupplyChart";
 import BuybacksPanel from "@/components/otc/BuybacksPanel";
 import DesksTables from "@/components/otc/DesksTables";
@@ -355,6 +356,13 @@ export default function Home() {
           </div>
           <CollapsibleCard title="TRADE :: NFT DESKS">
             <NftTradeCard />
+          </CollapsibleCard>
+        </div>
+
+        {/* Pot fee routing map: live source → vault → pot → desks flow */}
+        <div className="mt-3">
+          <CollapsibleCard title="POT_ROUTING :: LIVE FEE_FLOW">
+            <PotRoutingPanel latest={latest} />
           </CollapsibleCard>
         </div>
 
