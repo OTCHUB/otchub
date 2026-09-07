@@ -1,6 +1,6 @@
 # hubconnect — $HUB Protocol Full Specification
 
-**Repo:** `hubconnect` · **Version:** 1.1 (implementation spec) · **Date:** 2026-09-07
+**Repo:** `hubconnect` · **Version:** 1.2 (implementation spec) · **Date:** 2026-09-07
 **Purpose:** Self-contained spec for an AI agent to scaffold, implement, and test the $HUB
 protocol end-to-end. Everything needed is in this document — no external conversation
 context required.
@@ -471,6 +471,75 @@ The program is deployed **upgradeable** on purpose:
    with on-chain evidence (tx signatures / screenshots in `docs/evidence/`).
 7. **M6 — devnet pilot → mainnet deploy**: activate → finalize → claim → burn
    loop with a test SPL token standing in for $HUB; audit-ready state.
+
+---
+
+## PART C — TREASURY DASHBOARD & YIELD TRACKER (user-facing)
+
+### C1. Purpose
+
+Desk owners must be able to answer one question before paying an activation fee:
+**"What does an activated desk earn via $HUB vs leaving the desk raw?"** The
+dashboard shows both numbers live, side by side, with the assumptions exposed —
+never a promised APY. It is community tooling with the same evidence-first rules
+as the rest of hubconnect: every figure links to its on-chain source.
+
+### C2. Where it lives
+
+The OTC Hub dashboard app (this repo's sibling) already ingests most inputs on a
+5-minute cadence (OtcSnapshot: per-desk take history, pot sources, spot prices,
+desk counts) and has the Helius RPC path — so the yield tracker is added **there**
+as a new panel, reading hubconnect program accounts (Config, Pot, Epoch,
+TreasuryState, Burn) via the same RPC connection. hubconnect exposes only
+read-only account decoders in its SDK (`sdk`); no privileged endpoints exist.
+
+### C3. Live metrics strip (top of panel)
+
+| Metric | Source |
+|---|---|
+| Pot balance + liability (unclaimed accruals) | Pot PDA lamports vs Σ StakerAccrual |
+| Current epoch: inflow-so-far, time remaining | Epoch account |
+| Activated cohort: desks by tier, Σw | DeskTier accounts (index/scan) |
+| Treasury: desks owned / consigned, exit history, burns executed, HUB float vs ≤2% cap | TreasuryState, Burn, published treasury wallet |
+| Raw desk-pot take D (trailing 7d and latest day) | OtcSnapshot per_desk history (already ingested) |
+
+### C4. Yield comparison table (the core view)
+
+For each tier T1–T4, recomputed live from current epoch data:
+
+```text
+proj_daily_i   = (w_i / Σw_live) × 0.90 × pot_inflow_per_day_live
+breakeven_days = cumulative_cost_i / proj_daily_i
+vs_raw         = proj_daily_i / D_live              # multiplier vs raw desk take
+```
+
+Displayed per tier: cumulative cost, live weight, projected SOL/day (with USD),
+breakeven in days, and the **vs-raw multiplier** — the single number the whole
+product reduces to. Column beside it: the raw desk earning (D) so the comparison
+is unmissable. All projections labeled `ESTIMATE — scales with Σw; not a promise`.
+
+### C5. Scenario toggle
+
+Since Σw grows after you activate, a 3-way toggle (conservative / current / bull,
+from §A8) re-projects the table under different cohort sizes — showing honestly
+that yield compresses as adoption grows, while still beating raw desk take.
+
+### C6. Treasury transparency panel
+
+Sweep/consignment/exit ledger (every tx linked), burn history (HUB burned to
+date, last burn tx), LP depth + harvested fees (source F), and the treasury HUB
+float balance against its ≤2% cap — all read from on-chain accounts, no
+hand-maintained numbers. Collapsible evidence sub-sections per the dashboard's
+existing DOS-aesthetic conventions.
+
+### C7. Rules
+
+- Every displayed figure must be derivable on-chain or from the published
+  OtcSnapshot feed — no manual treasury reporting.
+- Community-tooling + DYOR disclaimers persist on this panel like everywhere else.
+- The tracker never estimates the launcher 70% leg (per-wallet pro-rata) — that
+  stream is direct-to-holder and shown only as a link-out explanation, since it
+  depends on the viewer's own HUB balance, not the tier system.
 
 ---
 
