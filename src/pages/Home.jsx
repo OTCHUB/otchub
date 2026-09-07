@@ -322,7 +322,7 @@ export default function Home() {
 
         {/* Trade hub: two-way token swap + NFT desk trade routes */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <div className="lg:col-span-2" id="otc-swap">
+          <div className="min-w-0 lg:col-span-2" id="otc-swap">
             <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
               openSignal={swapOpenSignal} locked={swapBusy}>
               <JupiterSwapPanel
