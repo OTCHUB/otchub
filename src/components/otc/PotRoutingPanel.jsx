@@ -1,6 +1,5 @@
 import React from "react";
 import { fmtSol } from "@/lib/format";
-import HelpNote from "@/components/otc/HelpNote";
 import PotMilestones from "@/components/otc/PotMilestones";
 import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
 
@@ -9,106 +8,48 @@ import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
 const POT = "BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR";
 const scan = (addr) => `https://solscan.io/account/${addr}`;
 const short = (addr) => `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+const potTxs = () => `${scan(POT)}#transfers`;
 
 // pump.fun creator-fee vaults: per-swap creator fees accrue here. The vault
 // authorities are neither the pot nor the protocol wallet, and the pot is not
 // referenced in the pool/vault accounts — no on-chain vault→pot route exists.
 const FEE_VAULTS = [
-  { src: "$OTC SWAPS", key: "14fL3h2oe5VKk7Jkh77ML2UFMKQeKGPxZy14ZLcqkQUd" },
-  { src: "LAUNCHER COINS", key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ" },
+  { src: "$OTC", key: "14fL3h2oe5VKk7Jkh77ML2UFMKQeKGPxZy14ZLcqkQUd" },
+  { src: "LAUNCHER", key: "GQr6Gu3X8TmAuwHugDX2W2Ub3HfeZoRUsv61rz8jDfmZ" },
 ];
 
-// Revenue-classification programs (mirror base44/shared/potSources.ts) and the
-// $OTC pool — every routing row links its backing program and the pot's
-// transfer history (the actual inflow txs the amounts are measured from).
+// Revenue-classification programs (mirror base44/shared/potSources.ts).
 const OTC_PROGRAM = "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW";
 const PUMPFUN_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 const PUMPAMM_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 const ME_V1_PROGRAM = "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K";
 const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc";
 const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
-const potTxs = () => `${scan(POT)}#transfers`;
-const prog = (id) => scan(id);
 
-function Node({ title, sub, href, tone = "src" }) {
-  const toneCls =
-    tone === "pot"
-      ? "border-emerald-400/60 text-emerald-300"
-      : tone === "warn"
-        ? "border-amber-500/50 text-amber-300"
-        : "border-green-500/30 text-green-300";
+function RouteRow({ mark, markCls, label, value, valueCls, href, note }) {
   return (
-    <div className={`border bg-black px-2 py-1.5 text-center ${toneCls}`}>
-      <div className="text-[10px] font-bold uppercase tracking-widest">{title}</div>
-      {sub && (
-        <div className="mt-0.5 font-mono text-[9px] text-green-500/60">
-          {href ? (
-            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">
-              {sub} ↗
-            </a>
-          ) : (
-            sub
-          )}
-        </div>
+    <div className="flex min-w-0 items-center gap-2 border border-green-500/15 px-2 py-1 font-mono text-[9px]">
+      <span className={`shrink-0 ${markCls}`}>{mark}</span>
+      <span className="min-w-0 flex-1 truncate uppercase text-green-400/80">{label}</span>
+      {note && <span className="shrink-0 text-green-500/50">{note}</span>}
+      <span className={`shrink-0 ${valueCls}`}>{value}</span>
+      {href && (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="shrink-0 text-cyan-300/70 underline hover:text-cyan-300">
+          ↗
+        </a>
       )}
     </div>
   );
 }
 
-function FlowEdge({ label, live, broken = false, amber = false }) {
-  const labelCls = broken
-    ? "text-red-400"
-    : amber
-      ? "text-amber-300/80"
-      : "text-green-500/70";
-  const head = broken ? "✖" : "▶";
-  const headCls = broken ? "text-red-400" : amber ? "text-amber-400" : "text-emerald-400";
+function Detail({ label, children }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-0.5 text-center">
-      <span className={`text-[9px] uppercase tracking-widest ${labelCls}`}>{label}</span>
-      {live && <span className="font-mono text-[9px] text-emerald-300">{live}</span>}
-      {/* horizontal route (sm+) */}
-      <div className="relative hidden h-2 w-full min-w-20 sm:block">
-        <div className={`absolute top-[3px] h-0.5 w-full ${broken ? "pot-flow-x pot-flow-broken" : "pot-flow-x"}`} />
-        <span className={`absolute -right-0.5 -top-[6px] text-[10px] ${headCls}`}>{head}</span>
-      </div>
-      {/* stacked route (mobile) */}
-      <div className="flex flex-col items-center sm:hidden">
-        <div className={`h-5 w-0.5 ${broken ? "pot-flow-y pot-flow-broken-y" : "pot-flow-y"}`} />
-        <span className={`text-[10px] ${headCls}`}>{broken ? "✖" : "▼"}</span>
-      </div>
-    </div>
-  );
-}
-
-function Evidence({ links }) {
-  if (!links?.length) return null;
-  return (
-    <div className="col-span-full flex flex-wrap items-center gap-x-2 gap-y-0.5 px-1 text-[9px] text-green-500/50">
-      <span className="uppercase tracking-widest text-green-500/40">EVIDENCE</span>
-      {links.map(({ label, url }) => (
-        <a
-          key={label + url}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-cyan-300/80 underline hover:text-cyan-300"
-        >
-          {label} ↗
-        </a>
-      ))}
-    </div>
-  );
-}
-
-function FlowRow({ src, edge, dst, evidence }) {
-  return (
-    <div className="grid grid-cols-1 items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(130px,auto)_minmax(0,1.15fr)]">
-      <div>{src}</div>
-      <div className="flex justify-center">{edge}</div>
-      <div>{dst}</div>
-      <Evidence links={evidence} />
-    </div>
+    <details className="border border-green-500/15 px-2 py-1 text-[9px]">
+      <summary className="cursor-pointer select-none font-mono uppercase tracking-widest text-green-500/50 hover:text-green-400">
+        {label}
+      </summary>
+      <div className="mt-1">{children}</div>
+    </details>
   );
 }
 
@@ -127,148 +68,85 @@ export default function PotRoutingPanel({ latest }) {
   );
   const launchToday = last.launchpad || 0;
   const dropPct = peak.val > 0 ? Math.round((1 - launchToday / peak.val) * 100) : null;
+  const inflow = (last.mint || 0) + (last.royalty || 0) + (last.other || 0) + launchToday;
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const lastClosed = (latest?.per_desk?.items || [])
     .filter((d) => String(d.day || "") < todayKey)
     .sort((a, b) => String(b.day || "").localeCompare(String(a.day || "")))[0];
 
-  const live = (v) => (v == null ? null : `+${fmtSol(v, 2)} · ${dayLbl}`);
-  const potChip = (
-    <div className="border border-emerald-400/50 bg-emerald-400/5 px-2 py-1.5 text-center text-emerald-300">
-      <div className="text-[10px] font-bold uppercase tracking-widest">POT ✓</div>
-      <a
-        href={scan(POT)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-mono text-[9px] text-green-500/60 underline hover:text-green-400"
-      >
-        {short(POT)} ↗
-      </a>
-    </div>
-  );
-
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-1">
-        <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-          POT_ROUTING :: SOURCE → VAULT → POT → DESKS
+    <div className="space-y-1.5">
+      {/* one-line header */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-mono text-[10px] uppercase tracking-widest text-green-500/70">
+          POT_ROUTING :: {dayLbl ?? "—"} · IN +{fmtSol(inflow, 2)} SOL
         </span>
-        <span className="flex items-center gap-1.5 text-[9px] text-emerald-400">
+        <span className="flex shrink-0 items-center gap-1 font-mono text-[9px] text-emerald-400">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          LIVE · latest tracked day {dayLbl ?? "—"}
+          LIVE
         </span>
       </div>
 
-      {/* horizontal flow diagram — last closed day at a glance */}
+      {/* sankey overview */}
       <PotFlowDiagram latest={latest} />
 
-      {/* stage A — fee origins and where they land */}
-      <FlowRow
-        src={<Node title="DESK_MINTS" sub="0.45 SOL surcharge/mint" />}
-        edge={<FlowEdge label="MINT_SURCHARGE" live={live(last.mint)} />}
-        dst={potChip}
-        evidence={[
-          { label: "PGM:OTC_MINT", url: prog(OTC_PROGRAM) },
-          { label: "PGM:PUMP_AMM", url: prog(PUMPAMM_PROGRAM) },
-          { label: "TXS:POT_TRANSFERS", url: potTxs() },
-        ]}
-      />
-      <FlowRow
-        src={<Node title="ME_DESK_SALES" sub="5% creator royalty" />}
-        edge={<FlowEdge label="ME_ROYALTY" live={live(last.royalty)} />}
-        dst={potChip}
-        evidence={[
-          { label: "PGM:ME_V1", url: prog(ME_V1_PROGRAM) },
-          { label: "PGM:ME_V2", url: prog(ME_V2_PROGRAM) },
-          { label: "TXS:POT_TRANSFERS", url: potTxs() },
-        ]}
-      />
-      <FlowRow
-        src={<Node title="SWEEPS · MISC" sub="$OTC tax sweeps, unattributed" />}
-        edge={<FlowEdge label="UNATTRIB" amber live={live(last.other)} />}
-        dst={potChip}
-        evidence={[{ label: "TXS:POT_TRANSFERS", url: potTxs() }]}
-      />
-      {FEE_VAULTS.map((v) => (
-        <FlowRow
-          key={v.key}
-          src={<Node title={v.src} sub="per-swap creator fees" />}
-          edge={<FlowEdge label="CREATOR_FEES" live="ACCRUING · BALANCE NOT VISIBLE" />}
-          dst={
-            <Node
-              title="FEE VAULT ⚠"
-              sub={short(v.key)}
-              href={scan(v.key)}
-              tone="warn"
-            />
-          }
-          evidence={[
-            { label: "PGM:PUMP_FUN", url: prog(PUMPFUN_PROGRAM) },
-            { label: "PGM:PUMP_AMM", url: prog(PUMPAMM_PROGRAM) },
-            ...(v.src === "$OTC SWAPS"
-              ? [{ label: "POOL:$OTC_SWAP", url: scan(OTC_POOL) }]
-              : []),
-          ]}
-        />
-      ))}
+      {/* live routes — one line each */}
+      <RouteRow mark="✓" markCls="text-emerald-400" label="DESK_MINTS · MINT_SURCHARGE"
+        value={`+${fmtSol(last.mint, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
+      <RouteRow mark="✓" markCls="text-emerald-400" label="ME_SALES · 5% ROYALTY"
+        value={`+${fmtSol(last.royalty, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
+      <RouteRow mark="△" markCls="text-amber-300" label="SWEEPS · UNATTRIB"
+        value={`+${fmtSol(last.other, 2)}`} valueCls="text-amber-300" href={potTxs()} />
+      <RouteRow mark="▶" markCls="text-emerald-400" label="POT → DESK_HOLDERS · AUTO_DISTRIBUTE"
+        note={`${latest?.desks_minted ?? "—"} desks`} valueCls="text-emerald-300"
+        value={lastClosed?.per_desk_sol != null ? `${fmtSol(lastClosed.per_desk_sol, 3)}/DESK` : "—"}
+        href={scan(OTC_PROGRAM)} />
 
-      {/* broken bridge — vaults to pot */}
-      <div className="border border-red-500/40 bg-red-500/5 px-2 py-1.5 text-center">
-        <span className="font-mono text-[9px] text-red-400">
-          ✖ VAULT → POT :: NO ON-CHAIN ROUTE — vault authorities ≠ POT ≠ PROTOCOL_WALLET ·{" "}
-          <a href={potTxs()} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
-            TXS:POT_TRANSFERS ↗
-          </a>
-        </span>
+      {/* broken route — single red line */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 border border-red-500/40 bg-red-500/5 px-2 py-1 font-mono text-[9px] text-red-400">
+        <span>✖ CREATOR_FEES ($OTC·LAUNCHER) → FEE VAULTS ≠ POT · SPLIT 75/10/15</span>
         {dropPct != null && dropPct > 0 && (
-          <div className="mt-0.5 font-mono text-[9px] text-red-400/80">
-            CREATOR_FEE inflow −{dropPct}% vs peak {peak.day?.slice(5)} ({fmtSol(peak.val, 1)} →{" "}
-            {fmtSol(launchToday, 1)} SOL/day)
-          </div>
+          <span className="text-red-400/80">−{dropPct}% vs peak {peak.day?.slice(5)}</span>
         )}
-        <div className="mt-0.5 font-mono text-[9px] text-green-500/70">
-          LAUNCHPAD FEE_SPLIT :: 75% launchpad holders · 10% desk pot · 15% unverified — the 10% desk
-          share is the route that went dark ·{" "}
-          <a href="https://otcdesks.cash/analytics" target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
-            OFFICIAL FEE_MAP ↗
-          </a>
-        </div>
+        <a href={potTxs()} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">
+          TXS↗
+        </a>
       </div>
 
-      {/* milestones, verified fee config, and the desk-owner ask */}
-      <PotMilestones latest={latest} />
-
-      {/* stage B — pot to desk holders */}
-      <FlowRow
-        src={<Node title="POT" sub={fmtSol(latest?.pot_sol_balance ?? null, 2)} href={scan(POT)} tone="pot" />}
-        edge={
-          <FlowEdge
-            label="AUTO_DISTRIBUTE"
-            live={
-              lastClosed?.per_desk_sol != null
-                ? `${fmtSol(lastClosed.per_desk_sol, 3)} SOL/DESK · ${String(lastClosed.day).slice(5)}`
-                : null
-            }
-          />
-        }
-        dst={<Node title="DESK HOLDERS" sub={`${latest?.desks_minted ?? "—"} desks · ${fmtSol(latest?.protocol_distributed_sol ?? null, 1)} distributed total`} />}
-        evidence={[
-          { label: "PGM:OTC_DISTRIBUTE", url: prog(OTC_PROGRAM) },
-          { label: "TXS:PROGRAM_TXS", url: prog(OTC_PROGRAM) },
-        ]}
-      />
-
-      <HelpNote label="[?] ROUTE_LEGEND">
-        On-chain fee map, verified by account inspection 2026-09-06. Green routes land directly in the
-        pot (mint surcharge, Magic Eden 5% royalty, sweeps). Amber UNATTRIB covers off-chain sweeps
-        ($OTC trading tax). Creator fees on $OTC and launcher coins accrue inside pump.fun fee vaults
-        controlled by the keys shown — those keys are neither the pot nor the protocol wallet, and the
-        pot is not referenced in the vault or pool accounts, so vault balances reach desks only if
-        manually swept. The launchpad pass-through (~10% of launcher creator fees) is the
-        pot&apos;s largest historical inflow; the drop banner shows its decline against the tracked
-        peak. Community tooling — verify on Solscan before drawing conclusions.
-      </HelpNote>
+      {/* everything else collapsed */}
+      <Detail label="[+] EVIDENCE">
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-green-500/60">
+          {[
+            ["PGM:OTC_MINT/DISTRIBUTE", scan(OTC_PROGRAM)],
+            ["PGM:PUMP_FUN", scan(PUMPFUN_PROGRAM)],
+            ["PGM:PUMP_AMM", scan(PUMPAMM_PROGRAM)],
+            ["PGM:ME_V1", scan(ME_V1_PROGRAM)],
+            ["PGM:ME_V2", scan(ME_V2_PROGRAM)],
+            ["POOL:$OTC_SWAP", scan(OTC_POOL)],
+            ["TXS:POT_TRANSFERS", potTxs()],
+            ["OFFICIAL FEE_MAP", "https://otcdesks.cash/analytics"],
+          ].map(([label, url]) => (
+            <a key={label} href={url} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
+              {label} ↗
+            </a>
+          ))}
+          {FEE_VAULTS.map((v) => (
+            <a key={v.key} href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-amber-300/80 underline hover:text-amber-300">
+              VAULT:{v.src} {short(v.key)} ↗
+            </a>
+          ))}
+        </div>
+        <p className="mt-1 leading-snug text-green-500/50">
+          Green routes land directly in the pot. Creator fees accrue inside pump.fun vaults whose keys
+          are neither the pot nor the protocol wallet — no on-chain vault→pot route exists, so balances
+          reach desks only if manually swept. Verified by account inspection 2026-09-06 · community
+          tooling — verify on Solscan before drawing conclusions.
+        </p>
+      </Detail>
+      <Detail label="[+] HISTORY & CONFIG">
+        <PotMilestones latest={latest} />
+      </Detail>
     </div>
   );
 }
