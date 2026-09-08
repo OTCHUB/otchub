@@ -416,6 +416,172 @@
       "args": []
     },
     {
+      "name": "claim_airdrop",
+      "docs": [
+        "§A7.1 #20 — a desk's current owner claims its snapshot allocation (one claim per asset)."
+      ],
+      "discriminator": [
+        137,
+        50,
+        122,
+        111,
+        89,
+        254,
+        8,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "claimant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "desk_asset"
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hub_mint"
+        },
+        {
+          "name": "airdrop_vault",
+          "writable": true
+        },
+        {
+          "name": "claimant_hub",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "claim",
+          "docs": [
+            "Receipt — `init` (not `init_if_needed`) makes a second claim for the same desk fail."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  105,
+                  114,
+                  100,
+                  114,
+                  111,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "desk_asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_units",
+          "type": "u64"
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "claim_yield",
       "docs": [
         "§B3 #5 (lazy revocation → #8 void_tier). One tx settles every closed round."
@@ -832,6 +998,118 @@
                   112,
                   97,
                   121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_tokenomics",
+      "docs": [
+        "§A7.1 #18 — authority records the supply plan + the vault $HUB account funding the airdrop."
+      ],
+      "discriminator": [
+        125,
+        28,
+        250,
+        57,
+        123,
+        233,
+        118,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "airdrop_vault"
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
                 ]
               }
             ]
@@ -1418,6 +1696,91 @@
       ]
     },
     {
+      "name": "set_airdrop_root",
+      "docs": [
+        "§A7.1 #19 — authority publishes the desk-snapshot Merkle root and opens/closes claims."
+      ],
+      "discriminator": [
+        207,
+        153,
+        120,
+        152,
+        60,
+        73,
+        58,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "desk_count",
+          "type": "u32"
+        },
+        {
+          "name": "open",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "set_otc_rate",
       "docs": [
         "§A4.1 #15 — authority refreshes the $OTC/SOL reference rate and the enable switch."
@@ -1971,6 +2334,19 @@
   ],
   "accounts": [
     {
+      "name": "AirdropClaim",
+      "discriminator": [
+        231,
+        12,
+        74,
+        54,
+        245,
+        181,
+        248,
+        38
+      ]
+    },
+    {
       "name": "BurnState",
       "discriminator": [
         21,
@@ -2062,6 +2438,19 @@
       ]
     },
     {
+      "name": "TokenomicsConfig",
+      "discriminator": [
+        43,
+        6,
+        224,
+        196,
+        51,
+        132,
+        142,
+        115
+      ]
+    },
+    {
       "name": "TreasuryState",
       "discriminator": [
         240,
@@ -2087,6 +2476,32 @@
         48,
         235,
         238
+      ]
+    },
+    {
+      "name": "AirdropClaimed",
+      "discriminator": [
+        125,
+        251,
+        195,
+        183,
+        202,
+        126,
+        89,
+        68
+      ]
+    },
+    {
+      "name": "AirdropRootSet",
+      "discriminator": [
+        200,
+        53,
+        71,
+        195,
+        125,
+        232,
+        157,
+        123
       ]
     },
     {
@@ -2459,6 +2874,26 @@
     },
     {
       "code": 6042,
+      "name": "AllocationExceedsSupply",
+      "msg": "Airdrop + treasury lock + team allocations exceed the max supply"
+    },
+    {
+      "code": 6043,
+      "name": "AirdropClosed",
+      "msg": "Airdrop claims are not open"
+    },
+    {
+      "code": 6044,
+      "name": "AirdropInvalidProof",
+      "msg": "Merkle proof does not match the published airdrop root"
+    },
+    {
+      "code": 6045,
+      "name": "AirdropLocked",
+      "msg": "Airdrop root cannot change once claims have been paid"
+    },
+    {
+      "code": 6046,
       "name": "NotImplemented",
       "msg": "Not implemented in this milestone"
     }
@@ -2476,6 +2911,109 @@
           {
             "name": "lamports",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AirdropClaim",
+      "docs": [
+        "`[\"airdrop\", asset]` — one claim per desk asset; existence is the double-claim guard."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "claimant",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_units",
+            "type": "u64"
+          },
+          {
+            "name": "claimed_ts",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AirdropClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "claimant",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_units",
+            "type": "u64"
+          },
+          {
+            "name": "total_claimed_units",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AirdropRootSet",
+      "docs": [
+        "§A7.1 — snapshot published (or re-published before any claim) / claims toggled."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "desk_count",
+            "type": "u32"
+          },
+          {
+            "name": "airdrop_units",
+            "type": "u64"
+          },
+          {
+            "name": "airdrop_bp",
+            "type": "u16"
+          },
+          {
+            "name": "public_bp",
+            "type": "u16"
+          },
+          {
+            "name": "open",
+            "type": "bool"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
           }
         ]
       }
@@ -3395,6 +3933,100 @@
       }
     },
     {
+      "name": "TokenomicsConfig",
+      "docs": [
+        "§A7.1 `[\"tokenomics\"]` — the supply allocation plan, on-chain so the dashboard and token-info",
+        "submissions read one source. Created by the authority after `initialize_config` (same",
+        "pattern as `OtcPayConfig`: no `Config` migration). Shares are bp of `max_supply_units`;",
+        "the airdrop share is derived from the desk count at snapshot, never typed in."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_supply_units",
+            "type": "u64"
+          },
+          {
+            "name": "airdrop_per_desk_units",
+            "type": "u64"
+          },
+          {
+            "name": "snapshot_desk_count",
+            "docs": [
+              "Desk assets counted at the airdrop snapshot (0 until `set_airdrop_root`)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "snapshot_ts",
+            "type": "i64"
+          },
+          {
+            "name": "airdrop_units",
+            "docs": [
+              "`snapshot_desk_count × airdrop_per_desk_units` — exact; `airdrop_bp` is the floored share."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "airdrop_bp",
+            "type": "u16"
+          },
+          {
+            "name": "treasury_lock_bp",
+            "type": "u16"
+          },
+          {
+            "name": "team_bp",
+            "type": "u16"
+          },
+          {
+            "name": "public_bp",
+            "docs": [
+              "Public / OTC-launch share: whatever remains once airdrop + treasury lock + team are out."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "airdrop_root",
+            "docs": [
+              "Merkle root over `keccak(AIRDROP_LEAF_TAG ‖ asset ‖ amount_le)`; zero until published."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "airdrop_vault",
+            "docs": [
+              "Vault-owned $HUB token account that funds claims (mint = `Config.hub_mint`)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "airdrop_claimed_units",
+            "type": "u64"
+          },
+          {
+            "name": "airdrop_claims",
+            "type": "u32"
+          },
+          {
+            "name": "airdrop_open",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "TreasuryState",
       "type": {
         "kind": "struct",
@@ -3520,7 +4152,7 @@
     {
       "name": "SEEDS_DOC",
       "type": "string",
-      "value": "\"config|epoch+u64|tier+asset|consign+asset|accrual+wallet+u64|pot|burn|treasury|vault|otc_pay\""
+      "value": "\"config|epoch+u64|tier+asset|consign+asset|accrual+wallet+u64|pot|burn|treasury|vault|otc_pay|tokenomics|airdrop+asset\""
     }
   ]
 }

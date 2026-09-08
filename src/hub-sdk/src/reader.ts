@@ -16,6 +16,8 @@ import {
   consignPda,
   vaultPda,
   otcPayPda,
+  tokenomicsPda,
+  airdropClaimPda,
 } from "./pda";
 import {
   ACC_SCALE,
@@ -126,6 +128,35 @@ export type OtcPayView = {
   /** Vault-owned $OTC token account: the POL reserve every $OTC fee lands in. */
   polAccount: string;
   totalOtcCollectedUnits: bigint;
+};
+
+/** §A7.1 `TokenomicsConfig` — `null` from `fetchTokenomics` means the plan was never recorded. */
+export type TokenomicsView = {
+  maxSupplyUnits: bigint;
+  airdropPerDeskUnits: bigint;
+  /** Desk assets in the snapshot (0 until `set_airdrop_root`). */
+  snapshotDeskCount: number;
+  snapshotTs: number;
+  airdropUnits: bigint;
+  airdropBp: number;
+  treasuryLockBp: number;
+  teamBp: number;
+  publicBp: number;
+  /** Hex Merkle root; all-zero ⇒ snapshot not published. */
+  airdropRoot: string;
+  airdropRootSet: boolean;
+  /** Vault-owned $HUB token account funding claims. */
+  airdropVault: string;
+  airdropClaimedUnits: bigint;
+  airdropClaims: number;
+  airdropOpen: boolean;
+};
+
+export type AirdropClaimView = {
+  asset: string;
+  claimant: string;
+  amountUnits: bigint;
+  claimedTs: number;
 };
 
 export type SupplyView = SupplyBreakdown & {
@@ -354,6 +385,52 @@ export async function fetchOtcPay(program: HubProgram): Promise<OtcPayView | nul
   const [key] = otcPayPda(program.programId);
   const p = await program.account.otcPayConfig.fetchNullable(key);
   return p ? toOtcPayView(p) : null;
+}
+
+export function toTokenomicsView(
+  t: Awaited<ReturnType<HubProgram["account"]["tokenomicsConfig"]["fetch"]>>,
+): TokenomicsView {
+  const root = Buffer.from(t.airdropRoot).toString("hex");
+  return {
+    maxSupplyUnits: big(t.maxSupplyUnits),
+    airdropPerDeskUnits: big(t.airdropPerDeskUnits),
+    snapshotDeskCount: t.snapshotDeskCount,
+    snapshotTs: n(t.snapshotTs),
+    airdropUnits: big(t.airdropUnits),
+    airdropBp: t.airdropBp,
+    treasuryLockBp: t.treasuryLockBp,
+    teamBp: t.teamBp,
+    publicBp: t.publicBp,
+    airdropRoot: root,
+    airdropRootSet: /[^0]/.test(root),
+    airdropVault: t.airdropVault.toBase58(),
+    airdropClaimedUnits: big(t.airdropClaimedUnits),
+    airdropClaims: t.airdropClaims,
+    airdropOpen: t.airdropOpen,
+  };
+}
+
+export async function fetchTokenomics(program: HubProgram): Promise<TokenomicsView | null> {
+  const [key] = tokenomicsPda(program.programId);
+  const t = await program.account.tokenomicsConfig.fetchNullable(key);
+  return t ? toTokenomicsView(t) : null;
+}
+
+/** `null` ⇒ this desk has not claimed its airdrop. */
+export async function fetchAirdropClaim(
+  program: HubProgram,
+  asset: PublicKey,
+): Promise<AirdropClaimView | null> {
+  const [key] = airdropClaimPda(program.programId, asset);
+  const c = await program.account.airdropClaim.fetchNullable(key);
+  return c
+    ? {
+        asset: c.asset.toBase58(),
+        claimant: c.claimant.toBase58(),
+        amountUnits: big(c.amountUnits),
+        claimedTs: n(c.claimedTs),
+      }
+    : null;
 }
 
 /** True when `activate_tier_otc` / `upgrade_tier_otc` would pass the program's payable gate. */

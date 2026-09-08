@@ -70,9 +70,97 @@ export function supplyBreakdown(
     burnedUnits: burned,
     lockedUnits: locked,
     circulatingUnits: circulating,
-    burnPctOfCirculatingBp:
-      circulating > 0n ? Number((burned * BigInt(BPS)) / circulating) : null,
+    burnPctOfCirculatingBp: circulating > 0n ? Number((burned * BigInt(BPS)) / circulating) : null,
     burnPctOfMaxBp: maxUnits > 0n ? Number((burned * BigInt(BPS)) / maxUnits) : 0,
+  };
+}
+
+/**
+ * §A7.1 supply plan — mirrors `TokenomicsConfig` defaults. Airdrop = 10,000 $HUB per desk asset
+ * at snapshot; treasury lock 5% (held, never sold — creator-fee position); team 0%; everything
+ * else is public, bought up the OTC launch curve.
+ */
+export const AIRDROP_PER_DESK = 10_000;
+export const AIRDROP_PER_DESK_UNITS = BigInt(AIRDROP_PER_DESK) * 10n ** BigInt(HUB_DECIMALS);
+export const TREASURY_LOCK_BP = 500;
+export const TEAM_ALLOCATION_BP = 0;
+/** Domain tag for airdrop Merkle leaves: `sha256(tag ‖ asset ‖ amount_le)`. */
+export const AIRDROP_LEAF_TAG = "hub-airdrop-v1";
+
+export type AllocationSlice = {
+  /** Stable id: `airdrop` · `treasury` · `team` · `public`. */
+  id: "airdrop" | "treasury" | "team" | "public";
+  label: string;
+  units: bigint;
+  /** Share of max supply in bp (floored, matches on-chain `*_bp`). */
+  bp: number;
+};
+
+export type TokenomicsPlan = {
+  maxUnits: bigint;
+  deskCount: number;
+  airdropPerDeskUnits: bigint;
+  slices: AllocationSlice[];
+  airdropUnits: bigint;
+  treasuryLockUnits: bigint;
+  teamUnits: bigint;
+  publicUnits: bigint;
+  /** True when airdrop + treasury + team would exceed max supply (the program rejects this). */
+  overAllocated: boolean;
+};
+
+/**
+ * Pure mirror of `TokenomicsConfig::apply_snapshot` — used before the PDA exists (preview from
+ * the live desk count) and to cross-check the on-chain numbers afterwards.
+ */
+export function tokenomicsPlan(
+  deskCount: number,
+  opts: {
+    maxUnits?: bigint;
+    airdropPerDeskUnits?: bigint;
+    treasuryLockBp?: number;
+    teamBp?: number;
+  } = {},
+): TokenomicsPlan {
+  const maxUnits = opts.maxUnits ?? HUB_MAX_SUPPLY_UNITS;
+  const perDesk = opts.airdropPerDeskUnits ?? AIRDROP_PER_DESK_UNITS;
+  const treasuryLockBp = opts.treasuryLockBp ?? TREASURY_LOCK_BP;
+  const teamBp = opts.teamBp ?? TEAM_ALLOCATION_BP;
+  const bps = BigInt(BPS);
+  const airdropUnits = BigInt(Math.max(0, Math.floor(deskCount))) * perDesk;
+  const treasuryLockUnits = (maxUnits * BigInt(treasuryLockBp)) / bps;
+  const teamUnits = (maxUnits * BigInt(teamBp)) / bps;
+  const carved = airdropUnits + treasuryLockUnits + teamUnits;
+  const overAllocated = carved > maxUnits;
+  const publicUnits = overAllocated ? 0n : maxUnits - carved;
+  const airdropBp = Number((airdropUnits * bps) / maxUnits);
+  const publicBp = overAllocated ? 0 : BPS - airdropBp - treasuryLockBp - teamBp;
+  const slices: AllocationSlice[] = [
+    { id: "public", label: "Public · OTC launch curve", units: publicUnits, bp: publicBp },
+    {
+      id: "treasury",
+      label: "Treasury lock (creator fees)",
+      units: treasuryLockUnits,
+      bp: treasuryLockBp,
+    },
+    {
+      id: "airdrop",
+      label: `Desk airdrop (${AIRDROP_PER_DESK.toLocaleString()} / desk)`,
+      units: airdropUnits,
+      bp: airdropBp,
+    },
+    { id: "team", label: "Dev / team", units: teamUnits, bp: teamBp },
+  ];
+  return {
+    maxUnits,
+    deskCount,
+    airdropPerDeskUnits: perDesk,
+    slices,
+    airdropUnits,
+    treasuryLockUnits,
+    teamUnits,
+    publicUnits,
+    overAllocated,
   };
 }
 

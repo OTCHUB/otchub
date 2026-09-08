@@ -25,11 +25,18 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
             <YieldTable state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
             <div className="flex justify-between text-[10px] text-green-700">
               <span>last read {new Date(fetchedAt).toLocaleTimeString()}</span>
-              <Link to="treasury" className="underline hover:text-green-300">
-                treasury transparency →
-              </Link>
+              <span className="flex gap-3">
+                <Link to="tokenomics" className="underline hover:text-green-300">
+                  tokenomics →
+                </Link>
+                <Link to="treasury" className="underline hover:text-green-300">
+                  treasury transparency →
+                </Link>
+              </span>
             </div>
-            <WalletPanel state={state} walletAddress={walletAddress} />
+            <div id="hub-wallet">
+              <WalletPanel state={state} walletAddress={walletAddress} />
+            </div>
           </>
         )}
       </ProtocolGate>
