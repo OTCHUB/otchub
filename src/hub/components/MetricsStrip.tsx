@@ -42,7 +42,7 @@ export function MetricsStrip({ state }: { state: ProtocolState }) {
       <Stat
         label="round inflow"
         value={fmtSol(effectiveInflowLamports(currentEpoch, config))}
-        sub={`burn slice ${fmtBp(config.burnPctBp, 0)}`}
+        sub={`${fmtBp(config.burnPctBp, 0)} burn · ${fmtBp(config.lpPctBp, 0)} LP · rest → $OTC yield`}
       />
       <Stat
         label="Σ weight"

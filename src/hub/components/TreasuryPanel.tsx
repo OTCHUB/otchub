@@ -1,25 +1,34 @@
-import { burnPda, potPda, treasuryPda, vaultPda, type ProtocolState } from "@hub-sdk";
+import { BPS, otcPotPda, burnPda, potPda, treasuryPda, vaultPda, type ProtocolState } from "@hub-sdk";
 import { useHub } from "../HubProvider";
-import { fmtBp, fmtBpPct, fmtHub, fmtNum, fmtSol, fmtUtc } from "../lib/format";
+import { fmtBp, fmtBpPct, fmtHub, fmtNum, fmtSol, fmtUnits, fmtUtc } from "../lib/format";
 import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
 import { CollapsibleCard, Flag, Panel, Row, Stat } from "./ui/Panel";
 import { TreasuryPortfolio } from "./TreasuryPortfolio";
 import { VerificationPanel } from "./VerificationPanel";
 
+/** $OTC mint decimals fallback for the pot's lifetime-bought display. */
+const OTC_DECIMALS = 6;
+
 /** §C6 — treasury transparency: what the protocol holds, has swept, and has burned. */
 export function TreasuryPanel({ state }: { state: ProtocolState }) {
   const { programId } = useHub();
-  const { config, treasury, burn, potLamports, supply, token } = state;
+  const { config, treasury, burn, otcPot, potLamports, supply, token } = state;
   const d = supply.decimals;
   const pdas = {
     pot: potPda(programId)[0].toBase58(),
     burn: burnPda(programId)[0].toBase58(),
+    otcPot: otcPotPda(programId)[0].toBase58(),
     treasury: treasuryPda(programId)[0].toBase58(),
     vault: vaultPda(programId)[0].toBase58(),
   };
-  const split = `${fmtBp(config.opsPctBp, 0)} / ${fmtBp(config.burnPctBp, 0)}`;
+  const stepFeeSplit = `${fmtBp(BPS - config.opsPctBp, 0)} pot / ${fmtBp(config.opsPctBp, 0)} ops`;
+  const roundSplit = `${fmtBp(config.burnPctBp, 0)} burn / ${fmtBp(config.lpPctBp, 0)} LP / ${fmtBp(BPS - config.burnPctBp - config.lpPctBp, 0)} $OTC yield`;
   const potVsLiability = `${fmtSol(potLamports)} / ${fmtSol(config.potLiabilityLamports)}`;
+  const otcAvgRate =
+    otcPot && otcPot.totalLamportsSpent > 0
+      ? Number(otcPot.totalOtcBoughtUnits) / otcPot.totalLamportsSpent
+      : null;
 
   return (
     <div className="space-y-2">
@@ -39,12 +48,62 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
             sub={`ledger ${fmtNum(burn.totalHubBurned)} units${supply.ledgerDrift ? " · drift" : ""}`}
           />
           <Stat label="burn pending" value={fmtSol(burn.burnPendingLamports)} sub="awaiting swap" />
+          <Stat
+            label="LP-build pending"
+            value={fmtSol(treasury.lpPendingLamports)}
+            sub="§A5 5% leg · phase-2 $HUB/$OTC LP"
+          />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Flag on={!config.paused} label="LIVE" />
           <Flag on={config.consignmentEnabled} label="CONSIGNMENT" />
           <Flag on={config.lpEnabled} label="LP" />
+          <Flag on={otcAvgRate !== null} label="$OTC YIELD FUNDED" />
         </div>
+      </Panel>
+
+      <Panel
+        title="$OTC YIELD VAULT"
+        right="§A5 90% leg — desks claim_yield pays out of this vault"
+      >
+        {!otcPot ? (
+          <div className="text-xs text-amber-400">
+            not provisioned yet — init_otc_pot hasn't been called on this cluster.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <Stat
+                label="pending buy"
+                value={fmtSol(otcPot.otcPendingLamports)}
+                sub="SOL earmarked, not yet spent by the keeper"
+              />
+              <Stat
+                label="lifetime spent"
+                value={fmtSol(otcPot.totalLamportsSpent)}
+                sub="SOL the keeper has deployed into $OTC buys"
+              />
+              <Stat
+                label="lifetime bought"
+                value={fmtUnits(otcPot.totalOtcBoughtUnits, OTC_DECIMALS)}
+                sub="$OTC deposited into the vault"
+              />
+              <Stat
+                label="avg buy rate"
+                value={otcAvgRate === null ? "—" : `${otcAvgRate.toFixed(4)} $OTC/lamport`}
+                sub={
+                  otcAvgRate === null
+                    ? "NoOtcPurchased — claim_yield reverts until the first buy"
+                    : "prices every claim_yield payout"
+                }
+              />
+            </div>
+            <div className="mt-2 text-[10px] text-green-700">
+              keeper <AddressLink address={otcPot.authority} /> · vault{" "}
+              <AddressLink address={otcPot.otcVault} />
+            </div>
+          </>
+        )}
       </Panel>
 
       <Panel title="TREASURY LOCKS" right="what the treasury's holdings are earmarked for">
@@ -120,6 +179,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Row k="$HUB mint" v={<AddressLink address={config.hubMint} />} />
           <Row k="pot (system PDA)" v={<AddressLink address={pdas.pot} />} />
           <Row k="burn state" v={<AddressLink address={pdas.burn} />} />
+          <Row k="OTC pot state" v={<AddressLink address={pdas.otcPot} />} />
           <Row k="treasury state" v={<AddressLink address={pdas.treasury} />} />
           <Row k="vault (consigned custody)" v={<AddressLink address={pdas.vault} />} />
           <Row k="treasury multisig" v={<AddressLink address={config.treasury} />} />
@@ -130,7 +190,8 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
 
         <CollapsibleCard title="PARAMETERS" defaultOpen>
           <Row k="step fee" v={fmtSol(config.stepFeeLamports, 2)} />
-          <Row k="ops / burn slice" v={split} />
+          <Row k="step fee split" v={stepFeeSplit} />
+          <Row k="round split" v={roundSplit} />
           <Row k="tier weights" v={config.tierWeightsBp.map((w) => `${w / 100}%`).join(" · ")} />
           <Row k="round threshold" v={fmtSol(config.minPotThresholdLamports, 2)} />
           <Row k="genesis" v={fmtUtc(config.genesisTs)} />

@@ -22,6 +22,8 @@ export type ScenarioInputs = {
   roundInflowLamports: number;
   totalWeightBp: number;
   burnPctBp: number;
+  /** §A5 5% — LP-build earmark, carved off before the $OTC yield leg (like burnPctBp). */
+  lpPctBp: number;
 };
 
 export function applyScenario(base: ScenarioInputs, s: Scenario): ScenarioInputs {
@@ -30,15 +32,22 @@ export function applyScenario(base: ScenarioInputs, s: Scenario): ScenarioInputs
   return base;
 }
 
-/** Distributable share of a round's inflow after the burn slice (§A5). */
-export const distributableLamports = (inflowLamports: number, burnPctBp: number) =>
-  inflowLamports - Math.floor((inflowLamports * burnPctBp) / BPS);
+/** Distributable ($OTC-leg) share of a round's inflow after the burn + LP-build slices (§A5). */
+export const distributableLamports = (
+  inflowLamports: number,
+  burnPctBp: number,
+  lpPctBp: number,
+) =>
+  inflowLamports -
+  Math.floor((inflowLamports * burnPctBp) / BPS) -
+  Math.floor((inflowLamports * lpPctBp) / BPS);
 
-/** Per-tier payout for one round under `inputs`; 0 while Σw is empty. */
+/** Per-tier payout for one round under `inputs`; 0 while Σw is empty. Lamport-equivalent — the
+ * $OTC leg pays this value in $OTC at the pot's lifetime average buy rate (`otcDueForLamports`). */
 export function tierPayoutLamports(tier: number, inputs: ScenarioInputs) {
   const w = TIER_WEIGHTS_BP[tier - 1] ?? 0;
   if (!w || inputs.totalWeightBp <= 0) return 0;
-  const dist = distributableLamports(inputs.roundInflowLamports, inputs.burnPctBp);
+  const dist = distributableLamports(inputs.roundInflowLamports, inputs.burnPctBp, inputs.lpPctBp);
   return Math.floor((dist * w) / inputs.totalWeightBp);
 }
 
@@ -88,6 +97,7 @@ export const baseInputs = (e: EpochView, config: ConfigView): ScenarioInputs => 
   roundInflowLamports: Math.max(config.minPotThresholdLamports, effectiveInflowLamports(e, config)),
   totalWeightBp: config.totalWeightBp,
   burnPctBp: config.burnPctBp,
+  lpPctBp: config.lpPctBp,
 });
 
 /** §A6.1: warn owners before listing/consigning when unclaimed yield is material. */

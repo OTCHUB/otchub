@@ -19,6 +19,7 @@ import {
   TOKEN_PROGRAM_ID,
   ataPda,
   configPda,
+  createAtaIdempotentIx,
   epochPda,
   hubCostDeltaUnits,
   otcPayPda,
@@ -29,6 +30,7 @@ import {
   type ConfigView,
   type HubProgram,
   type OtcPayView,
+  type OtcPotView,
 } from "@hub-sdk";
 import { buildClaimYieldIx } from "./claim";
 import type { TxLog } from "./swap";
@@ -110,14 +112,23 @@ export async function buildTierChangeIxs(opts: {
   method: PayMethod;
   config: ConfigView;
   otcPay: OtcPayView | null;
+  /** §A5 90% leg state — required to settle pending yield before an upgrade (see below). */
+  otcPot: OtcPotView | null;
   pendingLamports: number;
 }): Promise<TransactionInstruction[]> {
-  const { program, payer, deskAsset, fromTier, toTier, method, config, otcPay } = opts;
+  const { program, payer, deskAsset, fromTier, toTier, method, config, otcPay, otcPot } = opts;
   assertTierRange(fromTier, toTier);
   const id = program.programId;
   const ixs: TransactionInstruction[] = [];
-  if (fromTier > 0 && opts.pendingLamports > 0)
-    ixs.push(await buildClaimYieldIx(program, payer, deskAsset));
+  if (fromTier > 0 && opts.pendingLamports > 0) {
+    if (!otcPot || otcPot.totalLamportsSpent <= 0)
+      throw new Error(
+        "pending yield must be claimed before upgrading, but the $OTC yield vault isn't funded yet",
+      );
+    // Idempotent — a no-op if the payer already has the ATA; the settle-claim below pays into it.
+    ixs.push(createAtaIdempotentIx(payer, payer, new PublicKey(config.otcMint)));
+    ixs.push(await buildClaimYieldIx(program, payer, deskAsset, config, otcPot));
+  }
   const hubMint = new PublicKey(config.hubMint);
   const common = {
     payer,
@@ -179,6 +190,8 @@ export async function executeTierChange(opts: {
   method: PayMethod;
   config: ConfigView;
   otcPay: OtcPayView | null;
+  /** §A5 90% leg state — only needed when `pendingLamports > 0` on an upgrade. */
+  otcPot: OtcPotView | null;
   pendingLamports: number;
   onLog: (l: TxLog) => void;
   onPhase?: (p: TierChangePhase) => void;
@@ -197,6 +210,7 @@ export async function executeTierChange(opts: {
       method,
       config: opts.config,
       otcPay: opts.otcPay,
+      otcPot: opts.otcPot,
       pendingLamports: opts.pendingLamports,
     });
     const bh = await connection.getLatestBlockhash("confirmed");

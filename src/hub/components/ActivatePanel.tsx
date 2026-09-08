@@ -81,6 +81,8 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       : null;
   const hasQuote = quote !== null;
   const otcAvailable = quote?.otcAvailable ?? false;
+  const otcPot = state.otcPot;
+  const claimBlocked = pending > 0 && (!otcPot || otcPot.totalLamportsSpent <= 0);
 
   // $OTC can flip to unavailable mid-session (rate goes stale / path disabled): fall back to SOL.
   useEffect(() => {
@@ -109,6 +111,8 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
     if (method === "otc" && !quote.otcAvailable)
       return setErr(`$OTC payment unavailable: ${quote.otcUnavailableReason}`);
     if (hubShort) return setErr("insufficient $HUB balance for this activation's burn cost");
+    if (pending > 0 && (!state.otcPot || state.otcPot.totalLamportsSpent <= 0))
+      return setErr("pending yield must settle first, but the $OTC yield vault isn't funded yet");
     setBusy(true);
     setLogs([]);
     const res = await executeTierChange({
@@ -121,6 +125,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       method,
       config: state.config,
       otcPay,
+      otcPot: state.otcPot,
       pendingLamports: pending,
       onLog: (l) => setLogs((p) => [...p, l]),
       onPhase: setPhase,
@@ -330,7 +335,9 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
             <button
               type="button"
               onClick={run}
-              disabled={busy || !hasQuote || hubShort || (method === "otc" && !otcAvailable)}
+              disabled={
+                busy || !hasQuote || hubShort || claimBlocked || (method === "otc" && !otcAvailable)
+              }
               className={`${btn} border-emerald-500/60 font-bold text-emerald-300 hover:bg-emerald-500/10`}
             >
               {runLabel}
@@ -339,6 +346,12 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
               {shortKey(desk.asset, 6)} · T{fromTier} → T{toTier}
             </span>
           </div>
+          {claimBlocked && (
+            <div className="mt-1 text-[11px] text-amber-400">
+              this desk has {fmtSol(pending, 4)} pending yield that must settle first, but the $OTC
+              yield vault isn't funded yet — try again once the keeper has recorded a buy.
+            </div>
+          )}
         </>
       )}
       {!signer && (
