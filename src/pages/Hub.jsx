@@ -44,12 +44,20 @@ function HubHeader() {
   return (
     <header className="border border-green-500/30 bg-black">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-green-500/30 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-            &gt; $HUB :: TREASURY DASHBOARD &amp; YIELD TRACKER
-            <span className="ml-1 inline-block animate-blink text-green-500">▋</span>
-          </h1>
-          <EnvBadge />
+        <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1
+              className="cursor-help text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base"
+              title="H.U.B. — Headquarters for Unhinged Brokers"
+            >
+              &gt; $HUB :: TREASURY DASHBOARD &amp; YIELD TRACKER
+              <span className="ml-1 inline-block animate-blink text-green-500">▋</span>
+            </h1>
+            <EnvBadge />
+          </div>
+          <p className="text-[10px] uppercase tracking-widest text-green-500/50">
+            the big green button of OTC Desks.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <NavLink to="/" end className={navCls}>
