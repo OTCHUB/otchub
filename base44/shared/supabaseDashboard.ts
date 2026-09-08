@@ -9,10 +9,13 @@ import { secrets } from "base44:runtime";
 
 const TABLE = "otc_dashboard";
 
-// rows: [{ key, payload }] — one global upsert, newest payload per key wins.
+// row: { key, payload } — ONE row per call: each payload (core series or the
+// 2,200-row holdings table) is serialized on its own so the worker never
+// holds both payload strings in memory at once (the combined push OOMed the
+// ingest worker — "exceededMemory" → user-exception crashes).
 // `on_conflict=key` + Prefer merge-duplicates makes it idempotent across
 // concurrent ingest isolates.
-export async function pushDashboardToSupabase(rows) {
+export async function pushDashboardToSupabase(row) {
   const url = (secrets.get("SUPABASE_URL") || "").replace(/\/$/, "");
   const serviceKey = secrets.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) {
@@ -26,13 +29,11 @@ export async function pushDashboardToSupabase(rows) {
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates",
     },
-    body: JSON.stringify(
-      rows.map((r) => ({
-        key: r.key,
-        payload: r.payload,
-        updated_at: new Date().toISOString(),
-      }))
-    ),
+    body: JSON.stringify({
+      key: row.key,
+      payload: row.payload,
+      updated_at: new Date().toISOString(),
+    }),
   });
   if (!res.ok) {
     throw new Error(

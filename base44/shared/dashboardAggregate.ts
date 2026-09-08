@@ -156,6 +156,12 @@ export async function buildDashboard(base44, { holdings: givenHoldings = null } 
     latest.token_tge_supply = OTC_TGE_SUPPLY;
   }
 
+  const snapshotCount = list.length;
+  // Free the ~1,000 raw snapshot rows (each carrying by_stock/per_desk/
+  // buybacks sub-objects) before callers serialize the payload: holding
+  // them alongside the built history pushed the ingest worker over its
+  // memory limit. `latest` keeps its own row object alive independently.
+  list.length = 0;
   return {
     at: Date.now(),
     body: {
@@ -163,7 +169,7 @@ export async function buildDashboard(base44, { holdings: givenHoldings = null } 
       latest,
       history,
       holdings: storedHoldings || [],
-      snapshot_count: list.length,
+      snapshot_count: snapshotCount,
     },
   };
 }
@@ -200,42 +206,56 @@ export async function rebuildDashboardAggregate(base44, { holdings } = {}) {
     base44,
     holdings != null ? { holdings } : {}
   );
-  // Split across two records (core series vs holdings table) to keep each
-  // payload bounded; both carry the same build timestamp.
-  await upsertByKey(base44, CORE_KEY, {
+  // Split across two records (core series vs holdings table); both carry the
+  // same build timestamp. Each key is written to the Base44 cache AND pushed
+  // to the Supabase mirror BEFORE the next key is built, and its payload
+  // reference is dropped afterwards — the worker holds at most one ~1.5MB
+  // payload string at a time instead of both (~3MB), which is what OOMed the
+  // ingest worker ("exceededMemory" → user-exception crashes).
+  const snapshotCount = body.snapshot_count;
+  const holdingsCount = body.holdings ? body.holdings.length : 0;
+  console.info("[AGG] built", snapshotCount, "snaps,", holdingsCount, "holdings");
+
+  const corePayload = {
     at,
     addresses: body.addresses,
     latest: body.latest,
     history: body.history,
     snapshot_count: body.snapshot_count,
-  });
-  await upsertByKey(base44, HOLDINGS_KEY, { at, holdings: body.holdings });
-  // SUPABASE MIRROR: same two payloads upserted into the project's Supabase
-  // table, which browsers then read directly (src/lib/dashboardFeed.js) — the
-  // visitor dashboard path costs zero Base44 entity reads. Best-effort: a
-  // failed mirror push never fails the ingest or the Base44 cache write.
+  };
+  body.addresses = null;
+  body.latest = null;
+  body.history = null;
+  await upsertByKey(base44, CORE_KEY, corePayload);
+  console.info("[AGG] core cached");
+  // SUPABASE MIRROR (src/lib/dashboardFeed.js reads it directly): best-effort
+  // per key — a failed push never fails the ingest or the cache write.
   try {
-    await pushDashboardToSupabase([
-      {
-        key: CORE_KEY,
-        payload: {
-          at,
-          addresses: body.addresses,
-          latest: body.latest,
-          history: body.history,
-          snapshot_count: body.snapshot_count,
-        },
-      },
-      { key: HOLDINGS_KEY, payload: { at, holdings: body.holdings } },
-    ]);
+    await pushDashboardToSupabase({ key: CORE_KEY, payload: corePayload });
   } catch (e) {
-    console.warn("supabase dashboard mirror push failed:", e?.message || e);
+    console.warn("supabase mirror push failed (core):", e?.message || e);
   }
+  console.info("[AGG] core mirrored");
+  corePayload.addresses = null;
+  corePayload.latest = null;
+  corePayload.history = null;
+
+  const holdPayload = { at, holdings: body.holdings };
+  body.holdings = null;
+  await upsertByKey(base44, HOLDINGS_KEY, holdPayload);
+  console.info("[AGG] holdings cached");
+  try {
+    await pushDashboardToSupabase({ key: HOLDINGS_KEY, payload: holdPayload });
+  } catch (e) {
+    console.warn("supabase mirror push failed (holdings):", e?.message || e);
+  }
+  console.info("[AGG] holdings mirrored");
+
   return {
     ok: true,
     at,
-    snapshot_count: body.snapshot_count,
-    holdings_count: body.holdings.length,
+    snapshot_count: snapshotCount,
+    holdings_count: holdingsCount,
   };
 }
 

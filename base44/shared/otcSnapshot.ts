@@ -165,6 +165,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // + last-known-value fallbacks built in. The ingest used to burn its own
   // direct DexScreener requests here — a major driver of the intermittent
   // rate-limit gaps on the dashboard.
+  console.info("[INGEST] lock acquired");
   const spot = await getSpotPrices(base44);
   const pair = spot.otc_pair || {};
   let solPriceUsd = spot.prices[SOL_MINT] ?? null;
@@ -204,6 +205,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   const meStats = meR.status === "fulfilled" ? meR.value : null;
   const listings = lsR.status === "fulfilled" ? lsR.value : [];
   const assets = asR.status === "fulfilled" ? asR.value : null;
+  console.info("[INGEST] sources done");
   const stats = stR.status === "fulfilled" ? stR.value : null;
   // Exact decimal-adjusted on-chain supply straight from Helius DAS getAsset
   // (fetched above) — no direct DexScreener/RPC supply call needed. Fall back
@@ -411,6 +413,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   };
 
   const created = await base44.asServiceRole.entities.OtcSnapshot.create(snapshot);
+  console.info("[INGEST] snapshot created");
 
   const listedSet = new Set((listings || []).map((l) => l.tokenMint || l.token_mint || l.id));
   const priceMap = new Map();
@@ -446,6 +449,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     existingHoldingRows =
       (await base44.asServiceRole.entities.NftHolding.list("asset_id", 5000)) || [];
     prevListingMap = new Map(existingHoldingRows.map((h) => [h.asset_id, h]));
+    console.info("[INGEST] prev holdings read:", existingHoldingRows.length);
   }
 
   const holdings = assetList.map((a) => {
@@ -532,7 +536,9 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     // so dashboard loads landing in between showed no holdings/listings —
     // the intermittent "info missing" reads. In the gap, readers now see a
     // complete set (briefly duplicated), never a blank one.
+    console.info("[INGEST] bulkCreate", holdings.length);
     await base44.asServiceRole.entities.NftHolding.bulkCreate(holdings);
+    console.info("[INGEST] holdings persisted");
     // Delete EVERY pre-existing row id: every desk in the new set has a fresh
     // row, so ALL old rows are superseded — including old copies of desks
     // that are still in the collection (same asset_id, old row). Filtering
@@ -545,9 +551,16 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
         id: { $in: oldRowIds.slice(i, i + 400) },
       });
     }
+    // Free the pre-read holdings table (~2,500 rows) before the aggregate
+    // rebuild builds the full dashboard payload — holding both resident in
+    // memory OOMed the ingest worker after the snapshot was created.
+    existingHoldingRows = null;
+    prevListingMap = null;
+    console.info("[INGEST] old rows deleted");
   }
 
   await releaseLock(base44, lock);
+  console.info("[INGEST] lock released");
 
   // QUOTA FIX: rebuild the pre-aggregated dashboard cache right after the
   // data changed (new snapshot + fresh holdings), reusing the in-memory
@@ -555,6 +568,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   // instead of the dashboard re-reading 3,500 rows every minute per
   // isolate. Best-effort: a failed rebuild never fails the ingest — the
   // dashboard falls back to its direct build until the next good one.
+  console.info("[INGEST] rebuild start");
   try {
     await rebuildDashboardAggregate(
       base44,
@@ -563,6 +577,7 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
   } catch (e) {
     console.warn("dashboard aggregate rebuild failed:", e?.message || e);
   }
+  console.info("[INGEST] rebuild end");
 
   return {
     ok: true,
