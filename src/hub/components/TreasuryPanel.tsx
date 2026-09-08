@@ -1,4 +1,19 @@
-import { BPS, otcPotPda, burnPda, potPda, treasuryPda, vaultPda, type ProtocolState } from "@hub-sdk";
+import {
+  BPS,
+  otcPotPda,
+  burnPda,
+  potPda,
+  treasuryPda,
+  vaultPda,
+  creatorFeePda,
+  creatorFeeClearProgress,
+  CREATOR_FEE_DESK_POT_BP,
+  CREATOR_FEE_BURN_BP,
+  CREATOR_FEE_LP_BP,
+  CREATOR_FEE_STACK_BP,
+  CREATOR_FEE_OPS_BP,
+  type ProtocolState,
+} from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { fmtBp, fmtBpPct, fmtHub, fmtNum, fmtSol, fmtUnits, fmtUtc } from "../lib/format";
 import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
@@ -10,15 +25,24 @@ import { VerificationPanel } from "./VerificationPanel";
 /** $OTC mint decimals fallback for the pot's lifetime-bought display. */
 const OTC_DECIMALS = 6;
 
+/** Same ASCII bar as `EpochTracker`'s round-progress display, reused for the fee-clear meter. */
+function ProgressBar({ value }: { value: number }) {
+  const cells = 32;
+  const filled = Math.round(Math.min(1, value) * cells);
+  const bar = `[${"█".repeat(filled)}${"░".repeat(cells - filled)}] ${Math.round(value * 100)}%`;
+  return <div className="my-2 text-xs tracking-tighter text-green-500">{bar}</div>;
+}
+
 /** §C6 — treasury transparency: what the protocol holds, has swept, and has burned. */
 export function TreasuryPanel({ state }: { state: ProtocolState }) {
   const { programId } = useHub();
-  const { config, treasury, burn, otcPot, potLamports, supply, token } = state;
+  const { config, treasury, burn, otcPot, creatorFee, potLamports, supply, token } = state;
   const d = supply.decimals;
   const pdas = {
     pot: potPda(programId)[0].toBase58(),
     burn: burnPda(programId)[0].toBase58(),
     otcPot: otcPotPda(programId)[0].toBase58(),
+    creatorFee: creatorFeePda(programId)[0].toBase58(),
     treasury: treasuryPda(programId)[0].toBase58(),
     vault: vaultPda(programId)[0].toBase58(),
   };
@@ -59,6 +83,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Flag on={config.consignmentEnabled} label="CONSIGNMENT" />
           <Flag on={config.lpEnabled} label="LP" />
           <Flag on={otcAvgRate !== null} label="$OTC YIELD FUNDED" />
+          <Flag on={creatorFee !== null} label="CREATOR FEE FLYWHEEL" />
         </div>
       </Panel>
 
@@ -101,6 +126,63 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
             <div className="mt-2 text-[10px] text-green-700">
               keeper <AddressLink address={otcPot.authority} /> · vault{" "}
               <AddressLink address={otcPot.otcVault} />
+            </div>
+          </>
+        )}
+      </Panel>
+
+      <Panel
+        title="CREATOR FEE FLYWHEEL"
+        right="§A6.3 treasury's launcher holder-leg claim (2% $HUB supply) — re-split every clear"
+      >
+        {!creatorFee ? (
+          <div className="text-xs text-amber-400">
+            not provisioned yet — init_creator_fee_state hasn't been called on this cluster.
+          </div>
+        ) : (
+          <>
+            <ProgressBar value={creatorFeeClearProgress(creatorFee)} />
+            <Row
+              k="pending $OTC / threshold"
+              v={`${fmtUnits(creatorFee.pendingOtcUnits, OTC_DECIMALS)} / ${fmtUnits(creatorFee.clearThresholdUnits, OTC_DECIMALS)} $OTC`}
+            />
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <Stat
+                label={`desk pot (${fmtBp(CREATOR_FEE_DESK_POT_BP, 0)})`}
+                value={fmtUnits(creatorFee.totalDeskPotOtc, OTC_DECIMALS)}
+                sub="direct $OTC injection, no swap — raises avg buy rate"
+              />
+              <Stat
+                label={`burn (${fmtBp(CREATOR_FEE_BURN_BP, 0)})`}
+                value={fmtUnits(creatorFee.totalBurnHub, d)}
+                sub={`$HUB burned · ${fmtUnits(creatorFee.burnPendingOtc, OTC_DECIMALS)} $OTC pending swap`}
+              />
+              <Stat
+                label={`LP build (${fmtBp(CREATOR_FEE_LP_BP, 0)})`}
+                value={fmtUnits(creatorFee.totalLpOtc, OTC_DECIMALS)}
+                sub={`$OTC locked · ${fmtUnits(creatorFee.lpPendingOtc, OTC_DECIMALS)} pending — Raydium CP-Swap lock+burn`}
+              />
+              <Stat
+                label={`stack (${fmtBp(CREATOR_FEE_STACK_BP, 0)})`}
+                value={fmtUnits(creatorFee.totalStackHub, d)}
+                sub={`$HUB held · ${fmtUnits(creatorFee.stackPendingOtc, OTC_DECIMALS)} $OTC pending swap`}
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <Stat
+                label={`ops (${fmtBp(CREATOR_FEE_OPS_BP, 0)})`}
+                value={fmtSol(Number(creatorFee.totalOpsSolLamports))}
+                sub={`SOL for protocol ops · ${fmtUnits(creatorFee.opsPendingOtc, OTC_DECIMALS)} $OTC pending swap`}
+              />
+              <Stat
+                label="lifetime received"
+                value={fmtUnits(creatorFee.totalReceivedOtc, OTC_DECIMALS)}
+                sub="$OTC claimed via the launcher holder-leg, all-time"
+              />
+            </div>
+            <div className="mt-2 text-[10px] text-green-700">
+              keeper <AddressLink address={creatorFee.authority} /> · vault{" "}
+              <AddressLink address={creatorFee.creatorFeeVault} />
             </div>
           </>
         )}
@@ -180,6 +262,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Row k="pot (system PDA)" v={<AddressLink address={pdas.pot} />} />
           <Row k="burn state" v={<AddressLink address={pdas.burn} />} />
           <Row k="OTC pot state" v={<AddressLink address={pdas.otcPot} />} />
+          <Row k="creator fee state" v={<AddressLink address={pdas.creatorFee} />} />
           <Row k="treasury state" v={<AddressLink address={pdas.treasury} />} />
           <Row k="vault (consigned custody)" v={<AddressLink address={pdas.vault} />} />
           <Row k="treasury multisig" v={<AddressLink address={config.treasury} />} />
