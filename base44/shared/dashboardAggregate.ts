@@ -27,19 +27,24 @@ export const DASH_AGGREGATE_FRESH_MS = 10 * 60_000;
 // persisted the rows — skipping the expensive NftHolding re-read.
 export async function buildDashboard(base44, { holdings: givenHoldings = null } = {}) {
   // Public read-only analytics — service role reads shared data.
-  const [snapshots, storedHoldings] =
+  // MEMORY BOUND: every OtcSnapshot row embeds the FULL ~380-day per_desk /
+  // by_stock / pot_sources / buybacks sub-objects (~50KB per row), so the
+  // old 1,000-row history read was tens of MB in memory and OOMed the ingest
+  // worker ("exceededMemory" → user-exception crashes). The series is now
+  // built INCREMENTALLY: read ONE latest row + the previous cached core
+  // record (which already carries the full projected history), append the
+  // new point, and reuse the cached series for everything older. A multi-row
+  // read only happens on a cold/missing cache, bounded to 288 rows.
+  const [recentRows, prevCoreRows, storedHoldings] = await Promise.all([
+    base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1),
+    base44.asServiceRole.entities[CACHE_ENTITY].filter({ key: CORE_KEY }),
     givenHoldings != null
-      ? [
-          await base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1000),
-          givenHoldings,
-        ]
-      : await Promise.all([
-          base44.asServiceRole.entities.OtcSnapshot.list("-created_date", 1000),
-          base44.asServiceRole.entities.NftHolding.list("-created_date", 2500),
-        ]);
-
-  const list = snapshots || [];
-  const latest = list.length ? list[0] : null;
+      ? givenHoldings
+      : base44.asServiceRole.entities.NftHolding.list("-created_date", 2500),
+  ]);
+  const latest = recentRows?.[0] || null;
+  const prevCore = prevCoreRows?.[0]?.payload || null;
+  const prevHistory = Array.isArray(prevCore?.history) ? prevCore.history : [];
 
   // Bootstrap the full historical supply/burn series from the protocol's
   // daily per-desk history (stored on every snapshot). Each desk mint burns
