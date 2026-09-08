@@ -23,6 +23,11 @@ export const LP_ENABLED = false;
 export const LP_TARGET_SOL_LAMPORTS = 100 * LAMPORTS_PER_SOL;
 export const TREASURY_HUB_FLOAT_CAP_BP = 200;
 
+/** §A4.1 $OTC payment path: SOL step-fee value at `otc_per_sol` × this premium (2.00×). */
+export const OTC_PREMIUM_BP = 20_000;
+/** `activate_tier_otc` / `upgrade_tier_otc` reject an `otc_per_sol` older than this. */
+export const OTC_RATE_MAX_AGE_SECS = 86_400;
+
 export const MPL_CORE_PROGRAM_ID = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
 export const HUB_PROGRAM_ID = "5tCDEazUAkRjrkasup1uWcYo3t1C2ht76LmQva5rewQv";
 export const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -78,6 +83,20 @@ export const TIER_NAMES = ["TRADER", "BROKER", "DEALER", "MARKET MAKER"] as cons
 export const cumulativeFeeLamports = (tier: number) => STEP_FEE_LAMPORTS * tier;
 /** Fee to move `from` → `to` (from = 0 is a fresh activation). */
 export const stepFeeLamports = (from: number, to: number) => STEP_FEE_LAMPORTS * (to - from);
+
+/**
+ * $OTC base units due for `feeLamports` — mirrors `OtcPayConfig::otc_fee`:
+ * `⌈fee × otcPerSol × premiumBp / (10⁹ × 10⁴)⌉` (rounds up in the protocol's favour).
+ */
+export function otcFeeUnits(
+  feeLamports: number | bigint,
+  otcPerSol: number | bigint,
+  premiumBp: number = OTC_PREMIUM_BP,
+): bigint {
+  const num = BigInt(feeLamports) * BigInt(otcPerSol) * BigInt(premiumBp);
+  const den = BigInt(LAMPORTS_PER_SOL) * BigInt(BPS);
+  return (num + den - 1n) / den;
+}
 /** 90/10 split of a step fee. */
 export const splitFee = (fee: number) => {
   const toOps = Math.floor((fee * OPS_PCT_BP) / BPS);

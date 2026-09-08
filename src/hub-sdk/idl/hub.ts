@@ -128,6 +128,111 @@ export type Hub = {
       "args": []
     },
     {
+      "name": "activateTierOtc",
+      "docs": [
+        "§A4.1 #16 — `activate_tier` paid in $OTC at the 2× premium; proceeds → POL reserve."
+      ],
+      "discriminator": [
+        23,
+        23,
+        222,
+        246,
+        195,
+        202,
+        73,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "deskAsset"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcPay",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  97,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcMint"
+        },
+        {
+          "name": "payerOtc",
+          "writable": true
+        },
+        {
+          "name": "polAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "deskTier",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "buildLp",
       "docs": [
         "§B3 #13"
@@ -635,6 +740,115 @@ export type Hub = {
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "initOtcPayments",
+      "docs": [
+        "§A4.1 #14 — authority creates the $OTC payment config + POL reserve pointer (disabled)."
+      ],
+      "discriminator": [
+        234,
+        164,
+        177,
+        91,
+        233,
+        164,
+        77,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "polAccount"
+        },
+        {
+          "name": "otcPay",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  97,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "initializeConfig",
@@ -1210,6 +1424,79 @@ export type Hub = {
       ]
     },
     {
+      "name": "setOtcRate",
+      "docs": [
+        "§A4.1 #15 — authority refreshes the $OTC/SOL reference rate and the enable switch."
+      ],
+      "discriminator": [
+        97,
+        190,
+        198,
+        119,
+        23,
+        18,
+        202,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcPay",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  97,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "otcPerSol",
+          "type": "u64"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "unconsignDesk",
       "docs": [
         "§B3 #12"
@@ -1580,6 +1867,112 @@ export type Hub = {
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "upgradeTierOtc",
+      "docs": [
+        "§A4.1 #17 — `upgrade_tier` paid in $OTC at the 2× premium; proceeds → POL reserve."
+      ],
+      "discriminator": [
+        6,
+        67,
+        172,
+        88,
+        159,
+        216,
+        216,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "deskAsset"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcPay",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  97,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcMint"
+        },
+        {
+          "name": "payerOtc",
+          "writable": true
+        },
+        {
+          "name": "polAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "deskTier",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "targetTier",
+          "type": "u8"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1646,6 +2039,19 @@ export type Hub = {
         138,
         152,
         108
+      ]
+    },
+    {
+      "name": "otcPayConfig",
+      "discriminator": [
+        255,
+        93,
+        46,
+        105,
+        118,
+        68,
+        137,
+        98
       ]
     },
     {
@@ -1768,6 +2174,19 @@ export type Hub = {
       ]
     },
     {
+      "name": "otcRateSet",
+      "discriminator": [
+        74,
+        104,
+        139,
+        74,
+        54,
+        196,
+        74,
+        213
+      ]
+    },
+    {
       "name": "tierActivated",
       "discriminator": [
         197,
@@ -1778,6 +2197,19 @@ export type Hub = {
         207,
         221,
         194
+      ]
+    },
+    {
+      "name": "tierPaidOtc",
+      "discriminator": [
+        61,
+        179,
+        219,
+        168,
+        101,
+        116,
+        255,
+        145
       ]
     },
     {
@@ -2013,6 +2445,26 @@ export type Hub = {
     },
     {
       "code": 6038,
+      "name": "otcPaymentsDisabled",
+      "msg": "$OTC payments are disabled"
+    },
+    {
+      "code": 6039,
+      "name": "otcRateStale",
+      "msg": "$OTC reference rate is stale; authority must refresh it"
+    },
+    {
+      "code": 6040,
+      "name": "invalidTokenAccount",
+      "msg": "Account is not an SPL token account for the expected mint/owner"
+    },
+    {
+      "code": 6041,
+      "name": "wrongTokenProgram",
+      "msg": "Token program does not match the configured mint"
+    },
+    {
+      "code": 6042,
       "name": "notImplemented",
       "msg": "Not implemented in this milestone"
     }
@@ -2699,6 +3151,76 @@ export type Hub = {
       }
     },
     {
+      "name": "otcPayConfig",
+      "docs": [
+        "§A4.1 `[\"otc_pay\"]` — $OTC as an alternative step-fee currency. Created by the authority",
+        "after `initialize_config` (no `Config` migration); absent ⇒ the path does not exist."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "otcPerSol",
+            "docs": [
+              "Reference rate: $OTC base units per 1 SOL, refreshed by the authority (`set_otc_rate`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rateTs",
+            "type": "i64"
+          },
+          {
+            "name": "premiumBp",
+            "docs": [
+              "Premium over the SOL step-fee value (bp). Written from `OTC_PREMIUM_BP`, never updated."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "polAccount",
+            "docs": [
+              "Token account (mint = `Config.otc_mint`, owner = `[\"vault\"]` PDA) that receives every $OTC",
+              "fee. Program-custodied and reserved for the $OTC/$HUB POL leg (`build_lp(HubOtc)`)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "totalOtcCollected",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "otcRateSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "otcPerSol",
+            "type": "u64"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "stakerAccrual",
       "docs": [
         "Per-wallet consignor ledger (`[\"accrual\", wallet]`): consignor-share credits still owed,",
@@ -2759,6 +3281,54 @@ export type Hub = {
           {
             "name": "toOps",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "tierPaidOtc",
+      "docs": [
+        "§A4.1 — step(s) paid in $OTC at the 2× premium; nothing enters the pot, the $OTC lands in the",
+        "POL reserve. `from_tier == 0` is a fresh activation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "fromTier",
+            "type": "u8"
+          },
+          {
+            "name": "toTier",
+            "type": "u8"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "solEquivalentLamports",
+            "type": "u64"
+          },
+          {
+            "name": "otcPaid",
+            "type": "u64"
+          },
+          {
+            "name": "otcPerSol",
+            "type": "u64"
+          },
+          {
+            "name": "premiumBp",
+            "type": "u16"
           }
         ]
       }
@@ -2956,7 +3526,7 @@ export type Hub = {
     {
       "name": "seedsDoc",
       "type": "string",
-      "value": "\"config|epoch+u64|tier+asset|consign+asset|accrual+wallet+u64|pot|burn|treasury|vault\""
+      "value": "\"config|epoch+u64|tier+asset|consign+asset|accrual+wallet+u64|pot|burn|treasury|vault|otc_pay\""
     }
   ]
 };

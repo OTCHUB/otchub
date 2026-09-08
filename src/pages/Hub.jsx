@@ -6,6 +6,8 @@ import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
+import Footer from "@/components/otc/Footer";
+import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 import { EnvBadge, HubProvider, HubRoutes, rpcHost, useHub } from "@/hub";
 
 // $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/" so the
@@ -79,6 +81,26 @@ function HubHeader() {
   );
 }
 
+// otchub's fixed top/bottom terminal bars + page footer — reads `cluster` from HubProvider, so
+// it must render inside the provider (mirrors hubconnect/web's standalone shell AppShell).
+function HubShell({ wallet }) {
+  const { cluster } = useHub();
+  const statusText = `${cluster.toUpperCase().replace(/-/g, "_")}_LINK_ACTIVE`;
+  return (
+    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+      <TerminalTopBar label="HUB_TERMINAL" statusText={statusText} />
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
+        <HubHeader />
+        <main className="mt-3">
+          <HubRoutes walletAddress={wallet} />
+        </main>
+        <Footer />
+      </div>
+      <TerminalBottomBar>$HUB :: COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTC DESKS</TerminalBottomBar>
+    </div>
+  );
+}
+
 export default function Hub() {
   // Follow the wallet connected on /otc (same tab or another) without a second connect UI.
   const [wallet, setWallet] = useState(() => {
@@ -105,14 +127,7 @@ export default function Hub() {
       resolveSigner={getSignerForAddress}
       swapTransport={hubSwapTransport}
     >
-      <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black font-mono text-green-400">
-        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
-          <HubHeader />
-          <main className="mt-3">
-            <HubRoutes walletAddress={wallet} />
-          </main>
-        </div>
-      </div>
+      <HubShell wallet={wallet} />
     </HubProvider>
   );
 }
