@@ -1,0 +1,45 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Launcher Feed Scheduler",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "launcher_feed_scheduler",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "mirror_launcher_feed": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "mirrorLauncherFeed",
+            "args": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Mirror launcher feed",
+            "description": "Push launcher payloads to Supabase"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Mirrors the launcher live feed and analytics payload into Supabase every 5 minutes (archive + browser fallback for the launcher panel)."
+}

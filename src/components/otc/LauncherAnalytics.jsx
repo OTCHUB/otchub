@@ -5,6 +5,7 @@ import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
 import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
+import { fetchLauncherAnalyticsMirror } from "@/lib/launcherFeed";
 import Pager from "@/components/otc/Pager";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -175,7 +176,15 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         const res = await base44.functions.invoke("getLauncherAnalytics");
         if (res?.data?.error) throw new Error(res.data.error);
         if (mounted) { setData(res.data); setErr(null); }
-      } catch (e) { if (mounted) setErr(e.message || "fetch failed"); }
+      } catch (e) {
+        // Live endpoint down: fall back to the 5-min Supabase mirror.
+        try {
+          const mirror = await fetchLauncherAnalyticsMirror();
+          if (mounted) { setData(mirror); setErr(null); }
+        } catch {
+          if (mounted) setErr(e.message || "fetch failed");
+        }
+      }
       finally { pending = false; }
     };
     load();

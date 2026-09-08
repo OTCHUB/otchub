@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { fetchLauncherLiveMirror, projectLauncherView } from "@/lib/launcherFeed";
 
 export const LAUNCHER_POLL_MS = 30_000;
 
@@ -19,7 +20,19 @@ export function watchLauncherLive({ invoke, onData, onError, document, window,
       }
       if (!stopped) { onData(data); onError(null); }
     } catch {
-      if (!stopped) onError("Live refresh failed; displayed data may be stale.");
+      // Live endpoint down: fall back to the 5-min Supabase mirror (archived
+      // tape, filtered/sorted/paged locally). A missing/unreachable mirror
+      // keeps the old behavior — stale warning over the last snapshot.
+      try {
+        const mirror = await fetchLauncherLiveMirror();
+        const view = projectLauncherView(mirror, params);
+        if (!stopped) {
+          onData(view);
+          onError("Live feed unavailable — showing archived feed (refreshed every 5 min).");
+        }
+      } catch {
+        if (!stopped) onError("Live refresh failed; displayed data may be stale.");
+      }
     } finally { pending = false; }
   };
   refresh();
