@@ -1,4 +1,9 @@
+import { Github } from "lucide-react";
 import React from "react";
+
+// Public repo backing the deployed $HUB program — same one scripts/verify-build.sh builds
+// from, so this is the "verify the source yourself" link for anyone reading the footer.
+const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 
 // Mirrors the $HUB standalone shell's footer (hubconnect/web/src/Footer.tsx) — same copy
 // pattern, credits, and link styling — so the $HUB page inside otchub closes out the same way
@@ -25,6 +30,16 @@ export default function Footer() {
           className="underline hover:text-green-400"
         >
           fomo.otchub.dev ↗
+        </a>
+        {" · "}
+        <a
+          href={HUB_GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 underline hover:text-green-400"
+        >
+          <Github className="h-3 w-3" aria-hidden="true" />
+          source ↗
         </a>
       </div>
     </footer>

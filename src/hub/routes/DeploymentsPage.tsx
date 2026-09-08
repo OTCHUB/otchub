@@ -1,3 +1,4 @@
+import { Github } from "lucide-react";
 import { useState } from "react";
 import { useHub } from "../HubProvider";
 import { Disclaimer } from "../components/Disclaimer";
@@ -11,6 +12,10 @@ import {
   type RegistryCluster,
 } from "../lib/deployments";
 import { solscanAddress } from "../lib/explorer";
+
+// Public repo backing the deployed $HUB program — same one scripts/verify-build.sh builds
+// from, so build verifiers / auditors can diff the deployed program against this source.
+const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 
 const STATUS: Record<DeploymentStatus, { label: string; cls: string }> = {
   live: { label: "LIVE", cls: "border-emerald-500 text-emerald-300" },
@@ -108,17 +113,29 @@ export function DeploymentsPage() {
   const hubProgramStatus: DeploymentStatus = liveOnViewedCluster ? "live" : hub.status[cluster];
 
   const toggle = (
-    <span className="flex gap-1">
-      {(["devnet", "mainnet-beta"] as RegistryCluster[]).map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => setCluster(c)}
-          className={toggleCls(cluster === c)}
-        >
-          {c === "devnet" ? "DEVNET" : "MAINNET"}
-        </button>
-      ))}
+    <span className="flex items-center gap-2">
+      <a
+        href={HUB_GITHUB_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="View program source on GitHub"
+        className="inline-flex items-center gap-1 text-[10px] text-green-500/70 underline decoration-green-700 hover:text-green-300"
+      >
+        <Github className="h-3 w-3" aria-hidden="true" />
+        source
+      </a>
+      <span className="flex gap-1">
+        {(["devnet", "mainnet-beta"] as RegistryCluster[]).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCluster(c)}
+            className={toggleCls(cluster === c)}
+          >
+            {c === "devnet" ? "DEVNET" : "MAINNET"}
+          </button>
+        ))}
+      </span>
     </span>
   );
 
