@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "base44-cli": {
+      "source": "base44/skills",
+      "sourceType": "github",
+      "skillPath": "skills/base44-cli/SKILL.md",
+      "computedHash": "f58389da02c707219771859744cb32e6ca0f5b8e648e837a3f36d72275fdd909"
+    },
+    "base44-sdk": {
+      "source": "base44/skills",
+      "sourceType": "github",
+      "skillPath": "skills/base44-sdk/SKILL.md",
+      "computedHash": "3a0eabb8e691c120f9c7414b50ff30f1c6eccd35d619cc452697b5ec7a9c77dc"
+    }
+  }
+}
