@@ -109,7 +109,7 @@ export default function SwapCard({
   ];
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-md flex-col overflow-hidden gap-2 border border-green-500/30 bg-black p-2.5 sm:gap-2.5 sm:p-4 flex">
+    <div className="mx-auto min-w-0 w-full max-w-md flex-col overflow-hidden gap-2 border border-green-500/30 bg-black p-2.5 sm:mx-0 sm:max-w-none sm:gap-2.5 sm:p-4 flex">
       {/* Header: title + token tools */}
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">

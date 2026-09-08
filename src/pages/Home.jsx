@@ -269,6 +269,29 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
+        {/* Trade hub: two-way token swap + NFT desk trade routes — directly
+            under the wallet panel so a connected wallet can swap right away */}
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className="min-w-0 lg:col-span-2" id="otc-swap">
+            <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
+              openSignal={swapOpenSignal} locked={swapBusy}>
+              <JupiterSwapPanel
+                wallet={wallet}
+                latest={latest}
+                history={data?.history}
+                onGoConnect={goWalletConnect}
+                onConnected={setWallet}
+                token={selectedToken || undefined}
+                onBusyChange={onSwapBusyChange}
+                onResetToken={resetSwapToken}
+              />
+            </CollapsibleCard>
+          </div>
+          <CollapsibleCard title="TRADE :: NFT DESKS">
+            <NftTradeCard />
+          </CollapsibleCard>
+        </div>
+
         {/* All 8 headline metrics in one dense ticker strip */}
         <MetricsStrip latest={latest} history={data?.history} />
 
@@ -313,36 +336,13 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Listings: secondary-market desk inventory, above the trade hub so
-            arbitrage jumps land right next to the swap they feed into */}
+        {/* Listings: secondary-market desk inventory feeding the swap above */}
         <div className="mt-3">
           <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
             <ListingsDepthChart holdings={data?.holdings} />
             <div className="mt-3">
               <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
             </div>
-          </CollapsibleCard>
-        </div>
-
-        {/* Trade hub: two-way token swap + NFT desk trade routes */}
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <div className="min-w-0 lg:col-span-2" id="otc-swap">
-            <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
-              openSignal={swapOpenSignal} locked={swapBusy}>
-              <JupiterSwapPanel
-                wallet={wallet}
-                latest={latest}
-                history={data?.history}
-                onGoConnect={goWalletConnect}
-                onConnected={setWallet}
-                token={selectedToken || undefined}
-                onBusyChange={onSwapBusyChange}
-                onResetToken={resetSwapToken}
-              />
-            </CollapsibleCard>
-          </div>
-          <CollapsibleCard title="TRADE :: NFT DESKS">
-            <NftTradeCard />
           </CollapsibleCard>
         </div>
 
