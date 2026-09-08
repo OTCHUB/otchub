@@ -28,7 +28,7 @@ const ME_V1_PROGRAM = "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K";
 const ME_V2_PROGRAM = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc";
 const OTC_POOL = "DA4pM4xSDY4M9V4CgAKKBVH1pw1yscTQQa5nEkGHuKpt";
 
-function RouteRow({ mark, markCls, label, value, valueCls, href, note }) {
+function RouteRow({ mark, markCls, label, value, valueCls, href = null, note = null }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 border border-green-500/15 px-2 py-1 font-mono text-[11px]">
       <span className={`shrink-0 ${markCls}`}>{mark}</span>

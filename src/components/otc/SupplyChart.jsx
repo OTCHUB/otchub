@@ -21,7 +21,7 @@ const fmtM = (v) => (v == null ? "—" : `${(v / 1e6).toFixed(0)}M`);
 const fmtK = (v) => (v == null ? "—" : v.toLocaleString());
 
 // Metric tiles styled like the other panels' inline stat tiles
-function MetricCard({ label, value, sub, subRed }) {
+function MetricCard({ label, value, sub, subRed = false }) {
   return (
     <div className="flex-1 border border-green-500/20 bg-black px-2 py-1">
       <div className="text-[10px] uppercase tracking-widest text-green-500/50">{label}</div>
@@ -48,7 +48,7 @@ export default function SupplyChart({ history, latest }) {
       if (!prev || new Date(h.t) > new Date(prev.t)) byDay.set(key, h);
     }
     return [...byDay.values()]
-      .sort((a, b) => new Date(a.t) - new Date(b.t))
+      .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime())
       .map((h) => ({
         t: h.t,
         label: new Date(h.t).toLocaleDateString([], { month: "short", day: "2-digit", timeZone: "UTC" }),

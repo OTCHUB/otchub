@@ -4,7 +4,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@hub-sdk": ["./src/hub-sdk/src/index.ts"],
-      "@hub-sdk/*": ["./src/hub-sdk/src/*"]
+      "@hub-sdk/*": ["./src/hub-sdk/src/*"],
+      "bn.js": ["./src/types/bn-stub.d.ts"]
     },
     "jsx": "react-jsx",
     "module": "esnext",

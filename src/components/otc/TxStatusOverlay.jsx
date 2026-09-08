@@ -55,7 +55,7 @@ const PHASES = {
   },
 };
 
-export default function TxStatusOverlay({ phase, detail, onCancel }) {
+export default function TxStatusOverlay({ phase, detail = null, onCancel = null }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {

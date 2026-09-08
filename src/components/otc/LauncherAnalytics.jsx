@@ -22,6 +22,7 @@ const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
 // Launch-age windows for the tape; ALL shows every launch, historical included.
+/** @type {Array<[string, number|null]>} */
 const TIMEFRAMES = [["1H", 1], ["24H", 24], ["7D", 168], ["30D", 720], ["ALL", null]];
 const EMPTY_COUNTS = Object.fromEntries(STATUSES.map((s) => [s, 0]));
 

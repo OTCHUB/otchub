@@ -4,7 +4,7 @@ import { Buffer } from "buffer";
 
 if (typeof globalThis !== "undefined") {
   if (!globalThis.Buffer) globalThis.Buffer = Buffer;
-  if (!globalThis.process) globalThis.process = { env: {} };
+  if (!globalThis.process) globalThis.process = /** @type {any} */ ({ env: {} });
 }
 if (typeof window !== "undefined") {
   if (!window.Buffer) window.Buffer = Buffer;

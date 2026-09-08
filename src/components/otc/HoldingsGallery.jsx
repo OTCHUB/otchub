@@ -9,7 +9,7 @@ import Pager from "@/components/otc/Pager";
 
 const ME_BASE = "https://magiceden.io/item-details";
 
-export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned, claimPlan, claimPrices, lifetimeByDesk, onDeskCommand }) {
+export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned = false, claimPlan = null, claimPrices = null, lifetimeByDesk = null, onDeskCommand = null }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
   const solUsdSpot = claimPrices?.[SOL_MINT] ?? null;
   // Wallet variant: 3 rows of cards per page, but the grid densifies on wider

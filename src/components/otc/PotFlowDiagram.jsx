@@ -44,7 +44,7 @@ function Bar({ label, value, total, color, broken = false, note }) {
   );
 }
 
-const Arrow = ({ label, value }) => (
+const Arrow = ({ label, value = null }) => (
   <div className="flex items-center justify-center gap-1.5 py-0.5 font-mono text-[11px] uppercase tracking-widest text-green-500/60">
     <span className="h-3 w-0.5 pot-flow-y" />
     <span>▼ {label} {value != null ? `+${fmtSol(value, 2)} SOL` : ""}</span>

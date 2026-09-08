@@ -3,7 +3,7 @@ import React, { useState } from "react";
 // Terminal-styled copy-to-clipboard block: a labeled, read-only value with a
 // [COPY] button. Handles the legacy execCommand fallback for browsers that
 // don't expose navigator.clipboard.
-export default function CopyBlock({ label, value, note }) {
+export default function CopyBlock({ label, value, note = null }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {

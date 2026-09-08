@@ -192,7 +192,7 @@ export default function EarningsChart({ latest, history }) {
                 contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
                 labelStyle={{ color: "#22c55e" }}
                 formatter={(v, n) =>
-                  v == null ? ["—", n] : [n === "APR" ? `${v.toFixed(1)}%` : `${v.toFixed(1)} days`, n]
+                  v == null ? ["—", n] : [n === "APR" ? `${Number(v).toFixed(1)}%` : `${Number(v).toFixed(1)} days`, n]
                 }
               />
               <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />

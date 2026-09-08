@@ -1045,13 +1045,12 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
   let curCu = 0;
   let curMembers = null;
   const start = () => {
-    cur = new Transaction();
-    cur.feePayer = userPk;
-    cur.recentBlockhash = blockhash;
-    cur.add(ComputeBudgetProgram.setComputeUnitLimit({ units: MAX_CU }));
-    cur.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports }));
-    curCu = CU_BASE;
-    curMembers = [];
+    const tx = new Transaction();
+    tx.feePayer = userPk;
+    tx.recentBlockhash = blockhash;
+    tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: MAX_CU }));
+    tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports }));
+    return tx;
   };
   const flush = () => {
     if (cur) {
@@ -1066,7 +1065,11 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
   for (let pi = 0; pi < pairs.length; pi++) {
     const p = pairs[pi];
     const n = p.distCount || 1;
-    if (!cur) start();
+    if (!cur) {
+      cur = start();
+      curCu = CU_BASE;
+      curMembers = [];
+    }
     const beforeCount = cur.instructions.length;
     for (let i = 0; i < n; i++) cur.add(p.distIx);
     cur.add(p.claimIx);
@@ -1077,7 +1080,9 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
       // didn't fit — undo this pair and start a fresh tx for it
       cur.instructions.length = beforeCount;
       flush();
-      start();
+      cur = start();
+      curCu = CU_BASE;
+      curMembers = [];
       for (let i = 0; i < n; i++) cur.add(p.distIx);
       cur.add(p.claimIx);
     }
