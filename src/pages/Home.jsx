@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { fetchDashboardBody } from "@/lib/dashboardFeed";
 import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
@@ -116,8 +117,11 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      const res = await base44.functions.invoke("getOtcDashboard", {});
-      setData(res.data);
+      // Direct Supabase read (zero Base44 entity reads); the getOtcDashboard
+      // function only serves as the fallback inside dashboardFeed when the
+      // Supabase mirror is unreachable.
+      const body = await fetchDashboardBody();
+      setData(body);
       setError(null);
     } catch (e) {
       setError(e?.response?.data?.error || e.message || "Failed to load");

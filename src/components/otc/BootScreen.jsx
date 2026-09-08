@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { fetchDashboardBody } from "@/lib/dashboardFeed";
 import { fmtNum, fmtSol, fmtUsd, fmtPct } from "@/lib/format";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 
@@ -49,10 +49,9 @@ export default function BootScreen({ onComplete }) {
 
   useEffect(() => {
     let cancelled = false;
-    base44.functions
-      .invoke("getOtcDashboard", {})
-      .then((res) => {
-        if (!cancelled) setData(res.data);
+    fetchDashboardBody()
+      .then((body) => {
+        if (!cancelled) setData(body);
       })
       .catch(() => {
         if (!cancelled) setData({ offline: true });

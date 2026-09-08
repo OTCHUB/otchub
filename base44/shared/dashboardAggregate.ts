@@ -11,6 +11,7 @@
 // ingest after a deploy, or while rebuilds keep failing).
 
 import { ADDRESSES, fetchDasTokenInfo } from "./otcSources.ts";
+import { pushDashboardToSupabase } from "./supabaseDashboard.ts";
 
 const CACHE_ENTITY = "OtcDashboardCache";
 const CORE_KEY = "otc_dash_core"; // latest + history + addresses + counts
@@ -209,6 +210,27 @@ export async function rebuildDashboardAggregate(base44, { holdings } = {}) {
     snapshot_count: body.snapshot_count,
   });
   await upsertByKey(base44, HOLDINGS_KEY, { at, holdings: body.holdings });
+  // SUPABASE MIRROR: same two payloads upserted into the project's Supabase
+  // table, which browsers then read directly (src/lib/dashboardFeed.js) — the
+  // visitor dashboard path costs zero Base44 entity reads. Best-effort: a
+  // failed mirror push never fails the ingest or the Base44 cache write.
+  try {
+    await pushDashboardToSupabase([
+      {
+        key: CORE_KEY,
+        payload: {
+          at,
+          addresses: body.addresses,
+          latest: body.latest,
+          history: body.history,
+          snapshot_count: body.snapshot_count,
+        },
+      },
+      { key: HOLDINGS_KEY, payload: { at, holdings: body.holdings } },
+    ]);
+  } catch (e) {
+    console.warn("supabase dashboard mirror push failed:", e?.message || e);
+  }
   return {
     ok: true,
     at,
