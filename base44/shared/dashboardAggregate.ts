@@ -106,51 +106,75 @@ export async function buildDashboard(base44, { holdings: givenHoldings = null } 
       };
     });
 
-  const snapshotHistory = list
-    .slice()
-    .reverse()
-    .map((s) => {
-      // Backfill supply/burn from desks for snapshots that predate supply
-      // fetching (or where a run failed mid-field), so the chart series is
-      // complete — same migration logic as the daily bootstrap.
-      let supply = s.token_total_supply;
-      let burnt = s.token_burnt;
-      if (supply == null && s.desks_minted != null) {
-        burnt = burntFromDesks(s.desks_minted);
-        if (burnt != null) supply = OTC_TGE_SUPPLY - burnt;
-      }
-      return {
-        t: s.created_date,
-        token_price_usd: s.token_price_usd,
-        token_price_sol: s.token_price_sol,
-        sol_price_usd: s.sol_price_usd,
-        nft_floor_sol: s.nft_floor_sol,
-        nft_floor_usd: s.nft_floor_usd,
-        pot_sol_balance: s.pot_sol_balance,
-        protocol_distributed_sol: s.protocol_distributed_sol,
-        protocol_buyback_sol: s.protocol_buyback_sol,
-        desks_minted: s.desks_minted,
-        token_market_cap: s.token_market_cap,
-        token_volume_24h: s.token_volume_24h,
-        token_liquidity_usd: s.token_liquidity_usd,
-        nft_listed_count: s.nft_listed_count,
-        token_total_supply: supply,
-        token_burnt: burnt,
-        rounds_total: s.rounds_total,
-        mint_cost_usd: s.mint_cost_usd,
-        secondary_cost_usd: s.secondary_cost_usd,
-        spread_usd: s.spread_usd,
-        spread_pct: s.spread_pct,
-        nft_total_supply: s.nft_total_supply,
-      };
-    });
+  // Project one snapshot row into its ~20-scalar history point (same fields
+  // and supply backfill as before — only the number of rows read changed).
+  const projectSnapshot = (s) => {
+    // Backfill supply/burn from desks for snapshots that predate supply
+    // fetching (or where a run failed mid-field), so the chart series is
+    // complete — same migration logic as the daily bootstrap.
+    let supply = s.token_total_supply;
+    let burnt = s.token_burnt;
+    if (supply == null && s.desks_minted != null) {
+      burnt = burntFromDesks(s.desks_minted);
+      if (burnt != null) supply = OTC_TGE_SUPPLY - burnt;
+    }
+    return {
+      t: s.created_date,
+      token_price_usd: s.token_price_usd,
+      token_price_sol: s.token_price_sol,
+      sol_price_usd: s.sol_price_usd,
+      nft_floor_sol: s.nft_floor_sol,
+      nft_floor_usd: s.nft_floor_usd,
+      pot_sol_balance: s.pot_sol_balance,
+      protocol_distributed_sol: s.protocol_distributed_sol,
+      protocol_buyback_sol: s.protocol_buyback_sol,
+      desks_minted: s.desks_minted,
+      token_market_cap: s.token_market_cap,
+      token_volume_24h: s.token_volume_24h,
+      token_liquidity_usd: s.token_liquidity_usd,
+      nft_listed_count: s.nft_listed_count,
+      token_total_supply: supply,
+      token_burnt: burnt,
+      rounds_total: s.rounds_total,
+      mint_cost_usd: s.mint_cost_usd,
+      secondary_cost_usd: s.secondary_cost_usd,
+      spread_usd: s.spread_usd,
+      spread_pct: s.spread_pct,
+      nft_total_supply: s.nft_total_supply,
+    };
+  };
 
-  // Merge the daily bootstrap (full history) with live snapshot points
-  // (recent granularity), sorted chronologically. The supply/desks chart
-  // connects nulls so partial series render cleanly.
-  const history = [...bootstrap, ...snapshotHistory].sort((a, b) =>
-    String(a.t || "").localeCompare(String(b.t || ""))
-  );
+  // Cold cache only: no previous series to reuse — read a bounded recent
+  // window (288 rows ≈ 24h at the 5-min ingest cadence) to repopulate it.
+  const windowHistory = prevHistory.length
+    ? []
+    : (
+        (await base44.asServiceRole.entities.OtcSnapshot.list(
+          "-created_date",
+          288
+        )) || []
+      )
+        .slice()
+        .reverse()
+        .map(projectSnapshot);
+
+  const latestPoint = latest ? projectSnapshot(latest) : null;
+
+  // Merge, sorted chronologically: the fresh bootstrap + fresh points win
+  // the dedupe by t (superseding their older copies inside the cached
+  // series), then the cached series fills everything older. The
+  // supply/desks chart connects nulls so partial series render cleanly.
+  const seen = new Set();
+  const history = [];
+  for (const point of [...bootstrap, ...windowHistory, latestPoint, ...prevHistory]) {
+    if (!point || point.t == null || seen.has(point.t)) continue;
+    seen.add(point.t);
+    history.push(point);
+  }
+  history.sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")));
+  // Bound the live-granularity series (288 points/day → 15 days); the daily
+  // bootstrap covers everything older, so the payload can't grow forever.
+  if (history.length > 4320) history.splice(0, history.length - 4320);
 
   // Inject true on-chain supply/burn into the served latest so the protocol
   // panel always reflects real on-chain state, even if the stored snapshot
@@ -161,12 +185,10 @@ export async function buildDashboard(base44, { holdings: givenHoldings = null } 
     latest.token_tge_supply = OTC_TGE_SUPPLY;
   }
 
-  const snapshotCount = list.length;
-  // Free the ~1,000 raw snapshot rows (each carrying by_stock/per_desk/
-  // buybacks sub-objects) before callers serialize the payload: holding
-  // them alongside the built history pushed the ingest worker over its
-  // memory limit. `latest` keeps its own row object alive independently.
-  list.length = 0;
+  // Snapshot count shown in the dashboard header: prefer the count carried
+  // by the previous core payload (it survives across rebuilds) and never
+  // let it go backwards.
+  const snapshotCount = Math.max(prevCore?.snapshot_count || 0, history.length);
   return {
     at: Date.now(),
     body: {
