@@ -33,7 +33,14 @@ export function createLauncherGraduationStore({ clock = Date.now, cacheMs = CACH
         const entries = new Map();
         for (const row of rows) {
           if (MINT.test(row?.mint || "") && !entries.has(row.mint)) {
-            entries.set(row.mint, { graduated_at: row.graduated_at, source: row.source });
+            // name/symbol/launched_at power the historical-tape rows the live
+            // build serves for ledger mints the upstream roster dropped.
+            entries.set(row.mint, {
+              graduated_at: row.graduated_at, source: row.source,
+              name: typeof row.name === "string" ? row.name : "",
+              symbol: typeof row.symbol === "string" ? row.symbol : "",
+              launched_at: Number.isFinite(row.launched_at) ? row.launched_at : null,
+            });
           }
         }
         cache = { at: clock(), entries };
@@ -57,7 +64,10 @@ export function createLauncherGraduationStore({ clock = Date.now, cacheMs = CACH
     }
     if (!fresh.length) return 0;
     await ledger(getClient).bulkCreate(fresh);
-    for (const g of fresh) existing.set(g.mint, { graduated_at: g.graduated_at, source: g.source });
+    for (const g of fresh) existing.set(g.mint, {
+      graduated_at: g.graduated_at, source: g.source,
+      name: g.name || "", symbol: g.symbol || "", launched_at: null,
+    });
     return fresh.length;
   };
 

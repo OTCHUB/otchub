@@ -1,7 +1,7 @@
 {
   "name": "LauncherGraduate",
   "type": "object",
-  "description": "Global graduation ledger for launcher tokens: one row per mint, written once (server re-verifies the on-chain curve-complete flag before any write) and read by the live feed so GRADUATED statuses persist for every visitor across isolates without re-probing.",
+  "description": "Global graduation ledger for launcher tokens: one row per mint, written once (server re-verifies the on-chain curve-complete flag before any write) and read by the live feed so GRADUATED statuses persist for every visitor across isolates without re-probing. Ledger mints missing from the current upstream roster are still served as verified historical GRADUATED launches (full launch history), so an upstream feed reset can no longer erase the tape.",
   "properties": {
     "mint": {
       "type": "string"
@@ -14,6 +14,10 @@
     },
     "graduated_at": {
       "type": "integer"
+    },
+    "launched_at": {
+      "type": "integer",
+      "description": "Launch time (pair creation, ms epoch) from DEX enrichment; bootstrapped retroactively and left null when unknown."
     },
     "source": {
       "type": "string",

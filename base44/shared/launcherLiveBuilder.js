@@ -255,6 +255,24 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
         row.curveProgress = 100;
         row.statusAt = persistedGrad.graduated_at;
       }
+      // FULL LAUNCH HISTORY: ledger graduations the current upstream roster no
+      // longer lists (feed resets, curation, rotations) are still served as
+      // verified historical launches. The on-chain curve-complete flag was
+      // re-verified before the ledger write, so their GRADUATED status stays
+      // authoritative — the tape can no longer be reset away upstream.
+      const rosterMints = new Set(rows.map((row) => row.mint));
+      for (const [mint, entry] of persisted) {
+        if (rosterMints.has(mint)) continue;
+        rows.push({
+          mint, symbol: entry.symbol || "", name: entry.name || "",
+          image: "", logoUrl: "", socials: sourceSocials({}), payoutInfo: null,
+          vol24: null, mcap: null, liquidity: null, change24h: null,
+          ageH: ageHours(entry.launched_at, at), metricsAt: null,
+          curveProgress: 100, curveComplete: true,
+          status: "GRADUATED", statusAt: entry.graduated_at,
+          historical: true,
+        });
+      }
     }
     // The full roster is ~3000 launches (~3.5MB JSON) — far too large for a
     // 30s poll (client delivery failures). Ship a bounded roster: every
