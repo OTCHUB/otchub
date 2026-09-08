@@ -6,6 +6,7 @@ import { useLauncherLive } from "@/lib/useLauncherLive";
 import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
 import { fetchLauncherAnalyticsMirror } from "@/lib/launcherFeed";
+import { isOfficialHubMint } from "@/lib/hubMint";
 import Pager from "@/components/otc/Pager";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -320,6 +321,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 className="max-w-full break-all text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
                 ${t.symbol || t.mint.slice(0, 6)}
               </button>
+              {isOfficialHubMint(t.mint) && (
+                <span
+                  className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold uppercase tracking-widest text-fuchsia-300"
+                  title="Official OTC_HUB token — mint verified against the official CA"
+                >
+                  ★ OFFICIAL OTC_HUB
+                </span>
+              )}
               <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
               <span className="ml-auto shrink-0 text-green-500/50">{fmtAge(t.ageH)}</span>
             </span>

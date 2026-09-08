@@ -30,6 +30,7 @@ import KeeperPanel from "@/components/otc/KeeperPanel";
 import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
+import HubOfficialCa from "@/components/otc/HubOfficialCa";
 import { timeAgo } from "@/lib/format";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 import { silentReconnect } from "@/lib/solanaWallets";
@@ -251,6 +252,8 @@ export default function Home() {
               ERR: {error}
             </div>
           )}
+          {/* Official $HUB CA banner — hidden until the real mint is set */}
+          <HubOfficialCa />
         </header>
 
         {/* Wallet */}
