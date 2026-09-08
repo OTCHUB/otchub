@@ -24,9 +24,17 @@ import {
 import { fmtSol, fmtUnits, shortKey } from "../lib/format";
 import type { TxLog } from "../lib/swap";
 import { Panel } from "./ui/Panel";
+import { TierBadge } from "./ui/TierProgress";
 import { TxLogView } from "./ui/TxLogView";
 
-type Props = { address: string; state: ProtocolState; desks: OwnedDesk[]; onChanged?: () => void };
+type Props = {
+  address: string;
+  state: ProtocolState;
+  desks: OwnedDesk[];
+  onChanged?: () => void;
+  /** Preselect a desk (e.g. jumped here from a PORTFOLIO card's [ACTIVATE →]/[UPGRADE →]). */
+  selectedAsset?: string | null;
+};
 
 const btn = "border px-2.5 py-1 text-[12px] disabled:opacity-30";
 const TIERS = [1, 2, 3, 4] as const;
@@ -36,7 +44,7 @@ const OTC_DECIMALS = 6;
 const currentTier = (d: OwnedDesk) => (d.tier && !d.tier.voided ? d.tier.tier : 0);
 
 /** ACTIVATE_DESK — `activate_tier` / `upgrade_tier` paid in SOL, or the $OTC path at the premium. */
-export function ActivatePanel({ address, state, desks, onChanged }: Props) {
+export function ActivatePanel({ address, state, desks, onChanged, selectedAsset }: Props) {
   const { connection, program, resolveSigner } = useHub();
   const qc = useQueryClient();
   const otcPayQ = useOtcPay();
@@ -61,6 +69,11 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
   useEffect(() => {
     if (toTier <= fromTier) setToTier(Math.min(fromTier + 1, MAX_TIER));
   }, [fromTier, toTier]);
+
+  // PORTFOLIO card's [ACTIVATE →]/[UPGRADE →] jumps here with a desk already picked.
+  useEffect(() => {
+    if (selectedAsset) setAsset(selectedAsset);
+  }, [selectedAsset]);
 
   const quote: TierQuote | null =
     desk && toTier > fromTier && toTier <= MAX_TIER
@@ -143,7 +156,9 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
         </div>
       ) : (
         <>
-          <div className="text-[10px] uppercase tracking-widest text-green-600">desk</div>
+          <div className="text-[10px] uppercase tracking-widest text-green-600">
+            step 1 · select desk
+          </div>
           <div className="mt-1 max-h-32 overflow-y-auto border border-green-500/20">
             {rows.map((d) => {
               const t = currentTier(d);
@@ -159,9 +174,7 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
                   }`}
                 >
                   <span className="text-green-300">{shortKey(d.asset, 6)}</span>
-                  <span className={t ? "text-cyan-300" : "text-green-700"}>
-                    {t ? `T${t} ${TIER_NAMES[t - 1]}` : "NOT ACTIVATED"}
-                  </span>
+                  <TierBadge tier={t} />
                 </button>
               );
             })}
@@ -171,8 +184,10 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
 
       {desk && (
         <>
-          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">
-            target tier {fromTier ? `(current T${fromTier})` : "(fresh activation)"}
+          <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-green-600">
+            <span>step 2 · target tier</span>
+            <TierBadge tier={fromTier} />
+            <span className="text-green-700">→</span>
           </div>
           <div className="mt-1 grid grid-cols-4 gap-1">
             {TIERS.map((t) => (
@@ -197,7 +212,9 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
             ))}
           </div>
 
-          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">pay with</div>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">
+            step 3 · pay with
+          </div>
           <div className="mt-1 flex gap-1">
             {(["sol", "otc"] as PayMethod[]).map((m) => (
               <button
@@ -219,17 +236,32 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
           </div>
 
           {quote && split && (
-            <div className="mt-2 border border-green-500/20 p-2 text-[11px]">
-              <div className="flex justify-between gap-2">
-                <span className={method === "sol" ? "text-emerald-300" : "text-green-300"}>
+            <div className="mt-2 border border-emerald-500/30 bg-emerald-500/[0.03] p-2 text-[11px]">
+              <div className="mb-1.5 text-[10px] uppercase tracking-widest text-emerald-400/80">
+                step 4 · cost summary — {verb.toLowerCase()} T{toTier}
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className={
+                    method === "sol"
+                      ? "text-sm font-bold text-emerald-300"
+                      : "text-[11px] text-green-700"
+                  }
+                >
                   SOL: {fmtSol(quote.solLamports, 2)}
                 </span>
                 <span className="text-green-600">
                   {fmtSol(split.toPot, 2)} → pot, {fmtSol(split.toOps, 2)} → ops
                 </span>
               </div>
-              <div className="mt-1 flex justify-between gap-2">
-                <span className={method === "otc" ? "text-amber-300" : otcTone}>
+              <div className="mt-1 flex items-baseline justify-between gap-2">
+                <span
+                  className={
+                    method === "otc"
+                      ? "text-sm font-bold text-amber-300"
+                      : `text-[11px] ${otcTone}`
+                  }
+                >
                   $OTC:{" "}
                   {quote.otcUnits != null
                     ? `${fmtUnits(quote.otcUnits, otcDecimals)} OTC`
@@ -239,10 +271,12 @@ export function ActivatePanel({ address, state, desks, onChanged }: Props) {
                   {premium}× premium → POL reserve
                 </span>
               </div>
-              <div
-                className={`mt-1 flex justify-between gap-2 ${hubShort ? "text-amber-400" : "text-cyan-300"}`}
-              >
-                <span>$HUB burn: {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB</span>
+              <div className="mt-1.5 border-t border-emerald-500/15 pt-1.5 flex items-baseline justify-between gap-2">
+                <span
+                  className={`text-sm font-bold ${hubShort ? "text-amber-400" : "text-cyan-300"}`}
+                >
+                  {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB burn
+                </span>
                 <span className="text-green-700">
                   {fromTier ? "T" + fromTier + " → T" + toTier + " difference" : "full tier cost"}
                 </span>

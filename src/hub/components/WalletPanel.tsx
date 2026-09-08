@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProtocolState } from "@hub-sdk";
 import { useWalletPortfolio } from "../hooks/useWalletPortfolio";
 import { shortKey } from "../lib/format";
@@ -30,8 +30,16 @@ const readStored = () => {
 export function WalletPanel({ state, walletAddress }: Props) {
   const [address, setAddress] = useState<string | null>(() => walletAddress ?? readStored());
   const [open, setOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const activateRef = useRef<HTMLDivElement>(null);
   // Same query key as WalletPortfolio → one fetch, shared by portfolio + claim rows.
   const portfolio = useWalletPortfolio(address, state);
+
+  // From a PORTFOLIO desk card's [ACTIVATE →]/[UPGRADE →]: preselect it below and scroll to it.
+  const jumpToActivate = (asset: string) => {
+    setSelectedAsset(asset);
+    activateRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   useEffect(() => {
     if (walletAddress) setAddress(walletAddress);
@@ -102,6 +110,7 @@ export function WalletPanel({ state, walletAddress }: Props) {
           address={address}
           state={state}
           onClear={walletAddress ? undefined : clear}
+          onActivate={jumpToActivate}
         />
       </Panel>
       <div className="grid gap-2 lg:grid-cols-2">
@@ -113,12 +122,15 @@ export function WalletPanel({ state, walletAddress }: Props) {
           onClaimed={() => void portfolio.refetch()}
         />
       </div>
-      <ActivatePanel
-        address={address}
-        state={state}
-        desks={portfolio.data?.desks ?? []}
-        onChanged={() => void portfolio.refetch()}
-      />
+      <div ref={activateRef}>
+        <ActivatePanel
+          address={address}
+          state={state}
+          desks={portfolio.data?.desks ?? []}
+          selectedAsset={selectedAsset}
+          onChanged={() => void portfolio.refetch()}
+        />
+      </div>
     </div>
   );
 }

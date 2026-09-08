@@ -1,12 +1,20 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { TIER_NAMES, TIER_WEIGHTS_BP, type ProtocolState } from "@hub-sdk";
+import { TIER_WEIGHTS_BP, type ProtocolState } from "@hub-sdk";
 import { useWalletPortfolio, type OwnedDesk } from "../hooks/useWalletPortfolio";
+import { MAX_TIER } from "../lib/activate";
 import { fmtNum, fmtSol, fmtWeight, shortKey } from "../lib/format";
 import { magicEdenItemUrl } from "../lib/marketplace";
 import { AddressLink } from "./ui/AddressLink";
+import { TierBadge, TierLadder } from "./ui/TierProgress";
 
-type Props = { address: string; state: ProtocolState; onClear?: () => void };
+type Props = {
+  address: string;
+  state: ProtocolState;
+  onClear?: () => void;
+  /** Jump straight to ACTIVATE_DESK with this desk preselected — wired by WalletPanel. */
+  onActivate?: (asset: string) => void;
+};
 
 /** otchub's portfolio metric tile: label / bold value / sub-line, accent per metric. */
 function Metric({
@@ -29,58 +37,79 @@ function Metric({
   );
 }
 
-function DeskRow({ desk }: { desk: OwnedDesk }) {
+function DeskRow({
+  desk,
+  onActivate,
+}: {
+  desk: OwnedDesk;
+  onActivate?: (asset: string) => void;
+}) {
   const t = desk.tier;
-  const active = t && !t.voided;
-  const tierLabel = t
-    ? t.voided
-      ? "VOIDED"
-      : `${TIER_NAMES[t.tier - 1] ?? `T${t.tier}`} · ${fmtWeight(TIER_WEIGHTS_BP[t.tier - 1] ?? 0)}`
-    : "RAW · not activated";
-  const tone = !t ? "text-green-700" : t.voided ? "text-red-400" : "text-cyan-300";
+  const voided = !!t?.voided;
+  const tier = t && !voided ? t.tier : 0;
+  const canAdvance = !voided && tier < MAX_TIER;
   return (
-    <div className="flex items-center gap-2 border border-green-500/15 px-2 py-1 text-xs">
-      {desk.art?.image ? (
-        <img
-          src={desk.art.image}
-          alt={desk.art.name ?? "desk NFT"}
-          className="h-6 w-6 shrink-0 border border-green-500/30 bg-black object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <span className="inline-block h-6 w-6 shrink-0 border border-green-500/15 bg-black" />
-      )}
-      <AddressLink address={desk.asset} />
-      <span className={`${tone} flex-1`}>{tierLabel}</span>
-      {active && (
-        <span className="hidden text-[10px] text-amber-400 sm:inline" title="yield boost vs T1">
-          {desk.yieldBoostPct > 0 ? `+${desk.yieldBoostPct}%` : "base"}
+    <div className="border border-green-500/15 p-1.5 text-xs">
+      <div className="flex items-center gap-2">
+        {desk.art?.image ? (
+          <img
+            src={desk.art.image}
+            alt={desk.art.name ?? "desk NFT"}
+            className="h-7 w-7 shrink-0 border border-green-500/30 bg-black object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <span className="inline-block h-7 w-7 shrink-0 border border-green-500/15 bg-black" />
+        )}
+        <AddressLink address={desk.asset} />
+        <TierBadge tier={tier} voided={voided} />
+        {tier > 0 && !voided && (
+          <span className="hidden text-[10px] text-amber-400 sm:inline" title="yield boost vs T1">
+            {desk.yieldBoostPct > 0 ? `+${desk.yieldBoostPct}%` : "base"}
+          </span>
+        )}
+        <span
+          className="ml-auto w-20 text-right text-green-400"
+          title="claimable rewards — pays out in one claim_yield"
+        >
+          {fmtSol(desk.pendingLamports, 4)}
         </span>
-      )}
-      <span
-        className="w-20 text-right text-green-400"
-        title="claimable rewards — pays out in one claim_yield"
-      >
-        {fmtSol(desk.pendingLamports, 4)}
-      </span>
-      <a
-        href={magicEdenItemUrl(desk.asset)}
-        target="_blank"
-        rel="noreferrer"
-        className="text-[10px] text-green-600 hover:text-green-300"
-        title="view this desk on Magic Eden"
-      >
-        [ME ↗]
-      </a>
-      <Link to={`desk/${desk.asset}`} className="text-[10px] text-green-600 hover:text-green-300">
-        [DETAIL →]
-      </Link>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 pl-9">
+        <TierLadder tier={tier} voided={voided} />
+        <div className="ml-auto flex items-center gap-2">
+          {canAdvance && onActivate && (
+            <button
+              type="button"
+              onClick={() => onActivate(desk.asset)}
+              className="border border-emerald-500/50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/10"
+            >
+              [{tier ? "UPGRADE" : "ACTIVATE"} →]
+            </button>
+          )}
+          <a
+            href={magicEdenItemUrl(desk.asset)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] text-green-600 hover:text-green-300"
+            title="view this desk on Magic Eden"
+          >
+            [ME ↗]
+          </a>
+          <Link
+            to={`desk/${desk.asset}`}
+            className="text-[10px] text-green-600 hover:text-green-300"
+          >
+            [DETAIL →]
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
 
 /** Read-only wallet view: SOL, $HUB balance, and desks in the configured collection with tier. */
-export function WalletPortfolio({ address, state, onClear }: Props) {
+export function WalletPortfolio({ address, state, onClear, onActivate }: Props) {
   const q = useWalletPortfolio(address, state);
   const data = q.data;
   const activeWeightBp =
@@ -152,7 +181,7 @@ export function WalletPortfolio({ address, state, onClear }: Props) {
             ) : (
               <div className="mt-1 space-y-1">
                 {data.desks.map((d) => (
-                  <DeskRow key={d.asset} desk={d} />
+                  <DeskRow key={d.asset} desk={d} onActivate={onActivate} />
                 ))}
               </div>
             )}

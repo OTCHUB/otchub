@@ -6,6 +6,7 @@ import { CONSIGN_WARN_LAMPORTS, yieldBoostPctOverBase } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
 import { Panel, Row } from "./ui/Panel";
 import { Notice } from "./ui/StateBox";
+import { TierBadge } from "./ui/TierProgress";
 
 type Props = { asset: string; data: DeskLookupResult; state: ProtocolState };
 
@@ -77,9 +78,9 @@ export function DeskCard({ asset, data, state }: Props) {
       <Panel
         title="DESK TIER"
         right={
-          <>
-            {meLink} · {tier.voided ? "VOIDED" : "ACTIVE"}
-          </>
+          <span className="flex items-center gap-1.5">
+            {meLink} <TierBadge tier={tier.tier} voided={tier.voided} />
+          </span>
         }
       >
         <div className="flex gap-3">
