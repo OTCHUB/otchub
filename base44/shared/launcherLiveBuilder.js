@@ -85,9 +85,14 @@ function fillDexMetadata(row, pairs) {
   }
 }
 
-function rosterRows(raw, at) {
+export function extractCoins(raw) {
   const coins = Array.isArray(raw) ? raw : raw?.coins ?? raw?.data ?? raw?.tokens;
-  if (!Array.isArray(coins)) throw new Error("COINS_UNAVAILABLE");
+  return Array.isArray(coins) ? coins : null;
+}
+
+function rosterRows(raw, at) {
+  const coins = extractCoins(raw);
+  if (!coins) throw new Error("COINS_UNAVAILABLE");
   const seen = new Set(), rows = [];
   for (const coin of coins) {
     const mint = text(coin?.mint);
@@ -137,7 +142,8 @@ async function runBounded(tasks) {
 }
 
 export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl = fetch,
-  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore }) {
+  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore,
+  coinsArchive = null, freshPages = 0 }) {
   let activeRpc = 0;
   const risks = riskService ?? createLauncherRiskService({ ...riskOptions, fetchImpl, clock });
 
@@ -174,7 +180,27 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
   async function build(getClient) {
     const raw = await fetchJson(COINS_URL, 15_000);
     // Observation time, not a claim about the upstream snapshot's own update time.
-    const at = clock(), rows = rosterRows(raw, at), errors = new Set();
+    const at = clock(), errors = new Set();
+    const coins = extractCoins(raw) || [];
+    // Newest upstream pages: brand-new launches surface within one 30s poll
+    // instead of waiting for the next 5-min archive sweep.
+    if (freshPages > 0) {
+      const pages = await Promise.all(Array.from({ length: freshPages }, (_, i) =>
+        fetchJson(`${COINS_URL}?page=${i + 1}`, probeTimeoutMs).catch(() => null)));
+      for (const page of pages) {
+        for (const coin of extractCoins(page) || []) coins.push(coin);
+      }
+    }
+    // FULL LAUNCH HISTORY: the bare feed ships only the active featured set;
+    // the persistent coins archive (every launch ever swept from the upstream
+    // paginated DB, refreshed each mirror cycle) restores the complete tape.
+    // Fresh coins win by mint — rosterRows keeps the first occurrence.
+    if (coinsArchive) {
+      try {
+        for (const coin of (await coinsArchive()) || []) coins.push(coin);
+      } catch { errors.add("LAUNCHER_ARCHIVE_UNAVAILABLE"); }
+    }
+    const rows = rosterRows({ coins }, at);
     // Global graduation ledger: visitor-confirmed AMM migrations persisted in
     // the DB, shared by every isolate and visitor. Best-effort by design — an
     // unavailable ledger must never fail the live feed.

@@ -73,12 +73,14 @@ export async function parseFeedParams(req, url) {
 }
 
 export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl = fetch,
-  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore, createClient }) {
+  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore,
+  coinsArchive = null, freshPages = 0, createClient }) {
   // One handler/cache per isolate; no auth, entity reads, or client-selected mints.
   // The graduation ledger is the shared DB layer: visitor-confirmed migrations
   // persist globally, so GRADUATED statuses survive isolate restarts and are
-  // served to every visitor without re-probing each time.
-  const { build, attachRisks } = createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl, clock, probeTimeoutMs, riskService, riskOptions, graduationStore });
+  // served to every visitor without re-probing each time. The coins archive
+  // layer (Supabase) restores the full launch history behind the active set.
+  const { build, attachRisks } = createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl, clock, probeTimeoutMs, riskService, riskOptions, graduationStore, coinsArchive, freshPages });
   let cached = null, inflight = null;
 
   const statusKey = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";

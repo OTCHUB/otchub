@@ -1,6 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { buildLauncherLiveBody, buildLauncherAnalyticsBody } from "../../shared/launcherFeed.ts";
 import { pushDashboardToSupabase } from "../../shared/supabaseDashboard.ts";
+import { refreshLauncherCoinsArchive } from "../../shared/launcherArchive.ts";
 
 // Supabase mirror of the launcher feed — LAUNCHER PANEL RESILIENCE + ARCHIVE.
 // Every 5 minutes (LauncherFeedScheduler workflow) this builds the SAME
@@ -13,6 +14,13 @@ import { pushDashboardToSupabase } from "../../shared/supabaseDashboard.ts";
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
+
+    // FULL-TAPE SWEEP FIRST: catch the archive up with every launch since the
+    // last cycle (bounded page sweep, stops early once caught up), so the tape
+    // built below carries the complete launch history.
+    let archive = null;
+    try { archive = await refreshLauncherCoinsArchive({ pages: 40 }); }
+    catch { /* build with the last archived tape */ }
 
     const live = await buildLauncherLiveBody(() => base44);
     const liveRows = Array.isArray(live.rows) ? live.rows.length : 0;
@@ -33,6 +41,7 @@ export default async function (req) {
 
     return Response.json({
       ok: true,
+      archive,
       live_rows: liveRows,
       analytics_launches: analytics?.cohort?.launches ?? null,
     });

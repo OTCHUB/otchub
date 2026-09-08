@@ -10,6 +10,7 @@ import { PublicKey } from "npm:@solana/web3.js@1.98.4";
 import { heliusRpc } from "./otcSources.ts";
 import { createCurveAddressDeriver } from "./launcherCurve.js";
 import { createLauncherGraduationStore } from "./launcherGraduates.ts";
+import { createLauncherCoinsArchiveLoader } from "./launcherArchive.ts";
 import { createLauncherLiveBuilder } from "./launcherLiveBuilder.js";
 
 const DEX = "https://api.dexscreener.com/latest/dex";
@@ -30,6 +31,7 @@ export async function buildLauncherLiveBody(getClient) {
     rpc: heliusRpc,
     deriveCurveAddress: createCurveAddressDeriver(PublicKey),
     graduationStore: createLauncherGraduationStore(),
+    coinsArchive: createLauncherCoinsArchiveLoader(),
   });
   return await build(getClient);
 }
@@ -50,8 +52,21 @@ export async function buildLauncherAnalyticsBody() {
   const COINS_URL = "https://otcdesks.cash/api/coins";
   const now = Date.now() / 1000;
   const raw = await fetchJson(COINS_URL, 15_000);
-  const coins = (Array.isArray(raw) ? raw : raw.coins || raw.data || raw.tokens || [])
+  let coins = (Array.isArray(raw) ? raw : raw.coins || raw.data || raw.tokens || [])
     .filter((c) => c?.mint && c?.symbol);
+  // Full launch history: the bare feed ships only the active set; archived
+  // launches (swept from the upstream paginated DB, refreshed each mirror
+  // cycle) restore the complete cohort this panel reported before the reset.
+  try {
+    const archived = await createLauncherCoinsArchiveLoader()();
+    const seen = new Set(coins.map((c) => c.mint));
+    for (const coin of archived || []) {
+      if (coin?.mint && coin?.symbol && !seen.has(coin.mint)) {
+        seen.add(coin.mint);
+        coins.push(coin);
+      }
+    }
+  } catch { /* archive unavailable — cohort stays on the active set */ }
 
   const view = coins.map((c) => {
     const ageH = Math.max((now - (c.createdAt || now)) / 3600, 0.01);
