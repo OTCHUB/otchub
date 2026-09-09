@@ -1,0 +1,10 @@
+# OTC Pulse — otchub.dev
+# Community analytics dashboard for the OTC Desks (otcdesks.cash) ecosystem.
+# This file follows RFC 9116 (security.txt). It is the standard channel for
+# security researchers to report vulnerabilities in this website.
+Contact: mailto:tjaygmi@gmail.com
+Contact: https://otchub.dev/about
+Expires: 2027-08-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://otchub.dev/.well-known/security.txt
+Policy: https://otchub.dev/about
