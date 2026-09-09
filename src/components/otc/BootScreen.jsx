@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { fetchDashboardBody } from "@/lib/dashboardFeed";
 import { fmtNum, fmtSol, fmtUsd, fmtPct } from "@/lib/format";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
+import { getStoredSkin } from "@/lib/theme";
 
 const HEADER = [
   "+---------------------------------------------+",
@@ -46,6 +47,9 @@ export default function BootScreen({ onComplete }) {
   const [lines, setLines] = useState([]);
   const [done, setDone] = useState(false);
   const [data, setData] = useState(null);
+  // Boot-time skin: the modern skin renders a sans hero instead of the
+  // ASCII banner, so the boot sequence is fully converted too.
+  const [skin] = useState(getStoredSkin);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +90,7 @@ export default function BootScreen({ onComplete }) {
     : 0;
 
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+    <div className="skin-stage relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
       <TerminalTopBar label="OTC_HUB_BOOT_SEQUENCE" />
 
       {/* Full-screen CRT treatment: scanlines + vignette fill any viewport.
@@ -98,9 +102,20 @@ export default function BootScreen({ onComplete }) {
       {/* Scrollable terminal body: stays inside the viewport on every screen */}
       <div className="relative z-20 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
         <div className="w-full max-w-3xl xl:max-w-4xl">
-          <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
-            {HEADER.join("\n")}
-          </div>
+          {skin === "modern" ? (
+            <div className="text-left sm:text-center">
+              <div className="font-display text-2xl font-bold uppercase tracking-[0.22em] text-green-300 sm:text-4xl">
+                OTC_HUB
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-green-500/60 sm:text-[12px]">
+                Solana analytics · iridescent terminal · community tooling
+              </div>
+            </div>
+          ) : (
+            <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
+              {HEADER.join("\n")}
+            </div>
+          )}
           <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
             {!data && (
               <div>
@@ -131,7 +146,7 @@ export default function BootScreen({ onComplete }) {
       {/* Boot progress bar: pinned above the fixed footer, always visible and
           in lockstep with the milestone text scrolling above it */}
       <div className="relative z-20 mx-auto w-full max-w-3xl shrink-0 px-4 pb-2 sm:px-8 xl:max-w-4xl">
-        <div className="border border-green-500/30 p-1.5">
+        <div className="term-window border border-green-500/30 p-1.5">
           <div className="flex items-center justify-between text-[10px] text-green-500/60 sm:text-[11px]">
             <span>BOOT_SEQ</span>
             <span>{progress}%</span>

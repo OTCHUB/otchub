@@ -430,11 +430,11 @@ html.skin-modern {
   --c-slate-800: 42 49 58;
   --c-slate-900: 27 36 48;
 
-  /* Type: geometric sans UI + Plex Mono data; Press Start 2P reserved for
-     HUD display moments. Sentence case is untouched in JSX. */
+  /* Type: one modern geometric sans for UI + HUD wordmarks, Plex Mono only
+     for data/logs — every component (incl. the boot screen) converts. */
   --font-heading: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Press Start 2P", "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* shadcn tokens follow the chassis */
@@ -471,14 +471,18 @@ html.skin-modern {
   --chart-tip-radius: 12px;
 }
 
-/* Void canvas: the page stage turns pure black so the chassis panels
-   float in the void; cards keep the panel tone via --c-black. */
+/* Void canvas with a faint iridescent aurora behind the glass panels —
+   the frosted windows blur these glows as they scroll over them. */
 html.skin-modern body {
   background-color: #000000;
   color: #e8eef4;
 }
 html.skin-modern .skin-stage {
-  background-color: #000000;
+  background:
+    radial-gradient(1200px 800px at 15% -10%, rgb(92 225 255 / 0.1), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(167 139 255 / 0.08), transparent 60%),
+    radial-gradient(900px 900px at 50% 110%, rgb(255 92 200 / 0.06), transparent 60%),
+    #000000;
 }
 
 /* The CRT overlay is a RETRO-only effect; the modern screen is a
@@ -489,22 +493,49 @@ html.skin-modern .boot-crt {
 
 /* Chamfered geometry: cards and wells get the 12px frame radius,
    controls 8px — sharp 90° corners belong to the RETRO skin only. */
-/* One chamfer per window: the collapsible window root is the ONLY rounded
-   frame; every panel inside stays square, so expanding/collapsing reads as
-   one seamless window — never a rounded frame nested inside a rounded
-   frame. */
+/* One glass window per panel group: the collapsible window root is the
+   only frame — frosted chassis glass with an iridescent ring, while every
+   panel inside turns transparent so the whole window reads as ONE seamless
+   frosted sheet (never rounded-on-rounded). */
 html.skin-modern .term-window {
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
+  background: rgb(var(--c-black) / 0.55);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow:
+    0 0 0 1px rgb(92 225 255 / 0.22),
+    0 0 0 2px rgb(167 139 255 / 0.1),
+    0 16px 48px -12px rgb(92 225 255 / 0.14),
+    0 24px 64px -24px rgb(0 0 0 / 0.7);
+}
+html.skin-modern .term-window .bg-black {
+  background-color: transparent;
+}
+/* Frosted chassis: every other panel surface becomes translucent glass. */
+html.skin-modern .bg-black {
+  background-color: rgb(var(--c-black) / 0.72);
 }
 html.skin-modern [class*="inline-flex"][class*="overflow-hidden"] {
-  border-radius: 8px;
+  border-radius: 10px;
 }
 html.skin-modern button,
 html.skin-modern input,
 html.skin-modern select,
 html.skin-modern textarea {
-  border-radius: 8px;
+  border-radius: 12px;
+}
+
+/* HUD wordmark: heavy geometric sans instead of the pixel font. */
+html.skin-modern .font-display {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Fixed terminal bars freeze into glass above the scrolling page. */
+html.skin-modern .term-bar {
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
 }
 
 /* Recessed-well focus: iris ring + soft cyan bloom (spec §6 inputs). */
@@ -656,14 +687,27 @@ html.skin-modern.light {
   --chart-tip-radius: 12px;
 }
 
-/* Pale-metal canvas: the stage and page sit in the light haze while
-   the near-white chassis panels float on top. */
+/* Pale-metal canvas with a soft aurora: light glass panels float and
+   blur the darkened iris glows drifting behind them. */
 html.skin-modern.light body {
   background-color: #e3e9ef;
   color: #1b2430;
 }
 html.skin-modern.light .skin-stage {
-  background-color: #e3e9ef;
+  background:
+    radial-gradient(1200px 800px at 15% -10%, rgb(8 145 178 / 0.1), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(124 58 237 / 0.07), transparent 60%),
+    radial-gradient(900px 900px at 50% 110%, rgb(192 38 211 / 0.06), transparent 60%),
+    #e3e9ef;
+}
+/* Pearlescent glass: white glass sheet with a darker iris ring. */
+html.skin-modern.light .term-window {
+  background: rgb(var(--c-black) / 0.6);
+  box-shadow:
+    0 0 0 1px rgb(8 145 178 / 0.25),
+    0 0 0 2px rgb(124 58 237 / 0.1),
+    0 16px 48px -16px rgb(27 36 48 / 0.25),
+    0 24px 64px -24px rgb(27 36 48 / 0.18);
 }
 
 /* Light chassis interactions: darker iris focus/caret/selection and
