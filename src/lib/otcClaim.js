@@ -475,6 +475,7 @@ async function ensureConfirmed(entries, onLog, onConfirm) {
     // keeps being re-submitted while the blockhash window is still open.
     onLog({ type: "info", msg: `PEND :: ${pending.size} tx(s) unconfirmed — re-broadcasting...` });
     for (const [, b64] of pending) {
+      if (!b64) continue; // wallet-side send: no signed bytes to re-broadcast
       try {
         await withTimeout(relay("send", { tx: b64 }), 30000, "rebroadcast");
       } catch {

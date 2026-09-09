@@ -318,7 +318,14 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         // walletSigner resolves a global wallet; re-resolve at the final boundary.
         return getSignerForAddress(wallet).signTransactionRaw(tx);
       };
-      const res = await executeSwap(built.swapTransaction, sign, log, wallet, phase, shouldContinue, walletCurrent);
+      // Mobile fallback (Phantom in-app browser bug): the wallet signs AND sends.
+      const signAndSend = (tx) => {
+        checkContext();
+        const signer = getSignerForAddress(wallet);
+        if (!signer?.signAndSendRaw) throw new Error("Wallet cannot sign & send");
+        return signer.signAndSendRaw(tx);
+      };
+      const res = await executeSwap(built.swapTransaction, sign, log, wallet, phase, shouldContinue, walletCurrent, signAndSend);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });
         if (isCurrent(life)) later(() => loadBalance(life), 3000);

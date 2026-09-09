@@ -187,7 +187,10 @@ export async function simulateSwapTx(base64Tx) {
 // shouldContinue is a pre-sign context guard. It is NEVER consulted after the
 // wallet has signed: a UI/token change must not silently drop an approved tx.
 // shouldBroadcast is optional and wallet-only (not mount/token/amount state).
-export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey, onPhase, shouldContinue = () => true, shouldBroadcast = () => true) {
+// signAndSendRaw is the mobile fallback: when the wallet's signTransaction
+// resolves with an unsigned/changed tx (known Phantom in-app browser bug),
+// the wallet is asked to sign AND send our original unsigned tx instead.
+export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey, onPhase, shouldContinue = () => true, shouldBroadcast = () => true, signAndSendRaw = null) {
   const aborted = () => {
     onLog({ type: "err", msg: "ABORT: swap context changed before signing" });
     return { ok: false, reason: "context_changed" };
@@ -237,9 +240,30 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
     }
     // A wallet must return the simulated message, not a different transaction.
     const signedTx = VersionedTransaction.deserialize(new Uint8Array(signedBytes));
-    if (!Buffer.from(signedTx.message.serialize()).equals(simulatedMessage) ||
-        !signedTx.signatures[0]?.some((byte) => byte !== 0)) {
-      throw new Error("Wallet returned a changed or unsigned transaction");
+    const messageMatches = Buffer.from(signedTx.message.serialize()).equals(simulatedMessage);
+    const signaturePresent = !!signedTx.signatures[0]?.some((byte) => byte !== 0);
+    if (!messageMatches || !signaturePresent) {
+      // Some mobile wallets (notably Phantom's in-app browser) resolve
+      // signTransaction with an unsigned or re-serialized transaction. The
+      // returned bytes are never trusted or broadcast; instead the wallet
+      // signs AND sends OUR original unsigned tx via signAndSendTransaction,
+      // which the user reviews in the wallet's own approval prompt.
+      if (!signAndSendRaw) {
+        throw new Error("Wallet returned a changed or unsigned transaction");
+      }
+      if (!shouldContinue()) return aborted();
+      if (!shouldBroadcast()) {
+        onLog({ type: "err", msg: "ABORT: wallet changed while signing; nothing sent" });
+        return { ok: false, reason: "wallet_changed" };
+      }
+      onLog({ type: "info", msg: `WALLET_SIGN_INVALID (${messageMatches ? "unsigned" : "changed"} tx returned — known mobile wallet bug) :: retrying via the wallet's sign & send...` });
+      onPhase?.("send");
+      const sig = await signAndSendRaw(unsignedTx);
+      onLog({ type: "ok", msg: `SWAP SENT ${sig.slice(0, 8)}…`, sig });
+      onPhase?.("confirm");
+      onLog({ type: "info", msg: "Confirming landing..." });
+      await ensureConfirmed([{ sig, b64: null }], onLog);
+      return { ok: true, sig };
     }
     // Broadcast through the app's Helius RPC relay (plain sendTransaction).
     onPhase?.("send");

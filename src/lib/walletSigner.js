@@ -33,6 +33,7 @@ export function getSigner() {
     name: _connected.name,
     signTransactionRaw: (tx) => signTransactionRaw(_connected, tx),
     signAllTransactionsRaw: (txs) => signAllTransactionsRaw(_connected, txs),
+    signAndSendRaw: (tx) => signAndSendRaw(_connected, tx),
   };
 }
 
@@ -134,6 +135,34 @@ async function signTransactionRaw(conn, tx) {
     throw new Error("Wallet returned no signed transaction");
   }
   return new Uint8Array(signed);
+}
+
+// Sign AND broadcast through the wallet itself (signAndSendTransaction) —
+// the fallback path for mobile wallets (notably Phantom's in-app browser)
+// whose signTransaction resolves with an unsigned transaction. Returns the
+// base58 signature; the signed bytes never leave the wallet, so the app
+// cannot re-broadcast (confirmation is poll-only via the signature).
+async function signAndSendRaw(conn, tx) {
+  const finish = (sig) => {
+    if (typeof sig !== "string" || !sig.length) throw new Error("Wallet returned no signature");
+    return sig;
+  };
+  if (conn.kind === "injected" && typeof conn.provider?.signAndSendTransaction === "function") {
+    const res = await withSignTimeout(conn.provider.signAndSendTransaction(tx), "Wallet sign & send prompt");
+    return finish(res?.signature ?? res);
+  }
+  const feat = conn.wallet?.features?.["solana:signAndSendTransaction"];
+  if (!feat?.signAndSendTransaction) {
+    throw new Error("Connected wallet does not support signAndSendTransaction");
+  }
+  const account = conn.account;
+  if (!account) throw new Error("No authorized account from wallet");
+  const res = await withSignTimeout(
+    feat.signAndSendTransaction({ account, transaction: serializeForSigning(tx), chain: account.chains?.[0] }),
+    "Wallet sign & send prompt"
+  );
+  const out = Array.isArray(res) ? res[0] : res;
+  return finish(out?.signature ?? out);
 }
 
 // Sign many transactions with ONE wallet prompt. Injected wallets (Phantom /
