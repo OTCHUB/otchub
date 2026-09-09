@@ -318,13 +318,19 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         // walletSigner resolves a global wallet; re-resolve at the final boundary.
         return getSignerForAddress(wallet).signTransactionRaw(tx);
       };
-      // Mobile fallback (Phantom in-app browser bug): the wallet signs AND sends.
-      const signAndSend = (tx) => {
-        checkContext();
-        const signer = getSignerForAddress(wallet);
-        if (!signer?.signAndSendRaw) throw new Error("Wallet cannot sign & send");
-        return signer.signAndSendRaw(tx);
-      };
+      // Mobile fallback (Phantom in-app browser bug): the wallet signs AND
+      // sends in ONE approval. Passed to executeSwap only when the wallet
+      // actually supports signAndSendTransaction, so wallets without it keep
+      // the normal sign + relay-broadcast flow.
+      const walletCanSignAndSend = !!getSignerForAddress(wallet)?.canSignAndSend;
+      const signAndSend = walletCanSignAndSend
+        ? (tx) => {
+            checkContext();
+            const signer = getSignerForAddress(wallet);
+            if (!signer?.signAndSendRaw) throw new Error("Wallet cannot sign & send");
+            return signer.signAndSendRaw(tx);
+          }
+        : null;
       const res = await executeSwap(built.swapTransaction, sign, log, wallet, phase, shouldContinue, walletCurrent, signAndSend);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });

@@ -187,9 +187,10 @@ export async function simulateSwapTx(base64Tx) {
 // shouldContinue is a pre-sign context guard. It is NEVER consulted after the
 // wallet has signed: a UI/token change must not silently drop an approved tx.
 // shouldBroadcast is optional and wallet-only (not mount/token/amount state).
-// signAndSendRaw is the mobile fallback: when the wallet's signTransaction
-// resolves with an unsigned/changed tx (known Phantom in-app browser bug),
-// the wallet is asked to sign AND send our original unsigned tx instead.
+// signAndSendRaw is the wallet-side sign & send: on mobile wallets / in-app
+// browsers it is used as the PRIMARY path (one approval, one broadcast —
+// their signTransaction is broken and can double-send); elsewhere it is the
+// fallback when signTransaction resolves with an unsigned/changed tx.
 export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPublicKey, onPhase, shouldContinue = () => true, shouldBroadcast = () => true, signAndSendRaw = null) {
   const aborted = () => {
     onLog({ type: "err", msg: "ABORT: swap context changed before signing" });
@@ -222,6 +223,38 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
     onLog({ type: "err", msg: `SIM_FAIL: ${sim.err}` });
     return { ok: false, reason: sim.err };
   }
+  // Mobile wallets / in-app browsers (notably Phantom's) have a broken
+  // signTransaction: the approval itself can sign AND broadcast the tx inside
+  // the wallet, then resolve with the original unsigned bytes. Detecting the
+  // invalid bytes afterwards and falling back to signAndSendTransaction then
+  // sends a SECOND identical swap (the first already landed) — one user
+  // intent, two transactions. In those environments skip signTransaction
+  // entirely: the wallet signs AND sends in a single approval and returns the
+  // real signature, so there is no second broadcast path at all.
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const preferWalletSend =
+    !!signAndSendRaw && (/Phantom/i.test(ua) || /Android|iPhone|iPad|iPod/i.test(ua));
+  if (preferWalletSend) {
+    if (!shouldContinue()) return aborted();
+    if (!shouldBroadcast()) {
+      onLog({ type: "err", msg: "ABORT: wallet changed while signing; nothing sent" });
+      return { ok: false, reason: "wallet_changed" };
+    }
+    onPhase?.("send");
+    onLog({ type: "info", msg: "Requesting wallet sign & send (single approval)..." });
+    try {
+      const sig = await signAndSendRaw(unsignedTx);
+      onLog({ type: "ok", msg: `SWAP SENT ${sig.slice(0, 8)}…`, sig });
+      onPhase?.("confirm");
+      onLog({ type: "info", msg: "Confirming landing..." });
+      await ensureConfirmed([{ sig, b64: null }], onLog);
+      return { ok: true, sig };
+    } catch (e) {
+      onLog({ type: "err", msg: `SIGN_REJECTED: ${e.message}` });
+      return { ok: false, reason: "rejected" };
+    }
+  }
+
   onPhase?.("sign");
   onLog({ type: "sim", msg: `Sim OK (${sim.units} CU). Requesting signature...` });
   let signedBytes;

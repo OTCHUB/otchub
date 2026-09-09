@@ -26,6 +26,15 @@ export function clearConnectedWallet() {
   _connected = null;
 }
 
+// Does the wallet expose signAndSendTransaction at all (injected provider
+// method or Wallet Standard feature)? Callers use this to gate the wallet-side
+// send path BEFORE prompting the user, instead of discovering mid-swap that
+// the wallet can't sign & send.
+function canSignAndSend(conn) {
+  if (conn.kind === "injected" && typeof conn.provider?.signAndSendTransaction === "function") return true;
+  return !!conn.wallet?.features?.["solana:signAndSendTransaction"]?.signAndSendTransaction;
+}
+
 export function getSigner() {
   if (!_connected) return null;
   return {
@@ -34,6 +43,7 @@ export function getSigner() {
     signTransactionRaw: (tx) => signTransactionRaw(_connected, tx),
     signAllTransactionsRaw: (txs) => signAllTransactionsRaw(_connected, txs),
     signAndSendRaw: (tx) => signAndSendRaw(_connected, tx),
+    canSignAndSend: canSignAndSend(_connected),
   };
 }
 
