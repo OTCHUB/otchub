@@ -215,8 +215,9 @@ export default function Home() {
             <div>
               <h1 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
                 <Image
-                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/bbd255cbc_hub_n.jpg"
+                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/7166bbd89_hub_mt.png"
                   alt="OTC_HUB logo"
+                  fittingType="fit"
                   className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
                 />
                 OTC hub · OTC desk tools
