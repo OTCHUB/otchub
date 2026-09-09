@@ -212,8 +212,13 @@ export default function Home() {
         <header className="term-window border border-green-500/30 bg-black p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; OTC hub · OTC desk tools
+              <h1 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
+                <img
+                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/c8fc746da_generated_image.png"
+                  alt="OTC_HUB logo"
+                  className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
+                />
+                OTC hub · OTC desk tools
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
               <p className="text-[12px] uppercase text-green-500/50">
