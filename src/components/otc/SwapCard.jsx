@@ -247,6 +247,16 @@ export default function SwapCard({
         <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-green-500/50">
           <span className="truncate">
             YOU PAY · BAL {payToken === "SOL" ? solBalLabel ?? "…" : tokenBalLabel ?? "…"}
+            {wallet && !busy && (
+              <button
+                type="button"
+                onClick={onRetryBalances}
+                className="ml-1 text-cyan-400/80 hover:text-cyan-300"
+                title="Re-read SOL + token balances from chain"
+              >
+                [SYNC]
+              </button>
+            )}
             {balError && (
               <button
                 type="button"

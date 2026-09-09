@@ -161,18 +161,20 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
   }, [mint, mintEpoch, tokenInfo]);
 
   const loadBalance = async (life) => {
-    if (busyRef.current || !wallet || !tokenInfo || !isBalanceCurrent(life)) return;
+    if (busyRef.current || !wallet || !tokenInfo || !isBalanceCurrent(life)) return null;
     const request = ++balanceRequest.current;
     const [bal, sol] = await Promise.allSettled([fetchTokenBalance(wallet, tokenInfo), fetchSolBalanceRaw(wallet)]);
-    if (busyRef.current || !isBalanceCurrent(life) || balanceRequest.current !== request) return;
-    setBalances({
+    if (busyRef.current || !isBalanceCurrent(life) || balanceRequest.current !== request) return null;
+    const fresh = {
       mintEpoch,
       walletEpoch,
       token: bal.status === "fulfilled" ? bal.value : null,
       sol: sol.status === "fulfilled" ? sol.value : null,
       tokenError: bal.status === "rejected" ? bal.reason.message : null,
       solError: sol.status === "rejected" ? sol.reason.message : null,
-    });
+    };
+    setBalances(fresh);
+    return fresh;
   };
 
   useEffect(() => {
@@ -253,11 +255,21 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
     invalidate();
     setAmount(value);
   };
-  const switchMode = (m) => {
+  const switchMode = async (m) => {
     if (busyRef.current) return;
     invalidate();
     setMode(m);
-    setAmount(m === "BUY" ? "0.1" : tokenBal != null ? formatRawAmount(tokenBal, tokenInfo.decimals) : "");
+    if (m === "BUY") {
+      setAmount("0.1");
+      loadBalance(lifetime.current);
+      return;
+    }
+    // SELL: re-read the balances FIRST so the amount prefill (and MAX) use
+    // the fresh on-chain token balance — a just-landed buy otherwise
+    // prefills the stale pre-swap balance (e.g. empty after buying a token).
+    const fresh = await loadBalance(lifetime.current);
+    const bal = fresh?.token ?? tokenBal;
+    setAmount(bal != null && tokenInfo ? formatRawAmount(bal, tokenInfo.decimals) : "");
   };
 
   const fetchQuote = async () => {
@@ -354,7 +366,10 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
         // Landing is confirmed at this point: nudge the wallet panel so its
         // OTC_BALANCE / desk holdings reflect the swap immediately.
         onSwapComplete?.();
+        // Two delayed re-reads: 3s for the normal case, 9s in case the RPC
+        // replica lags behind the just-landed transaction.
         if (isCurrent(life)) later(() => loadBalance(life), 3000);
+        if (isCurrent(life)) later(() => loadBalance(life), 9000);
       } else if (isCurrent(life)) setErr(`Swap stopped: ${res.reason || "not sent"}`);
     } catch (e) {
       log({ type: "err", msg: `SWAP_ABORT: ${e.message}` });
