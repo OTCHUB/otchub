@@ -90,6 +90,21 @@ export function extractCoins(raw) {
   return Array.isArray(coins) ? coins : null;
 }
 
+// Persisted archive curve check (on-chain sweep each mirror cycle, stored per
+// mint in the coins archive) — gives rows outside the live candidate set a
+// real status instead of UNKNOWN.
+function archivedCurveStatus(coin) {
+  const curve = coin?.curve && typeof coin.curve === "object" ? coin.curve : null;
+  if (!curve || !Number.isFinite(curve.at)) return { curveProgress: null, status: "UNKNOWN", curveComplete: null, statusAt: null };
+  const complete = curve.complete === true ? true : null;
+  const progress = complete === true ? 100 : Number.isFinite(curve.progress) ? curve.progress : null;
+  return {
+    curveProgress: progress, curveComplete: complete,
+    status: launcherStatus({ curveComplete: complete, curveProgress: progress }, false),
+    statusAt: curve.at,
+  };
+}
+
 function rosterRows(raw, at) {
   const coins = extractCoins(raw);
   if (!coins) throw new Error("COINS_UNAVAILABLE");
@@ -105,7 +120,7 @@ function rosterRows(raw, at) {
       vol24: nonnegative(snapshot?.volume24h), mcap: nonnegative(snapshot?.marketCap),
       liquidity: nonnegative(snapshot?.liquidity), change24h: numeric(snapshot?.change24h),
       ageH: ageHours(coin.createdAt, at), metricsAt: sourceTime(snapshot?.at, at),
-      curveProgress: null, status: "UNKNOWN", curveComplete: null, statusAt: null,
+      ...archivedCurveStatus(coin),
     });
   }
   if (coins.length && !rows.length) throw new Error("COINS_UNAVAILABLE");
@@ -259,11 +274,18 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       if (c.curve) Object.assign(c.row, c.curve);
       const persistedGrad = persisted.get(c.row.mint);
       c.graduated = c.graduated || persistedGrad != null;
-      c.row.status = launcherStatus(c.curve, c.graduated);
+      // Live probe first; a failed probe falls back to the row's archived
+      // curve check (mirror-cycle sweep) instead of UNKNOWN.
+      const archived = c.curve ? null
+        : (c.row.curveComplete != null || c.row.curveProgress != null)
+          ? { curveComplete: c.row.curveComplete, curveProgress: c.row.curveProgress }
+          : null;
+      c.row.status = launcherStatus(c.curve ?? archived, c.graduated);
       // Known statuses carry the time of their supporting evidence, not a later
       // empty check. Unknown rows can still have a successful no-account check.
       if (c.graduated) c.row.statusAt = persistedGrad?.graduated_at ?? c.dexAt;
       else if (c.curve) c.row.statusAt = c.curveAt;
+      else if (archived) { /* archived statusAt already stands */ }
       else c.row.statusAt = c.curveAt === null ? c.dexAt : Math.max(c.curveAt, c.dexAt ?? c.curveAt);
     }
     // Ledger-backed roster rows outside the candidate set keep their persisted
@@ -317,10 +339,20 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     // rate-limits the shared function-runtime egress IP, so AMM-migration
     // evidence is confirmed from the visitor's own browser and reported once;
     // the persisted result is then global for every visitor.
-    const pendingGraduation = graduationStore
-      ? candidates.filter((c) => c.curve?.curveComplete === true && !c.graduated)
-        .map((c) => c.row.mint).slice(0, 90)
-      : [];
+    const pendingGraduation = graduationStore ? (() => {
+      const listed = new Set(), mints = [];
+      const push = (mint) => { if (!listed.has(mint)) { listed.add(mint); mints.push(mint); } };
+      for (const c of candidates) {
+        if (c.curve?.curveComplete === true && !c.graduated) push(c.row.mint);
+      }
+      // Archived sweep rows whose curves completed outside the live candidate
+      // set join the same browser confirmation queue.
+      for (const row of rows) {
+        if (mints.length >= 90) break;
+        if (row.curveComplete === true && row.status !== "GRADUATED") push(row.mint);
+      }
+      return mints.slice(0, 90);
+    })() : [];
     return {
       at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
       statusCounts, rosterTotal: rows.length, pendingGraduation,

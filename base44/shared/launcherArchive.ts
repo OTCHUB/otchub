@@ -11,6 +11,7 @@
 
 import { secrets } from "base44:runtime";
 import { pushDashboardToSupabase } from "./supabaseDashboard.ts";
+import { decodeLauncherCurve } from "./launcherCurve.js";
 
 const TABLE = "otc_dashboard";
 const ARCHIVE_KEY = "launcher_archive";
@@ -59,6 +60,56 @@ export async function fetchLauncherCoinsPage(page, { fetchImpl = fetch, timeoutM
   return { coins, total: Number.isFinite(raw?.total) ? raw.total : null };
 }
 
+// Bounded on-chain curve sweep over the archived tape: probes bonding-curve
+// accounts for launches the live candidate scan never covers (~12k launches,
+// ~150 live probes), persisting { complete, progress, at } per mint so the
+// tape's UNKNOWN share converges to real statuses over successive mirror
+// cycles (each cycle re-checks the never-checked first, then the stalest).
+// Absent curve accounts are recorded as checked-but-unknown (absence is not
+// evidence of graduation) so they stop displacing fresh checks in priority.
+export async function sweepLauncherCurveStatuses(coins, { rpc, deriveCurveAddress,
+  chunks = 20, chunkSize = 100, clock = Date.now } = {}) {
+  if (typeof rpc !== "function" || typeof deriveCurveAddress !== "function" || !Array.isArray(coins)) return 0;
+  const targets = coins
+    .filter((coin) => text(coin?.mint))
+    .sort((a, b) => (a.curve?.at ?? 0) - (b.curve?.at ?? 0))
+    .slice(0, chunks * chunkSize);
+  let checked = 0;
+  for (let i = 0; i < targets.length; i += chunkSize) {
+    const chunk = targets.slice(i, i + chunkSize);
+    const accounts = [], valid = [];
+    for (const coin of chunk) {
+      try { accounts.push(deriveCurveAddress(coin.mint)); valid.push(coin); }
+      catch { /* non-canonical mint: stays unchecked */ }
+    }
+    if (!valid.length) continue;
+    let value;
+    try {
+      const result = await rpc("getMultipleAccounts", [accounts, {
+        encoding: "base64", commitment: "confirmed", dataSlice: { offset: 0, length: 49 },
+      }]);
+      value = Array.isArray(result?.value) && result.value.length === valid.length ? result.value : null;
+    } catch { continue; }
+    if (!value) continue;
+    const at = clock();
+    valid.forEach((coin, index) => {
+      if (value[index] === null) {
+        coin.curve = { complete: null, progress: null, at };
+        checked++;
+        return;
+      }
+      try {
+        const decoded = decodeLauncherCurve(value[index]);
+        if (decoded) {
+          coin.curve = { complete: decoded.curveComplete, progress: decoded.curveProgress, at };
+          checked++;
+        }
+      } catch { /* invalid account: stays unchecked, retried next cycle */ }
+    });
+  }
+  return checked;
+}
+
 // Read the archived tape from Supabase. Returns [] when the archive is
 // missing/unreachable — the caller degrades to the bare active set.
 export async function readLauncherCoinsArchive({ fetchImpl = fetch, timeoutMs = 20_000 } = {}) {
@@ -99,7 +150,7 @@ export function createLauncherCoinsArchiveLoader({ cacheMs = CACHE_MS, clock = D
 // page is fully archived (caught up), capped at `pages`. Fresh sweeps win by
 // mint; new launches append. Self-healing after downtime: a longer outage just
 // means the next cycles sweep deeper until caught up.
-export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetch } = {}) {
+export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetch, curveSweep = null } = {}) {
   const archived = await readLauncherCoinsArchive({ fetchImpl });
   const byMint = new Map();
   for (const coin of archived) {
@@ -116,6 +167,10 @@ export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetc
     for (const coin of result.coins) {
       const trimmed = trimLauncherCoin(coin);
       if (!trimmed.mint) continue;
+      // Persisted curve checks survive fresh upstream overwrites — the sweep
+      // below refreshes them on its own schedule.
+      const prev = byMint.get(trimmed.mint);
+      if (prev?.curve) trimmed.curve = prev.curve;
       if (byMint.has(trimmed.mint)) refreshed++;
       else added++;
       byMint.set(trimmed.mint, trimmed);
@@ -124,6 +179,11 @@ export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetc
     if (pageKnown) break;
   }
   const coins = [...byMint.values()];
+  let curveChecked = 0;
+  if (curveSweep) {
+    try { curveChecked = await sweepLauncherCurveStatuses(coins, curveSweep); }
+    catch { /* sweep is best-effort — the archive still refreshes */ }
+  }
   await writeLauncherCoinsArchive(coins);
-  return { total: coins.length, swept, added, refreshed };
+  return { total: coins.length, swept, added, refreshed, curveChecked };
 }

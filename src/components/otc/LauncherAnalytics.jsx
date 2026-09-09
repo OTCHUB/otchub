@@ -397,8 +397,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="LAUNCHES" />
       <div className="mt-1 text-[11px] text-green-500/50">
         PAGE {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
-        statuses checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} candidates
-        (top 60 volume + top 60 gainers + newest 30). Others remain UNKNOWN.
+        statuses live-checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} active candidates
+        (top 60 volume + top 60 gainers + newest 30); the rest carry archived on-chain curve checks
+        (swept every 5 min) — UNKNOWN fades as each sweep covers more of the tape.
         Near graduation = ≥{feed?.nearThreshold ?? 90}% funding · completed curves are AMM-verified, persisted globally in the DB and shown GRADUATED for every visitor.
       </div>
       {!!feed?.statusError?.length && <div className="mt-1 text-[11px] text-amber-400">Some status/progress checks unavailable; UNKNOWN is not BONDING.</div>}

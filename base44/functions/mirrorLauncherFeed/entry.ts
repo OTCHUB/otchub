@@ -1,7 +1,10 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
+import { PublicKey } from "npm:@solana/web3.js@1.98.4";
 import { buildLauncherLiveBody, buildLauncherAnalyticsBody } from "../../shared/launcherFeed.ts";
 import { pushDashboardToSupabase } from "../../shared/supabaseDashboard.ts";
 import { refreshLauncherCoinsArchive } from "../../shared/launcherArchive.ts";
+import { heliusRpc } from "../../shared/otcSources.ts";
+import { createCurveAddressDeriver } from "../../shared/launcherCurve.js";
 
 // Supabase mirror of the launcher feed — LAUNCHER PANEL RESILIENCE + ARCHIVE.
 // Every 5 minutes (LauncherFeedScheduler workflow) this builds the SAME
@@ -19,7 +22,13 @@ export default async function (req) {
     // last cycle (bounded page sweep, stops early once caught up), so the tape
     // built below carries the complete launch history.
     let archive = null;
-    try { archive = await refreshLauncherCoinsArchive({ pages: 40 }); }
+    try {
+      // curveSweep: bounded on-chain probe of the archived tape so launches
+      // outside the live candidate set still get real curve statuses.
+      archive = await refreshLauncherCoinsArchive({ pages: 40, curveSweep: {
+        rpc: heliusRpc, deriveCurveAddress: createCurveAddressDeriver(PublicKey),
+      } });
+    }
     catch { /* build with the last archived tape */ }
 
     const live = await buildLauncherLiveBody(() => base44);
