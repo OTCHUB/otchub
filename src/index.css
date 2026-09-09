@@ -521,3 +521,141 @@ html.skin-modern .pot-flow-broken {
 html.skin-modern .pot-flow-broken-y {
   background-image: repeating-linear-gradient(180deg, rgb(255 92 200 / 0.45) 0 3px, transparent 3px 8px);
 }
+
+/* ==================================================================
+   MODERN SKIN :: LIGHT ("Pearlescent") — html.skin-modern.light
+   The Iridescent Terminal on a light instrument chassis: a cool pale
+   metal canvas (#E3E9EF), near-white chassis panels (#F4F7FA), dark
+   slate text, and the iris spectrum darkened one step (cyan #0891B2,
+   teal aqua, gold #B45309, magenta #C026D3, violet #7C3AED) so accents
+   stay readable on light surfaces. Higher specificity than both
+   html.light (retro paper) and html.skin-modern (dark chassis), so the
+   two header toggles compose: LIGHT/DARK switches the modern skin's
+   chassis, RETRO/MODERN switches the design language.
+   ================================================================== */
+html.skin-modern.light {
+  color-scheme: light;
+  --c-black: 244 247 250; /* chassis panel #F4F7FA */
+  --c-green-200: 18 25 34;
+  --c-green-300: 42 50 62;
+  --c-green-400: 26 34 44;
+  --c-green-500: 8 145 178; /* iris cyan, darkened for light surfaces */
+  --c-green-600: 14 116 144;
+  --c-green-700: 124 92 224;
+  --c-green-800: 124 92 224;
+  --c-green-900: 100 74 190;
+  --c-emerald-200: 5 150 105;
+  --c-emerald-300: 5 150 105;
+  --c-emerald-400: 5 150 105;
+  --c-emerald-500: 5 150 105;
+  --c-emerald-600: 4 120 87;
+  --c-emerald-700: 4 120 87;
+  --c-emerald-800: 6 95 70;
+  --c-emerald-900: 6 78 59;
+  --c-cyan-200: 13 148 136;
+  --c-cyan-300: 13 148 136;
+  --c-cyan-400: 13 148 136;
+  --c-cyan-500: 15 118 110;
+  --c-cyan-600: 17 94 88;
+  --c-cyan-700: 19 78 74;
+  --c-cyan-800: 21 64 61;
+  --c-cyan-900: 22 52 50;
+  --c-amber-200: 180 83 9;
+  --c-amber-300: 180 83 9;
+  --c-amber-400: 180 83 9;
+  --c-amber-500: 158 66 5;
+  --c-amber-600: 141 56 5;
+  --c-amber-700: 123 47 2;
+  --c-amber-800: 108 40 2;
+  --c-amber-900: 96 36 2;
+  --c-red-200: 192 38 211;
+  --c-red-300: 192 38 211;
+  --c-red-400: 192 38 211;
+  --c-red-500: 162 28 175;
+  --c-red-600: 134 25 143;
+  --c-red-700: 112 26 117;
+  --c-red-800: 100 22 104;
+  --c-red-900: 88 20 92;
+  --c-fuchsia-200: 124 58 237;
+  --c-fuchsia-300: 124 58 237;
+  --c-fuchsia-400: 124 58 237;
+  --c-fuchsia-500: 109 40 217;
+  --c-fuchsia-600: 91 33 182;
+  --c-fuchsia-700: 76 29 149;
+  --c-fuchsia-800: 65 26 130;
+  --c-fuchsia-900: 57 23 113;
+  --c-slate-200: 100 116 139;
+  --c-slate-300: 71 85 105;
+  --c-slate-400: 51 65 85;
+  --c-slate-500: 41 51 66;
+  --c-slate-600: 42 49 58;
+  --c-slate-700: 34 42 52;
+  --c-slate-800: 148 163 184;
+  --c-slate-900: 203 213 225;
+
+  /* shadcn tokens follow the light chassis */
+  --background: 210 29% 91%;
+  --foreground: 216 33% 14%;
+  --card: 210 43% 97%;
+  --popover: 210 43% 97%;
+  --border: 213 15% 78%;
+  --input: 213 15% 78%;
+  --ring: 192 94% 36%;
+  --primary: 192 94% 36%;
+  --primary-foreground: 210 43% 97%;
+  --muted-foreground: 213 9% 40%;
+
+  /* Chart telemetry on light panels */
+  --chart-grid: #d5dce4;
+  --chart-axis: #b4bec9;
+  --chart-tick: #5c6570;
+  --chart-primary: #0891b2;
+  --chart-secondary: #b45309;
+  --chart-tertiary: #7c3aed;
+  --chart-danger: #c026d3;
+  --chart-pos: #059669;
+  --chart-bar-fill: #dce3ea;
+  --chart-bar-edge: #8a93a0;
+  --chart-seg-a: #0891b2;
+  --chart-seg-b: #7c3aed;
+  --chart-seg-c: #0d9488;
+  --chart-seg-d: #b45309;
+  --chart-tip-bg: #f4f7fa;
+  --chart-tip-border: #b4bec9;
+  --chart-tip-label: #0891b2;
+  --chart-tip-text: #1b2430;
+  --chart-tip-radius: 12px;
+}
+
+/* Pale-metal canvas: the stage and page sit in the light haze while
+   the near-white chassis panels float on top. */
+html.skin-modern.light body {
+  background-color: #e3e9ef;
+  color: #1b2430;
+}
+html.skin-modern.light .skin-stage {
+  background-color: #e3e9ef;
+}
+
+/* Light chassis interactions: darker iris focus/caret/selection and
+   metal scrollbars on the pale canvas. */
+html.skin-modern.light input:focus,
+html.skin-modern.light select:focus,
+html.skin-modern.light textarea:focus {
+  border-color: rgba(8, 145, 178, 0.65);
+  box-shadow: 0 0 0 1px rgba(8, 145, 178, 0.55), 0 0 16px rgba(8, 145, 178, 0.3);
+}
+html.skin-modern.light input,
+html.skin-modern.light textarea {
+  caret-color: #0891b2;
+}
+html.skin-modern.light ::selection {
+  background: rgba(8, 145, 178, 0.2);
+}
+html.skin-modern.light ::-webkit-scrollbar-track {
+  background: #e3e9ef;
+}
+html.skin-modern.light ::-webkit-scrollbar-thumb {
+  background: #b4bec9;
+  border: 2px solid #e3e9ef;
+}

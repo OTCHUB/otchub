@@ -80,6 +80,13 @@
     var(--iris) border-box;
 }
 
+/* ------------------------------------------------------------------
+   LIGHT variant ("Pearlescent") — html.skin-modern.light at runtime.
+   The iris spectrum darkens one step on the pale chassis:
+   cyan #0891B2 · aqua #0D9488 · gold #B45309 · magenta #C026D3 ·
+   violet #7C3AED · success #059669. Canvas #E3E9EF, panels #F4F7FA.
+   ------------------------------------------------------------------ */
+
 /* HUD display moment (uppercase, iridescent fill, soft bloom) */
 .hud-display {
   font-family: var(--font-hud);
