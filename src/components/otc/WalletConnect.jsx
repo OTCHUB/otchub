@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { detectWallets, connectWallet, subscribeStandardWallets } from "@/lib/solanaWallets";
-import HelpNote from "@/components/otc/HelpNote";
 
 // official brand marks, vendored in /public/wallets (no hotlinks)
 const BRAND_ICON = {
@@ -124,10 +123,6 @@ export default function WalletConnect({ onConnected }) {
         >
           {busy ? "[CONNECTING...]" : "[CONNECT_WALLET]"}
         </button>
-        <span className="text-[12px] text-green-500/40">
-          PHANTOM · SOLFLARE · BACKPACK · JUPITER · OTHERS
-          {wallets.length > 0 && ` · ${wallets.length} DETECTED`}
-        </span>
       </div>
 
       {status && (
@@ -146,17 +141,6 @@ export default function WalletConnect({ onConnected }) {
           <span className="text-green-500/40">opens this page in the Solflare in-app browser</span>
         </div>
       )}
-
-      <HelpNote label="[?] WALLET_SAFETY :: WHY_SIGNING_WARNS">
-        Wallet warnings here are NORMAL for a community tool — Phantom flags any app or program that
-        is not on its own verified list. Connecting is READ-ONLY: the app sees your public balances,
-        never your keys. Claim transactions only touch the official otcdesks.cash desk program
-        (AjMx…dHQW — cross-check it on the sign screen against the CONTRACTS panel) and always
-        deliver stock to YOUR OWN wallet; every transaction is simulated first, so you are never
-        asked to sign one that would fail. Swaps route through Jupiter — an "unknown token" warning
-        only means $OTC is not on Phantom's verified-token list. When in doubt, verify the program
-        ID on the wallet prompt at solscan.io before approving.
-      </HelpNote>
 
       {wallets.length > 0 && (
         <div className="mt-3 border border-green-500/30 p-2">
@@ -187,11 +171,11 @@ export default function WalletConnect({ onConnected }) {
           value={manual}
           onChange={(e) => setManual(e.target.value)}
           placeholder="OR PASTE WALLET ADDRESS..."
-          className="min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 font-mono text-[13px] text-green-400 placeholder:text-green-500/30 focus:outline-none"
+          className="compact-input min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1 font-mono text-[11px] text-green-400 placeholder:text-green-500/30 focus:outline-none"
         />
         <button
           type="submit"
-          className="border border-green-500/50 px-3 py-1.5 text-[13px] text-green-400 hover:bg-green-500/10"
+          className="border border-green-500/50 px-3 py-1 text-[11px] text-green-400 hover:bg-green-500/10"
         >
           [LOOKUP]
         </button>

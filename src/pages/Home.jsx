@@ -33,6 +33,7 @@ import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import HubOfficialCa from "@/components/otc/HubOfficialCa";
 import { timeAgo } from "@/lib/format";
+import { Image } from "@/components/ui/image";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 import { silentReconnect } from "@/lib/solanaWallets";
 
@@ -213,8 +214,8 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                <img
-                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/c8fc746da_generated_image.png"
+                <Image
+                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/bbd255cbc_hub_n.jpg"
                   alt="OTC_HUB logo"
                   className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
                 />
@@ -272,7 +273,28 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          <CollapsibleCard title="Wallet" id="otc-wallet" openSignal={walletOpenSignal}>
+          <CollapsibleCard
+            title="Wallet"
+            id="otc-wallet"
+            openSignal={walletOpenSignal}
+            defaultOpen={false}
+            right={
+              <span
+                className={`flex items-center gap-1.5 font-mono text-[11px] ${
+                  wallet ? "text-emerald-400" : "text-green-500/40"
+                }`}
+              >
+                {wallet ? (
+                  <>
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    {`CONNECTED · ${wallet.slice(0, 4)}…${wallet.slice(-4)}`}
+                  </>
+                ) : (
+                  "NOT CONNECTED"
+                )}
+              </span>
+            }
+          >
             {wallet ? (
               <WalletPortfolio
                 address={wallet}

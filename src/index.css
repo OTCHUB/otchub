@@ -108,6 +108,12 @@ body {
   select {
     font-size: 16px !important;
   }
+
+  /* Compact one-line fields (wallet paste lookup) keep their designed 11px
+     on phones — deliberately exempt from the 16px zoom guard above. */
+  input.compact-input {
+    font-size: 11px !important;
+  }
 }
 
 /* Mobile typography scale: every size level steps one notch tighter on
