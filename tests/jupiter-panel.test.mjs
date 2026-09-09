@@ -84,7 +84,7 @@ function harness(initialProps = {}, overrides = {}) {
     "@/components/otc/PriceCandles": { __esModule: true, default: PriceCandles },
     "@/components/otc/RecentSwaps": { __esModule: true, default: RecentSwaps },
   };
-  for (const name of ["HelpNote", "TxStatusOverlay", "WalletConnect", "SwapCard"]) modules[`@/components/otc/${name}`] = { __esModule: true, default: Stub };
+  for (const name of ["HelpNote", "TxStatusOverlay", "WalletConnect"]) modules[`@/components/otc/${name}`] = { __esModule: true, default: Stub };
   const module = { exports: {} };
   runInNewContext(compiled, { module, exports: module.exports, AbortController,
     navigator: { clipboard: { writeText: async (value) => { calls.copies.push(value); } } },
