@@ -107,7 +107,7 @@ export default function CommunityMenu() {
         title="OTC community links + community tool sites"
         className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
       >
-        [COMMUNITY {open ? "▴" : "▾"}]
+        COMMUNITY {open ? "▴" : "▾"}
       </button>
       {open && pos && createPortal(
         <div

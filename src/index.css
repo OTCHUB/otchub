@@ -172,9 +172,9 @@ body {
    Terminal theme variables (mapped in tailwind.config.js).
    :root = DARK mode — values replicate Tailwind's default palette
    exactly, so the existing look is byte-for-byte unchanged.
-   html.light = LIGHT mode — reuses the dark-mode palette directly (no
-   variable remap): the header toggle stays, but light renders the
-   same colors as dark until a new light palette is designed.
+   html.light = LIGHT mode — "phosphor paper": dark green ink on a
+   pale mint paper surface, accents darkened for readable contrast.
+   Swap only the variables; no class changes in components.
    ------------------------------------------------------------------ */
 :root {
   color-scheme: dark;
@@ -260,8 +260,99 @@ body {
   --chart-tip-radius: 0px;
 }
 
-/* LIGHT mode reuses the dark palette directly (see note above) — no
-   variable overrides needed here. */
+html.light {
+  color-scheme: light;
+  background-color: rgb(236 243 236);
+  --c-black: 236 243 236;
+  --c-green-200: 16 36 22;
+  --c-green-300: 18 48 28;
+  --c-green-400: 22 64 36;
+  --c-green-500: 34 96 56;
+  --c-green-600: 28 120 70;
+  --c-green-700: 34 145 82;
+  --c-green-800: 46 170 96;
+  --c-green-900: 70 195 118;
+  --c-emerald-200: 4 108 72;
+  --c-emerald-300: 5 130 86;
+  --c-emerald-400: 6 152 100;
+  --c-emerald-500: 8 175 115;
+  --c-emerald-600: 10 198 130;
+  --c-emerald-700: 16 215 145;
+  --c-emerald-800: 44 225 165;
+  --c-emerald-900: 80 235 185;
+  --c-cyan-200: 8 92 108;
+  --c-cyan-300: 10 110 130;
+  --c-cyan-400: 12 130 152;
+  --c-cyan-500: 14 150 175;
+  --c-cyan-600: 17 172 200;
+  --c-cyan-700: 22 195 225;
+  --c-cyan-800: 46 212 232;
+  --c-cyan-900: 84 226 240;
+  --c-amber-200: 100 56 8;
+  --c-amber-300: 118 66 10;
+  --c-amber-400: 136 77 12;
+  --c-amber-500: 156 88 14;
+  --c-amber-600: 176 100 17;
+  --c-amber-700: 198 114 22;
+  --c-amber-800: 218 134 40;
+  --c-amber-900: 238 158 62;
+  --c-red-200: 110 22 22;
+  --c-red-300: 128 27 26;
+  --c-red-400: 146 32 30;
+  --c-red-500: 165 38 34;
+  --c-red-600: 184 45 39;
+  --c-red-700: 203 53 45;
+  --c-red-800: 220 64 54;
+  --c-red-900: 233 80 68;
+  --c-fuchsia-200: 78 22 98;
+  --c-fuchsia-300: 92 26 114;
+  --c-fuchsia-400: 106 30 130;
+  --c-fuchsia-500: 120 35 146;
+  --c-fuchsia-600: 135 41 162;
+  --c-fuchsia-700: 152 48 178;
+  --c-fuchsia-800: 172 60 196;
+  --c-fuchsia-900: 194 78 218;
+  --c-slate-200: 48 58 68;
+  --c-slate-300: 58 70 82;
+  --c-slate-400: 70 84 98;
+  --c-slate-500: 84 100 116;
+  --c-slate-600: 100 118 136;
+  --c-slate-700: 118 138 158;
+  --c-slate-800: 142 162 182;
+  --c-slate-900: 170 190 208;
+
+  /* Chart telemetry on paper: ink grid + deep accent series. */
+  --chart-grid: #d9e3d9;
+  --chart-axis: #a9c0aa;
+  --chart-tick: #7c9a80;
+  --chart-primary: #16a34a;
+  --chart-secondary: #b45309;
+  --chart-tertiary: #0e7490;
+  --chart-danger: #dc2626;
+  --chart-pos: #16a34a;
+  --chart-bar-fill: #d8e6da;
+  --chart-bar-edge: #15803d;
+  --chart-seg-a: #15803d;
+  --chart-seg-b: #0e7490;
+  --chart-seg-c: #16a34a;
+  --chart-seg-d: #b45309;
+  --chart-tip-bg: #ffffff;
+  --chart-tip-border: #b9cdb5;
+  --chart-tip-label: #15803d;
+  --chart-tip-text: #1c3a22;
+  --chart-tip-radius: 0px;
+}
+
+html.light body {
+  background-color: rgb(236 243 236);
+  color: rgb(19 32 22);
+}
+
+/* Boot screen CRT scanlines + vignette are dark-mode-only effects; the
+   phosphor-paper light mode keeps a flat paper background. */
+html.light .boot-crt {
+  display: none;
+}
 
 /* ==================================================================
    MODERN SKIN :: "Iridescent Terminal" (design/tokens.css is the source
@@ -532,8 +623,166 @@ html.skin-modern .pot-flow-broken-y {
 }
 
 /* ==================================================================
-   MODERN SKIN :: LIGHT — html.skin-modern.light
-   Reuses the dark-modern chassis directly: no pearlescent remap (the
-   light toggle is a visual no-op until a new light palette is
-   designed). RETRO/MODERN still switches the design language.
+   MODERN SKIN :: LIGHT ("Pearlescent") — html.skin-modern.light
+   The Iridescent Terminal on a light instrument chassis: a cool pale
+   metal canvas, near-white frosted panels, dark slate text, and the
+   iris spectrum darkened one step (cyan #0891B2, teal aqua, gold
+   #B45309, magenta #C026D3, violet #7C3AED) so accents stay readable
+   on light surfaces. Placed AFTER html.skin-modern so it overrides
+   the dark chassis; composes with the RETRO/MODERN toggle.
    ================================================================== */
+html.skin-modern.light {
+  color-scheme: light;
+  --c-black: 245 248 251;
+  --c-green-200: 30 41 59;
+  --c-green-300: 30 41 59;
+  --c-green-400: 51 65 85;
+  --c-green-500: 8 145 178;
+  --c-green-600: 8 145 178;
+  --c-green-700: 124 58 237;
+  --c-green-800: 124 58 237;
+  --c-green-900: 109 40 217;
+  --c-emerald-200: 4 108 78;
+  --c-emerald-300: 4 108 78;
+  --c-emerald-400: 13 148 136;
+  --c-emerald-500: 13 148 136;
+  --c-emerald-600: 20 184 166;
+  --c-emerald-700: 20 184 166;
+  --c-emerald-800: 94 226 203;
+  --c-emerald-900: 150 238 222;
+  --c-cyan-200: 7 100 116;
+  --c-cyan-300: 13 148 136;
+  --c-cyan-400: 15 158 145;
+  --c-cyan-500: 8 145 178;
+  --c-cyan-600: 20 170 160;
+  --c-cyan-700: 45 200 185;
+  --c-cyan-800: 110 225 210;
+  --c-cyan-900: 170 240 230;
+  --c-amber-200: 146 64 14;
+  --c-amber-300: 158 72 16;
+  --c-amber-400: 180 83 9;
+  --c-amber-500: 180 83 9;
+  --c-amber-600: 199 96 22;
+  --c-amber-700: 217 119 6;
+  --c-amber-800: 234 152 28;
+  --c-amber-900: 247 190 60;
+  --c-red-200: 131 24 141;
+  --c-red-300: 144 26 155;
+  --c-red-400: 157 29 169;
+  --c-red-500: 170 32 182;
+  --c-red-600: 192 38 211;
+  --c-red-700: 216 70 229;
+  --c-red-800: 233 120 240;
+  --c-red-900: 246 165 248;
+  --c-fuchsia-200: 91 33 182;
+  --c-fuchsia-300: 104 42 196;
+  --c-fuchsia-400: 124 58 237;
+  --c-fuchsia-500: 139 92 246;
+  --c-fuchsia-600: 167 139 250;
+  --c-fuchsia-700: 196 181 253;
+  --c-fuchsia-800: 219 205 255;
+  --c-fuchsia-900: 238 230 255;
+  --c-slate-200: 42 49 61;
+  --c-slate-300: 51 61 75;
+  --c-slate-400: 64 76 92;
+  --c-slate-500: 82 95 112;
+  --c-slate-600: 102 117 136;
+  --c-slate-700: 126 142 162;
+  --c-slate-800: 156 172 194;
+  --c-slate-900: 190 204 222;
+
+  /* shadcn tokens follow the light chassis */
+  --background: 210 20% 97%;
+  --foreground: 217 33% 20%;
+  --card: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --border: 214 20% 86%;
+  --input: 214 20% 86%;
+  --ring: 190 90% 34%;
+  --primary: 190 90% 34%;
+  --primary-foreground: 0 0% 100%;
+  --muted-foreground: 215 16% 42%;
+
+  /* Chart telemetry: ink grid + darkened iris series. */
+  --chart-grid: #dce4ee;
+  --chart-axis: #c0cad8;
+  --chart-tick: #748199;
+  --chart-primary: #0891b2;
+  --chart-secondary: #b45309;
+  --chart-tertiary: #7c3aed;
+  --chart-danger: #c026d3;
+  --chart-pos: #0d9488;
+  --chart-bar-fill: #cfd9e6;
+  --chart-bar-edge: #0891b2;
+  --chart-seg-a: #0891b2;
+  --chart-seg-b: #7c3aed;
+  --chart-seg-c: #0d9488;
+  --chart-seg-d: #b45309;
+  --chart-tip-bg: #f5f8fb;
+  --chart-tip-border: #c0cad8;
+  --chart-tip-label: #0891b2;
+  --chart-tip-text: #1e2632;
+  --chart-tip-radius: 12px;
+}
+
+html.skin-modern.light body {
+  background-color: #e3e9ef;
+  color: #1e2632;
+}
+
+/* Pale metal canvas with soft iris glows behind the frosted panels. */
+html.skin-modern.light .skin-stage {
+  background:
+    radial-gradient(1200px 800px at 15% -10%, rgb(8 145 178 / 0.1), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(124 58 237 / 0.08), transparent 60%),
+    radial-gradient(900px 900px at 50% 110%, rgb(192 38 211 / 0.06), transparent 60%),
+    #e3e9ef;
+}
+
+/* Frosted chassis on light: white glass with a darkened iris ring. */
+html.skin-modern.light .term-window {
+  box-shadow:
+    0 0 0 1px rgb(8 145 178 / 0.28),
+    0 0 0 2px rgb(124 58 237 / 0.08),
+    0 16px 48px -12px rgb(8 145 178 / 0.12),
+    0 24px 64px -24px rgb(30 41 59 / 0.22);
+}
+
+/* Recessed-well focus on light: darker iris ring + soft cyan bloom. */
+html.skin-modern.light input:focus,
+html.skin-modern.light select:focus,
+html.skin-modern.light textarea:focus {
+  outline: none;
+  border-color: rgba(8, 145, 178, 0.65);
+  box-shadow: 0 0 0 1px rgba(8, 145, 178, 0.45), 0 0 16px rgba(8, 145, 178, 0.22);
+}
+html.skin-modern.light input,
+html.skin-modern.light textarea {
+  caret-color: #0891b2;
+}
+html.skin-modern.light ::selection {
+  background: rgba(8, 145, 178, 0.22);
+}
+
+/* Metal scrollbars on the pale chassis. */
+html.skin-modern.light ::-webkit-scrollbar-track {
+  background: #e3e9ef;
+}
+html.skin-modern.light ::-webkit-scrollbar-thumb {
+  background: #aebdd0;
+  border: 2px solid #e3e9ef;
+}
+
+/* Fee-flow routes march in darkened iris cyan; broken routes dim magenta. */
+html.skin-modern.light .pot-flow-x {
+  background-image: repeating-linear-gradient(90deg, rgb(8 145 178 / 0.8) 0 4px, transparent 4px 8px);
+}
+html.skin-modern.light .pot-flow-y {
+  background-image: repeating-linear-gradient(180deg, rgb(8 145 178 / 0.8) 0 4px, transparent 4px 8px);
+}
+html.skin-modern.light .pot-flow-broken {
+  background-image: repeating-linear-gradient(90deg, rgb(162 28 145 / 0.5) 0 3px, transparent 3px 8px);
+}
+html.skin-modern.light .pot-flow-broken-y {
+  background-image: repeating-linear-gradient(180deg, rgb(162 28 145 / 0.5) 0 3px, transparent 3px 8px);
+}

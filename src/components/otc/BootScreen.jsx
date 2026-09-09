@@ -93,7 +93,9 @@ export default function BootScreen({ onComplete }) {
     <div className="skin-stage relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
       <TerminalTopBar label="OTC hub boot sequence" />
 
-      {/* Full-screen CRT treatment: scanlines + vignette fill any viewport. */}
+      {/* Full-screen CRT treatment: scanlines + vignette fill any viewport.
+          Dark mode only — index.css (html.light .boot-crt) hides these so the
+          phosphor-paper light mode keeps a flat paper background. */}
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(to_bottom,transparent,transparent_2px,rgba(0,255,80,0.025)_3px)]" />
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.75))]" />
 
