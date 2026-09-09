@@ -4,6 +4,7 @@ import PotMilestones from "@/components/otc/PotMilestones";
 import PotFlowDiagram from "@/components/otc/PotFlowDiagram";
 import PotWatchStrip from "@/components/otc/PotWatchStrip";
 import PotPumpTrace from "@/components/otc/PotPumpTrace";
+import PotLauncherSplit from "@/components/otc/PotLauncherSplit";
 
 // Fee-routing map verified on-chain 2026-09-06 by RPC account inspection.
 // Keep addresses in sync with ADDRESSES in base44/shared/otcSources.ts.
@@ -61,15 +62,7 @@ export default function PotRoutingPanel({ latest }) {
   const lastDay = dayRows[dayRows.length - 1];
   const last = lastDay?.[1] || {};
   const dayLbl = lastDay ? lastDay[0].slice(5) : null;
-  const peak = dayRows.reduce(
-    (best, [d, v]) => {
-      const val = v?.launchpad || 0;
-      return val > best.val ? { day: d, val } : best;
-    },
-    { day: null, val: 0 }
-  );
   const launchToday = last.launchpad || 0;
-  const dropPct = peak.val > 0 ? Math.round((1 - launchToday / peak.val) * 100) : null;
   const inflow = (last.mint || 0) + (last.royalty || 0) + (last.other || 0) + launchToday;
 
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -101,6 +94,8 @@ export default function PotRoutingPanel({ latest }) {
         value={`+${fmtSol(last.mint, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
       <RouteRow mark="✓" markCls="text-emerald-400" label="ME_SALES · 5% ROYALTY"
         value={`+${fmtSol(last.royalty, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
+      <RouteRow mark="✓" markCls="text-emerald-400" label="LAUNCHER_CREATOR_FEES · 10% POT_SHARE"
+        value={`+${fmtSol(launchToday, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
       <RouteRow mark="△" markCls="text-amber-300" label="SWEEPS · UNATTRIB"
         value={`+${fmtSol(last.other, 2)}`} valueCls="text-amber-300" href={potTxs()} />
       <RouteRow mark="▶" markCls="text-emerald-400" label="POT → DESK_HOLDERS · AUTO_DISTRIBUTE"
@@ -108,16 +103,8 @@ export default function PotRoutingPanel({ latest }) {
         value={lastClosed?.per_desk_sol != null ? `${fmtSol(lastClosed.per_desk_sol, 3)}/DESK` : "—"}
         href={scan(OTC_PROGRAM)} />
 
-      {/* broken route — single red line */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 border border-red-500/40 bg-red-500/5 px-2 py-1 font-mono text-[11px] text-red-400">
-        <span>✖ CREATOR_FEES ($OTC·LAUNCHER) → PUMP GLOBAL/POOL VAULTS ≠ POT · DESK SHARE COLLAPSED</span>
-        {dropPct != null && dropPct > 0 && (
-          <span className="text-red-400/80">−{dropPct}% vs peak {peak.day?.slice(5)}</span>
-        )}
-        <a href={potTxs()} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">
-          TXS↗
-        </a>
-      </div>
+      {/* launcher creator-fee split — 70/10/15/5 inside the per-minute claim tx */}
+      <PotLauncherSplit launchpadSol={launchToday} />
 
       {/* pump.fun fee path — traced live on-chain 2026-09-07 */}
       <PotPumpTrace />
@@ -146,14 +133,14 @@ export default function PotRoutingPanel({ latest }) {
           ))}
         </div>
         <p className="mt-1 leading-snug text-green-500/50">
-          Green routes land directly in the pot. Live-traced 2026-09-07 on the $401jk launcher pool:
-          pump.fun keeps its protocol fee in the global vault (34.6 SOL) and the LP share in the pool
-          vault — the coin creator fee is 0% on sampled pools and both per-coin creators hold 0 SOL.
-          The pot still receives collapsed per-swap micro-deposits (−85% vs the 09-01 peak), while
-          fee-funded stock rewards flow overwhelmingly to launcher-coin holders (≈78% of everything
-          distributed) instead of desks. The old vault addresses recorded earlier are CLOSED on-chain
-          and were never the real route. Community tooling — verify on Solscan before drawing
-          conclusions.
+          Green routes land directly in the pot. The launcher 10% desk share arrives inside
+          per-minute creator-fee claim transactions (pump.fun claim + stock buy + 4-way split,
+          verified on-chain 2026-09-09: pot inflows every minute, 0.0002–0.003 SOL each) — it never
+          sits in a per-coin vault, which is why the earlier vault trace misread the route as broken.
+          Day totals track launcher trading volume, so they vary. pump.fun still keeps its own
+          protocol fee in the global vault and the LP share in pool vaults — that is separate from
+          creator fees. The old per-coin vault addresses recorded earlier are CLOSED on-chain and
+          were never the real route. Community tooling — verify on Solscan before drawing conclusions.
         </p>
       </Detail>
       <Detail label="[+] HISTORY & CONFIG">
