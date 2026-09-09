@@ -33,7 +33,7 @@ import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import FooterBranding from "@/components/otc/FooterBranding";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import HubOfficialCa from "@/components/otc/HubOfficialCa";
-import { timeAgo } from "@/lib/format";
+
 import { Image } from "@/components/ui/image";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 import { silentReconnect } from "@/lib/solanaWallets";
@@ -214,21 +214,16 @@ export default function Home() {
         <header className="term-window border border-green-500/30 bg-black p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h1 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
+              <h1 className="flex items-center gap-3 text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg xl:text-xl">
                 <Image
                   src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/7166bbd89_hub_mt.png"
                   alt="OTC_HUB logo"
                   fittingType="fit"
-                  className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
+                  className="h-8 w-8 shrink-0 sm:h-10 sm:w-10"
                 />
-                OTC hub · OTC desk tools
+                OTC_HUB · OTC Analytics and Tools
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
-              <p className="text-[12px] uppercase text-green-500/50">
-                Last update {timeAgo(latest?.updated_date || latest?.created_date)}
-                {live ? " · " : ""}{live && <span className="text-emerald-400">● LIVE</span>}
-                {" · "}{data?.snapshot_count || 0} snapshots
-              </p>
             </div>
             {/* actions row: wraps + shrinks on narrow screens so the header
                 never overflows horizontally on mobile */}
