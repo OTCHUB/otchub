@@ -11,8 +11,10 @@ import {
   Legend,
 } from "recharts";
 import { fmtSol, fmtUsd } from "@/lib/format";
+import { useChartTheme, tipStyle, labelStyle, legendStyle } from "@/lib/chartTheme";
 
 export default function EarningsChart({ latest, history }) {
+  const T = useChartTheme();
   const [unit, setUnit] = useState("USD");
   const raw = latest?.per_desk?.items || [];
   const solUsd = latest?.sol_price_usd || 0;
@@ -129,18 +131,18 @@ export default function EarningsChart({ latest, history }) {
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="label" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
-            <YAxis yAxisId="sol" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
-            <YAxis yAxisId="avg" orientation="right" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+            <XAxis dataKey="label" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} />
+            <YAxis yAxisId="sol" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} tickFormatter={(v) => `${+v.toFixed(1)}`} width={56} />
+            <YAxis yAxisId="avg" orientation="right" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} tickFormatter={(v) => `${+v.toFixed(3)}`} width={48} />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-              labelStyle={{ color: "#22c55e" }}
+              contentStyle={tipStyle(T)}
+              labelStyle={labelStyle(T)}
               formatter={(v, n) => (n === "AVG_DESK" ? [v == null ? "bootstrap" : fmt(v), n] : [fmt(v), n])}
             />
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
-            <Bar yAxisId="sol" dataKey="total" name="TOTAL" fill="#0a3a1a" stroke="#1a6b3a" />
-            <Line yAxisId="avg" type="monotone" dataKey="avg" name="AVG_DESK" stroke="#4ade80" dot={{ r: 2, fill: "#4ade80" }} strokeWidth={1.5} connectNulls />
+            <Legend wrapperStyle={legendStyle(T)} />
+            <Bar yAxisId="sol" dataKey="total" name="TOTAL" fill={T.barFill} stroke={T.barEdge} />
+            <Line yAxisId="avg" type="monotone" dataKey="avg" name="AVG_DESK" stroke={T.primary} dot={{ r: 2, fill: T.primary }} strokeWidth={1.5} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -169,35 +171,35 @@ export default function EarningsChart({ latest, history }) {
         <div className="mt-1 h-40 sm:h-48">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-              <XAxis dataKey="label" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
+              <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+              <XAxis dataKey="label" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} />
               <YAxis
                 yAxisId="apr"
-                stroke="#1a6b3a"
+                stroke={T.axis}
                 fontSize={12}
-                tick={{ fill: "#2a8b4a" }}
+                tick={{ fill: T.tick }}
                 tickFormatter={(v) => `${+v.toFixed(0)}%`}
                 width={56}
               />
               <YAxis
                 yAxisId="be"
                 orientation="right"
-                stroke="#1a6b3a"
+                stroke={T.axis}
                 fontSize={12}
-                tick={{ fill: "#2a8b4a" }}
+                tick={{ fill: T.tick }}
                 tickFormatter={(v) => `${+v.toFixed(0)}d`}
                 width={48}
               />
               <Tooltip
-                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-                labelStyle={{ color: "#22c55e" }}
+                contentStyle={tipStyle(T)}
+                labelStyle={labelStyle(T)}
                 formatter={(v, n) =>
                   v == null ? ["—", n] : [n === "APR" ? `${Number(v).toFixed(1)}%` : `${Number(v).toFixed(1)} days`, n]
                 }
               />
-              <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
-              <Line yAxisId="apr" type="monotone" dataKey="apr" name="APR" stroke="#22d3ee" dot={{ r: 2, fill: "#22d3ee" }} strokeWidth={1.5} connectNulls />
-              <Line yAxisId="be" type="monotone" dataKey="be" name="BREAKEVEN" stroke="#fbbf24" dot={{ r: 2, fill: "#fbbf24" }} strokeWidth={1.5} connectNulls />
+              <Legend wrapperStyle={legendStyle(T)} />
+              <Line yAxisId="apr" type="monotone" dataKey="apr" name="APR" stroke={T.tertiary} dot={{ r: 2, fill: T.tertiary }} strokeWidth={1.5} connectNulls />
+              <Line yAxisId="be" type="monotone" dataKey="be" name="BREAKEVEN" stroke={T.secondary} dot={{ r: 2, fill: T.secondary }} strokeWidth={1.5} connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

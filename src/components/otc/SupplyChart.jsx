@@ -9,13 +9,10 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { useChartTheme, tipStyle, labelStyle, itemStyle, legendStyle } from "@/lib/chartTheme";
 
 const TGE = 1_000_000_000;
 const DESK_CAP = 5000;
-
-const SUPPLY_COLOR = "#4ade80";
-const DESKS_COLOR = "#22d3ee";
-const RED = "#f87171";
 
 const fmtM = (v) => (v == null ? "—" : `${(v / 1e6).toFixed(0)}M`);
 const fmtK = (v) => (v == null ? "—" : v.toLocaleString());
@@ -34,6 +31,9 @@ function MetricCard({ label, value, sub, subRed = false }) {
 }
 
 export default function SupplyChart({ history, latest }) {
+  const T = useChartTheme();
+  const SUPPLY_COLOR = T.primary;
+  const DESKS_COLOR = T.tertiary;
   // Daily datapoints: collapse the dense snapshot history to ONE point per UTC
   // day (the day's last snapshot = end-of-day reading), so the chart shows a
   // clean smooth supply-burn vs desk-mint trend instead of a jagged intraday
@@ -132,12 +132,12 @@ export default function SupplyChart({ history, latest }) {
       <div className="mt-3 h-64 shrink-0 sm:h-72 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 6, right: 6, bottom: 4, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
             <XAxis
               dataKey="label"
-              stroke="#1a6b3a"
+              stroke={T.axis}
               fontSize={12}
-              tick={{ fill: "#2a8b4a" }}
+              tick={{ fill: T.tick }}
               minTickGap={20}
               interval="preserveStartEnd"
             />
@@ -164,15 +164,15 @@ export default function SupplyChart({ history, latest }) {
               width={38}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-              labelStyle={{ color: "#22c55e" }}
-              itemStyle={{ color: "#4ade80" }}
+              contentStyle={tipStyle(T)}
+              labelStyle={labelStyle(T)}
+              itemStyle={itemStyle(T)}
               formatter={(v, n) => [
                 n === "OTC_SUPPLY" ? `${fmtM(v)} OTC` : n === "DESKS" ? `${fmtK(v)}` : v,
                 n,
               ]}
             />
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
+            <Legend wrapperStyle={legendStyle(T)} />
             <Line yAxisId="supply" type="monotone" dataKey="supply" name="OTC_SUPPLY" stroke={SUPPLY_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
             <Line yAxisId="desks" type="monotone" dataKey="desks" name="DESKS" stroke={DESKS_COLOR} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "auto" }} connectNulls />
           </ComposedChart>

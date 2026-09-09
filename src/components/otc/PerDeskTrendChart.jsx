@@ -10,8 +10,10 @@ import {
   ReferenceLine,
 } from "recharts";
 import { fmtSol, fmtUsd } from "@/lib/format";
+import { useChartTheme, tipStyle, labelStyle } from "@/lib/chartTheme";
 
 export default function PerDeskTrendChart({ latest }) {
+  const T = useChartTheme();
   const [unit, setUnit] = useState("USD");
   const raw = latest?.per_desk?.items || [];
   const solUsd = latest?.sol_price_usd || 0;
@@ -71,29 +73,29 @@ export default function PerDeskTrendChart({ latest }) {
       <div className="mt-3 h-48 shrink-0 sm:h-56 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+            <XAxis dataKey="day" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} />
             <YAxis
-              stroke="#1a6b3a"
+              stroke={T.axis}
               fontSize={12}
-              tick={{ fill: "#2a8b4a" }}
+              tick={{ fill: T.tick }}
               tickFormatter={(v) => (unit === "USD" ? `$${+v.toFixed(2)}` : `${+v.toFixed(4)}`)}
               width={56}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-              labelStyle={{ color: "#22c55e" }}
+              contentStyle={tipStyle(T)}
+              labelStyle={labelStyle(T)}
               formatter={(v) => [fmt(v), "PER_DESK"]}
             />
             {avgVal != null && (
               <ReferenceLine
                 y={avgVal}
-                stroke="#fbbf24"
+                stroke={T.secondary}
                 strokeDasharray="4 3"
-                label={{ value: `7d ${fmt(avgVal)}`, fill: "#fbbf24", fontSize: 13, position: "insideTopRight" }}
+                label={{ value: `7d ${fmt(avgVal)}`, fill: T.secondary, fontSize: 13, position: "insideTopRight" }}
               />
             )}
-            <Line type="monotone" dataKey="v" name="PER_DESK" stroke="#4ade80" dot={{ r: 2, fill: "#4ade80" }} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="v" name="PER_DESK" stroke={T.primary} dot={{ r: 2, fill: T.primary }} strokeWidth={1.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>

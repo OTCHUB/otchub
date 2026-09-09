@@ -14,11 +14,12 @@ import {
   ReferenceLine,
 } from "recharts";
 import { fmtUsd } from "@/lib/format";
-
-const oppColor = (v) =>
-  v == null ? "#1a6b3a" : v > 0 ? "#22c55e" : v < 0 ? "#fbbf24" : "#1a6b3a";
+import { useChartTheme, tipStyle, labelStyle, itemStyle, legendStyle } from "@/lib/chartTheme";
 
 export default function ArbitrageChart({ history }) {
+  const T = useChartTheme();
+  const oppColor = (v) =>
+    v == null ? T.axis : v > 0 ? T.pos : v < 0 ? T.secondary : T.axis;
   const data = (history || []).map((h) => ({
     t: new Date(h.t).getTime(),
     mint: h.mint_cost_usd,
@@ -29,9 +30,9 @@ export default function ArbitrageChart({ history }) {
   const axisFmt = (t) =>
     new Date(t).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
   const tip = {
-    contentStyle: { background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 13 },
-    labelStyle: { color: "#22c55e" },
-    itemStyle: { color: "#4ade80" },
+    contentStyle: tipStyle(T),
+    labelStyle: labelStyle(T),
+    itemStyle: itemStyle(T),
   };
 
   return (
@@ -50,13 +51,13 @@ export default function ArbitrageChart({ history }) {
       <div className="mt-3 h-44 shrink-0 sm:h-52 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+            <XAxis dataKey="t" tickFormatter={axisFmt} stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} />
+            <YAxis stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
-            <Line type="monotone" dataKey="mint" name="MINT_COST" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
-            <Line type="monotone" dataKey="secondary" name="SECONDARY_COST" stroke="#22d3ee" dot={false} strokeWidth={1.5} />
+            <Legend wrapperStyle={legendStyle(T)} />
+            <Line type="monotone" dataKey="mint" name="MINT_COST" stroke={T.secondary} dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="secondary" name="SECONDARY_COST" stroke={T.tertiary} dot={false} strokeWidth={1.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -67,10 +68,10 @@ export default function ArbitrageChart({ history }) {
       <div className="mt-1 h-24 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="t" tickFormatter={axisFmt} stroke="#1a6b3a" fontSize={11} tick={{ fill: "#2a8b4a" }} />
-            <YAxis stroke="#1a6b3a" fontSize={11} tick={{ fill: "#2a8b4a" }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
-            <ReferenceLine y={0} stroke="#4ade80" />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+            <XAxis dataKey="t" tickFormatter={axisFmt} stroke={T.axis} fontSize={11} tick={{ fill: T.tick }} />
+            <YAxis stroke={T.axis} fontSize={11} tick={{ fill: T.tick }} tickFormatter={(v) => `$${+v.toFixed(2)}`} width={56} />
+            <ReferenceLine y={0} stroke={T.primary} />
             <Tooltip labelFormatter={(t) => new Date(t).toLocaleString()} formatter={(v) => fmtUsd(v)} {...tip} />
             <Bar dataKey="spread" name="SPREAD">
               {data.map((d, i) => (

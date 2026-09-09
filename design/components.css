@@ -1,0 +1,390 @@
+/* ==================================================================
+   Iridescent Terminal — component classes (design-framework reference)
+   ------------------------------------------------------------------
+   Class map for the MODERN skin. The live app currently restyles via
+   the html.skin-modern token remap (src/index.css); adopt these classes
+   per-component as panels are rebuilt on the new framework.
+   Import order (when adopted): tokens.css, then this file.
+   ================================================================== */
+
+@import "./tokens.css";
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                 */
+/* ------------------------------------------------------------------ */
+
+.ui-root {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ui-stage {
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--bg-void);
+}
+
+@media (min-width: 768px) {
+  .ui-stage { padding: 40px; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Surfaces                                                             */
+/* ------------------------------------------------------------------ */
+
+.card-panel,
+.sheet-panel,
+.modal-panel {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-device);
+  border: 1px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-panel), var(--bg-panel)),
+    var(--iris);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.card-panel { padding: 16px 20px; }
+.sheet-panel { padding: 24px; }
+
+.well,
+.screen-well {
+  background: var(--bg-inset);
+  border-radius: var(--radius-frame);
+  border: 1px solid color-mix(in srgb, var(--iris-cyan) 28%, var(--metal-line));
+}
+
+.screen-well {
+  position: relative;
+  overflow: hidden;
+  background-image:
+    linear-gradient(var(--bg-inset), var(--bg-inset)),
+    linear-gradient(var(--hud-grid), var(--hud-grid));
+  background-size: 100% 100%, 8px 8px;
+  background-blend-mode: normal, overlay;
+}
+
+.screen-well::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 3px,
+    rgb(255 255 255 / 0.03) 3px 4px
+  );
+}
+
+.hull-bar {
+  background: var(--bg-hull);
+  border-bottom: 1px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-hull), var(--bg-hull)),
+    var(--iris-soft);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* ------------------------------------------------------------------ */
+/* Type                                                                 */
+/* ------------------------------------------------------------------ */
+
+.title-ui {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.label-ui {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.body-ui {
+  font-size: 14px;
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.text-mono {
+  font-family: var(--font-mono-data);
+  font-size: 13px;
+}
+
+.text-hud {
+  font-family: var(--font-hud);
+  letter-spacing: 0.08em;
+  text-transform: uppercase; /* HUD moments only */
+  background-image: var(--iris);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--iris-cyan) 35%, transparent));
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons                                                              */
+/* ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: none;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.btn:active { transform: translateY(1px); }
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.btn-primary {
+  color: var(--text-primary);
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-inset), var(--bg-inset)),
+    var(--iris);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+
+.btn-secondary {
+  color: var(--text-primary);
+  background: var(--bg-hull);
+  border: 1px solid var(--metal-line);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+  border-color: transparent;
+  background-image:
+    linear-gradient(var(--bg-hull), var(--bg-hull)),
+    var(--iris);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover { color: var(--text-primary); }
+
+.btn-danger {
+  color: var(--iris-magenta);
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--iris-magenta) 55%, var(--metal-line));
+}
+
+/* ------------------------------------------------------------------ */
+/* Inputs                                                               */
+/* ------------------------------------------------------------------ */
+
+.input-well,
+.select-well,
+.textarea-well {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--text-primary);
+  background: var(--bg-inset);
+  border: 1px solid var(--metal-line);
+  border-radius: var(--radius-sm);
+  caret-color: var(--iris-cyan);
+  text-transform: none;
+}
+
+.textarea-well { min-height: 96px; padding: 10px 12px; }
+
+.input-well::placeholder,
+.textarea-well::placeholder {
+  color: var(--text-tertiary);
+}
+
+.input-well:focus,
+.select-well:focus,
+.textarea-well:focus {
+  outline: none;
+  border-color: var(--iris-cyan);
+  box-shadow: var(--shadow-focus);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Nav                                                                  */
+/* ------------------------------------------------------------------ */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.nav-item[data-active="true"],
+.nav-item.active {
+  color: var(--iris-cyan);
+  background: color-mix(in srgb, var(--iris-cyan) 8%, var(--bg-hull));
+  box-shadow: inset 2px 0 0 var(--iris-cyan);
+}
+
+/* ------------------------------------------------------------------ */
+/* Status                                                               */
+/* ------------------------------------------------------------------ */
+
+.status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-square {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--iris-lime);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--iris-lime) 55%, transparent);
+}
+
+.status-slit {
+  width: 16px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--iris-cyan);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--iris-cyan) 50%, transparent);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--iris-cyan) 32%, var(--metal-line));
+  font-family: var(--font-mono-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase; /* chips only */
+}
+
+.chip-live { border-color: color-mix(in srgb, var(--iris-lime) 50%, var(--metal-line)); }
+.chip-warn { border-color: color-mix(in srgb, var(--iris-gold) 50%, var(--metal-line)); }
+.chip-danger { border-color: color-mix(in srgb, var(--iris-magenta) 50%, var(--metal-line)); }
+
+/* ------------------------------------------------------------------ */
+/* HUD ornaments                                                        */
+/* ------------------------------------------------------------------ */
+
+.hud-frame {
+  position: relative;
+}
+
+.hud-frame::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 10px;
+  border: 1px solid color-mix(in srgb, var(--iris-cyan) 22%, transparent);
+  clip-path: polygon(
+    0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px,
+    100% calc(100% - 12px), calc(100% - 12px) 100%,
+    12px 100%, 0 calc(100% - 12px)
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Charts                                                               */
+/* ------------------------------------------------------------------ */
+
+.chart-well {
+  background: var(--bg-inset);
+  border-radius: var(--radius-frame);
+  border: 1px solid color-mix(in srgb, var(--iris-cyan) 22%, var(--metal-line));
+  padding: 16px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.chart-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.progress-track {
+  height: 6px;
+  background: var(--bg-hull);
+  border: 1px solid var(--metal-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--iris);
+  background-size: 200% 100%;
+  border-radius: inherit;
+}
+
+/* ------------------------------------------------------------------ */
+/* Overlay / modal                                                      */
+/* ------------------------------------------------------------------ */
+
+.modal-scrim {
+  background: rgb(0 0 0 / 0.7);
+}
+
+.icon-stroke {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}

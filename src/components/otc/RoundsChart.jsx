@@ -2,8 +2,10 @@ import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
+import { useChartTheme, tipStyle, labelStyle } from "@/lib/chartTheme";
 
 export default function RoundsChart({ latest }) {
+  const T = useChartTheme();
   const raw = latest?.per_desk?.items || [];
   // Chronological left→right (oldest at left, newest at right): the feed
   // arrives oldest-first, so sort ascending — the old reverse made the chart
@@ -90,21 +92,21 @@ export default function RoundsChart({ latest }) {
       <div className="mt-3 h-52 shrink-0 sm:h-64 lg:h-auto lg:min-h-0 lg:flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
-            <XAxis dataKey="day" stroke="#1a6b3a" fontSize={12} tick={{ fill: "#2a8b4a" }} />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
+            <XAxis dataKey="day" stroke={T.axis} fontSize={12} tick={{ fill: T.tick }} />
             <YAxis
-              stroke="#1a6b3a"
+              stroke={T.axis}
               fontSize={12}
-              tick={{ fill: "#2a8b4a" }}
+              tick={{ fill: T.tick }}
               tickFormatter={(v) => `${+v.toFixed(0)}`}
               width={56}
             />
             <Tooltip
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-              labelStyle={{ color: "#22c55e" }}
+              contentStyle={tipStyle(T)}
+              labelStyle={labelStyle(T)}
               formatter={(v, n) => [fmtNum(v), n]}
             />
-            <Bar dataKey="rounds" name="ROUNDS" fill="#0a3a1a" stroke="#1a6b3a" />
+            <Bar dataKey="rounds" name="ROUNDS" fill={T.barFill} stroke={T.barEdge} />
           </BarChart>
         </ResponsiveContainer>
       </div>

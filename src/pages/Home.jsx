@@ -4,6 +4,7 @@ import { fetchDashboardBody } from "@/lib/dashboardFeed";
 import { RefreshCw } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
+import SkinToggle from "@/components/otc/SkinToggle";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import LauncherAnalytics from "@/components/otc/LauncherAnalytics";
@@ -204,7 +205,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+    <div className="skin-stage min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
       <TerminalTopBar label="OTC_HUB_TERMINAL" />
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
@@ -244,6 +245,7 @@ export default function Home() {
                 [RU_FOMO ↗]
               </a>
               <ThemeToggle />
+              <SkinToggle />
               <button
                 onClick={refresh}
                 disabled={refreshing}

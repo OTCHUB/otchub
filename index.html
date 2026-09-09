@@ -11,6 +11,13 @@
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://otchub.dev/" />
 
+    <!-- MODERN skin fonts (Iridescent Terminal): Inter Tight = UI,
+         IBM Plex Mono = data, Press Start 2P = HUD display moments.
+         Only the html.skin-modern token block consumes them. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="OTC Hub" />
@@ -38,7 +45,10 @@
     </script>
     <!-- Apply the stored theme before CSS/JS loads so light users get no dark flash -->
     <script>
-      try { if (localStorage.getItem("otc_theme") === "light") document.documentElement.classList.add("light"); } catch (e) {}
+      try {
+        if (localStorage.getItem("otc_theme") === "light") document.documentElement.classList.add("light");
+        if (localStorage.getItem("otc_skin") === "modern") document.documentElement.classList.add("skin-modern");
+      } catch (e) {}
     </script>
   </head>
   <body>

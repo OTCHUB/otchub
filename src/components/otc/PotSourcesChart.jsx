@@ -2,19 +2,23 @@ import React from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { fmtSol } from "@/lib/format";
 import HelpNote from "@/components/otc/HelpNote";
+import { useChartTheme, tipStyle, labelStyle, legendStyle } from "@/lib/chartTheme";
 
 // Stacked daily bars of the desk pot's on-chain SOL inflow by revenue source:
 // desk mint surcharge (90% of the 0.5 SOL per-mint surcharge), launchpad fees
 // (~10% of launcher creator fees funnel to the pot), and unattributed
 // ($OTC trading-tax sweeps and misc — no per-swap pot deposit pattern exists).
+// Segment fills come from the chart telemetry tokens (chartTheme) so both
+// skins restyle the stacked sources: RETRO greens/cyans, MODERN iris series.
 const SEGMENTS = [
-  { key: "mint", name: "MINT", fill: "#166534" },
-  { key: "royalty", name: "ME_ROYALTY", fill: "#0e7490" },
-  { key: "launchpad", name: "CREATOR_FEES", fill: "#22c55e" },
-  { key: "other", name: "UNATTRIB", fill: "#b45309" },
+  { key: "mint", name: "MINT", token: "segA" },
+  { key: "royalty", name: "ME_ROYALTY", token: "segB" },
+  { key: "launchpad", name: "CREATOR_FEES", token: "segC" },
+  { key: "other", name: "UNATTRIB", token: "segD" },
 ];
 
 export default function PotSourcesChart({ latest }) {
+  const T = useChartTheme();
   const ps = latest?.pot_sources;
   const days = ps?.days || {};
   // Full protocol-lifetime history: the backend backfills day-by-day back to
@@ -31,6 +35,7 @@ export default function PotSourcesChart({ latest }) {
     }));
   const totals = SEGMENTS.map((s) => ({
     ...s,
+    fill: T[s.token],
     sol: rows.reduce((a, r) => a + (r[s.key] || 0), 0),
   }));
   const grandTotal = totals.reduce((a, t) => a + t.sol, 0);
@@ -56,38 +61,32 @@ export default function PotSourcesChart({ latest }) {
           <div className="mt-2 h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+                <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
                 <XAxis
                   dataKey="day"
                   stroke="#1a6b3a"
                   fontSize={12}
-                  tick={{ fill: "#2a8b4a" }}
+                  tick={{ fill: T.tick }}
                   interval="preserveStartEnd"
                   minTickGap={12}
                 />
                 <YAxis
                   stroke="#1a6b3a"
                   fontSize={12}
-                  tick={{ fill: "#2a8b4a" }}
+                  tick={{ fill: T.tick }}
                   tickFormatter={(v) => `${v}`}
                   width={44}
                 />
                 <Tooltip
-                  contentStyle={{
-                    background: "#000",
-                    border: "1px solid #1a6b3a",
-                    borderRadius: 0,
-                    fontFamily: "monospace",
-                    fontSize: 13,
-                  }}
-                  labelStyle={{ color: "#22c55e" }}
+                  contentStyle={tipStyle(T)}
+                  labelStyle={labelStyle(T)}
                   formatter={(v, name) => [fmtSol(v, 3), name]}
                 />
                 <Legend
-                  wrapperStyle={{ fontFamily: "monospace", fontSize: 12, color: "#2a8b4a" }}
+                  wrapperStyle={legendStyle(T)}
                 />
                 {SEGMENTS.map((s) => (
-                  <Bar key={s.key} dataKey={s.key} name={s.name} stackId="pot" fill={s.fill} stroke="#1a6b3a" />
+                  <Bar key={s.key} dataKey={s.key} name={s.name} stackId="pot" fill={T[s.token]} stroke={T.barEdge} />
                 ))}
               </BarChart>
             </ResponsiveContainer>

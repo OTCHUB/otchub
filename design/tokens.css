@@ -1,0 +1,93 @@
+/* ==================================================================
+   Iridescent Terminal — design tokens (reference sheet)
+   ------------------------------------------------------------------
+   This file is the design-framework source of truth for the MODERN
+   skin. The RUNTIME lives in src/index.css (html.skin-modern block),
+   which remaps the app's existing CSS variables to these values; keep
+   the two in sync when tokens change.
+   Sentence case everywhere in product UI — uppercase is reserved for
+   HUD/display moments only.
+   ================================================================== */
+
+:root {
+  --bg-void: #000000;
+  --bg-hull: #0b0e12;
+  --bg-panel: #12161c;
+  --bg-inset: #07090c;
+  --bg-elevated: #181e26;
+
+  --metal-base: #9aa3ae;
+  --metal-edge: #e8eef4;
+  --metal-line: #2a313a;
+
+  --text-primary: #e8eef4;
+  --text-secondary: #8a93a0;
+  --text-tertiary: #5c6570;
+
+  --iris-cyan: #5ce1ff;
+  --iris-aqua: #3dffd2;
+  --iris-violet: #a78bff;
+  --iris-magenta: #ff5cc8;
+  --iris-gold: #f0c14a;
+  --iris-lime: #7cff6b;
+  --iris: linear-gradient(135deg, #5ce1ff 0%, #a78bff 40%, #ff5cc8 70%, #f0c14a 100%);
+  --iris-soft: linear-gradient(135deg, rgba(92,225,255,.35), rgba(167,139,255,.28), rgba(255,92,200,.22));
+  --iris-conic: conic-gradient(from 210deg, #5ce1ff, #a78bff, #ff5cc8, #f0c14a, #5ce1ff);
+
+  --hud-grid: #1b2430;
+
+  /* Chart telemetry (consumed by src/lib/chartTheme.js at runtime) */
+  --chart-grid: #1b2430;
+  --chart-axis: #2a313a;
+  --chart-tick: #5c6570;
+  --chart-primary: #5ce1ff;
+  --chart-secondary: #f0c14a;
+  --chart-tertiary: #a78bff;
+  --chart-danger: #ff5cc8;
+  --chart-pos: #3dffd2;
+  --chart-bar-fill: #1b2430;
+  --chart-bar-edge: #2a313a;
+  --chart-seg-a: #5ce1ff;
+  --chart-seg-b: #a78bff;
+  --chart-seg-c: #3dffd2;
+  --chart-seg-d: #f0c14a;
+  --chart-tip-bg: #12161c;
+  --chart-tip-border: #2a313a;
+  --chart-tip-label: #5ce1ff;
+  --chart-tip-text: #e8eef4;
+  --chart-tip-radius: 12px;
+
+  --radius-sm: 8px;
+  --radius-frame: 12px;
+  --radius-panel: 14px;
+
+  --shadow-device: 0 18px 50px rgba(0,0,0,.55);
+  --shadow-focus: 0 0 0 1px #5ce1ff, 0 0 16px rgba(92,225,255,.35);
+
+  --ease-out: cubic-bezier(.16,1,.3,1);
+
+  --font-ui: "Inter Tight", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-hud: "Press Start 2P", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono-data: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* Iridescent border — 1px spectrum on a panel fill. Never fill large
+   backgrounds with the rainbow. */
+.iris-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--bg-panel), var(--bg-panel)) padding-box,
+    var(--iris) border-box;
+}
+
+/* HUD display moment (uppercase, iridescent fill, soft bloom) */
+.hud-display {
+  font-family: var(--font-hud);
+  letter-spacing: 0.08em;
+  text-transform: uppercase; /* HUD only — product UI stays sentence case */
+  background: var(--iris);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 12px rgba(92,225,255,.35));
+}

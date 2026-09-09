@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { fmtSol, fmtNum } from "@/lib/format";
+import { useChartTheme, tipStyle, labelStyle, legendStyle } from "@/lib/chartTheme";
 
 // BLUR-style listing depth for the desk NFTs: cumulative count of listed desks
 // at or below each SOL price, plus the cumulative SOL needed to SWEEP the book
@@ -8,6 +9,7 @@ import { fmtSol, fmtNum } from "@/lib/format";
 // X-range toggle keeps the near-floor region readable when a long tail of
 // expensive listings would otherwise flatten the interesting part.
 export default function ListingsDepthChart({ holdings }) {
+  const T = useChartTheme();
   const [range, setRange] = useState("NEAR");
 
   const listed = (holdings || [])
@@ -84,53 +86,53 @@ export default function ListingsDepthChart({ holdings }) {
             <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="depthFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+                  <stop offset="0%" stopColor={T.pos} stopOpacity={0.45} />
+                  <stop offset="100%" stopColor={T.pos} stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+              <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
               <XAxis
                 dataKey="p"
                 type="number"
                 domain={["dataMin", "dataMax"]}
-                stroke="#1a6b3a"
+                stroke={T.axis}
                 fontSize={12}
-                tick={{ fill: "#2a8b4a" }}
+                tick={{ fill: T.tick }}
                 tickFormatter={(v) => (+v).toFixed(2)}
               />
               <YAxis
                 yAxisId="count"
-                stroke="#1a6b3a"
+                stroke={T.axis}
                 fontSize={12}
-                tick={{ fill: "#2a8b4a" }}
+                tick={{ fill: T.tick }}
                 allowDecimals={false}
                 width={40}
               />
               <YAxis
                 yAxisId="sweep"
                 orientation="right"
-                stroke="#1a6b3a"
+                stroke={T.axis}
                 fontSize={12}
-                tick={{ fill: "#b45309" }}
+                tick={{ fill: T.segD }}
                 tickFormatter={(v) => `${+v.toFixed(1)}`}
                 width={44}
               />
               <Tooltip
-                cursor={{ stroke: "#22c55e", strokeDasharray: "3 3" }}
-                contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, fontFamily: "monospace", fontSize: 13 }}
-                labelStyle={{ color: "#22c55e" }}
+                cursor={{ stroke: T.pos, strokeDasharray: "3 3" }}
+                contentStyle={tipStyle(T)}
+                labelStyle={labelStyle(T)}
                 labelFormatter={(v) => `≤ ${fmtSol(v, 3)} SOL`}
                 formatter={(v, n) =>
                   n === "SWEEP_SOL" ? [`${fmtSol(v, 2)} SOL to sweep`, n] : [`${fmtNum(v)} desks`, n]
                 }
               />
-              <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
+              <Legend wrapperStyle={legendStyle(T)} />
               <Area
                 yAxisId="count"
                 type="stepAfter"
                 dataKey="count"
                 name="DEPTH"
-                stroke="#22c55e"
+                stroke={T.pos}
                 strokeWidth={1.5}
                 fill="url(#depthFill)"
               />
@@ -139,9 +141,9 @@ export default function ListingsDepthChart({ holdings }) {
                 type="stepAfter"
                 dataKey="sweep"
                 name="SWEEP_SOL"
-                stroke="#fbbf24"
+                stroke={T.secondary}
                 strokeWidth={1.5}
-                fill="#fbbf24"
+                fill={T.secondary}
                 fillOpacity={0.08}
               />
             </AreaChart>

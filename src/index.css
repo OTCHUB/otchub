@@ -229,6 +229,29 @@ body {
   --c-slate-700: 51 65 85;
   --c-slate-800: 30 41 59;
   --c-slate-900: 15 23 42;
+
+  /* Chart telemetry tokens (consumed by src/lib/chartTheme.js): RETRO
+     values replicate the previous hardcoded chart hexes byte-for-byte;
+     the MODERN skin overrides these in the html.skin-modern block. */
+  --chart-grid: #0a3a1a;
+  --chart-axis: #1a6b3a;
+  --chart-tick: #2a8b4a;
+  --chart-primary: #4ade80;
+  --chart-secondary: #fbbf24;
+  --chart-tertiary: #22d3ee;
+  --chart-danger: #f87171;
+  --chart-pos: #22c55e;
+  --chart-bar-fill: #0a3a1a;
+  --chart-bar-edge: #1a6b3a;
+  --chart-seg-a: #166534;
+  --chart-seg-b: #0e7490;
+  --chart-seg-c: #22c55e;
+  --chart-seg-d: #b45309;
+  --chart-tip-bg: #000000;
+  --chart-tip-border: #1a6b3a;
+  --chart-tip-label: #22c55e;
+  --chart-tip-text: #4ade80;
+  --chart-tip-radius: 0px;
 }
 
 html.light {
@@ -302,4 +325,199 @@ html.light body {
    phosphor-paper light mode keeps a flat paper background (no gradients). */
 html.light .boot-crt {
   display: none;
+}
+
+/* ==================================================================
+   MODERN SKIN :: "Iridescent Terminal" (design/tokens.css is the source
+   spec; design/components.css the class map). Applied by adding
+   .skin-modern to <html> (src/lib/theme.js) — independent of the
+   dark/light RETRO theme. The skin is a full remap of the same CSS
+   variables the RETRO terminal uses, so every panel converts with no
+   component changes:
+     black        -> chassis panel  #12161C (page stage stays pure void)
+     green        -> instrument silver text + iris cyan accents/borders
+     emerald      -> status lime #7CFF6B / aqua #3DFFD2
+     cyan         -> aqua          #3DFFD2
+     amber        -> gold          #F0C14A (warnings)
+     red          -> magenta      #FF5CC8 (danger — never generic red)
+     fuchsia      -> violet        #A78BFF
+     slate        -> pearlescent metal grays
+   Placed AFTER html.light so the skin also overrides phosphor-paper
+   values when both classes are present. Iridescence lives on borders,
+   labels, and active states — never as full-field fills.
+   ================================================================== */
+html.skin-modern {
+  color-scheme: dark;
+  --c-black: 18 22 28;
+  --c-green-200: 232 238 244;
+  --c-green-300: 201 210 220;
+  --c-green-400: 219 228 238;
+  --c-green-500: 92 225 255;
+  --c-green-600: 92 225 255;
+  --c-green-700: 167 139 255;
+  --c-green-800: 167 139 255;
+  --c-green-900: 148 119 245;
+  --c-emerald-200: 124 255 107;
+  --c-emerald-300: 124 255 107;
+  --c-emerald-400: 124 255 107;
+  --c-emerald-500: 124 255 107;
+  --c-emerald-600: 61 255 210;
+  --c-emerald-700: 61 255 210;
+  --c-emerald-800: 47 190 158;
+  --c-emerald-900: 40 160 133;
+  --c-cyan-200: 122 255 222;
+  --c-cyan-300: 61 255 210;
+  --c-cyan-400: 61 255 210;
+  --c-cyan-500: 55 224 186;
+  --c-cyan-600: 47 190 158;
+  --c-cyan-700: 40 160 133;
+  --c-cyan-800: 34 134 111;
+  --c-cyan-900: 28 108 90;
+  --c-amber-200: 240 193 74;
+  --c-amber-300: 240 193 74;
+  --c-amber-400: 240 193 74;
+  --c-amber-500: 222 173 62;
+  --c-amber-600: 199 150 50;
+  --c-amber-700: 176 130 42;
+  --c-amber-800: 152 110 36;
+  --c-amber-900: 128 92 30;
+  --c-red-200: 255 92 200;
+  --c-red-300: 255 92 200;
+  --c-red-400: 255 92 200;
+  --c-red-500: 235 74 184;
+  --c-red-600: 214 55 166;
+  --c-red-700: 191 39 147;
+  --c-red-800: 168 33 128;
+  --c-red-900: 145 28 110;
+  --c-fuchsia-200: 183 159 255;
+  --c-fuchsia-300: 167 139 255;
+  --c-fuchsia-400: 167 139 255;
+  --c-fuchsia-500: 148 119 245;
+  --c-fuchsia-600: 130 100 220;
+  --c-fuchsia-700: 113 84 192;
+  --c-fuchsia-800: 96 70 164;
+  --c-fuchsia-900: 82 59 140;
+  --c-slate-200: 154 163 174;
+  --c-slate-300: 138 147 160;
+  --c-slate-400: 122 132 144;
+  --c-slate-500: 92 101 112;
+  --c-slate-600: 72 80 90;
+  --c-slate-700: 54 61 72;
+  --c-slate-800: 42 49 58;
+  --c-slate-900: 27 36 48;
+
+  /* Type: geometric sans UI + Plex Mono data; Press Start 2P reserved for
+     HUD display moments. Sentence case is untouched in JSX. */
+  --font-heading: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Press Start 2P", "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* shadcn tokens follow the chassis */
+  --background: 240 6% 0%;
+  --foreground: 213 41% 93%;
+  --card: 217 22% 9%;
+  --popover: 217 22% 9%;
+  --border: 214 16% 20%;
+  --input: 214 16% 20%;
+  --ring: 193 100% 68%;
+  --primary: 193 100% 68%;
+  --primary-foreground: 240 6% 0%;
+  --muted-foreground: 213 9% 58%;
+
+  /* Chart telemetry: HUD grid + iris series (see src/lib/chartTheme.js) */
+  --chart-grid: #1b2430;
+  --chart-axis: #2a313a;
+  --chart-tick: #5c6570;
+  --chart-primary: #5ce1ff;
+  --chart-secondary: #f0c14a;
+  --chart-tertiary: #a78bff;
+  --chart-danger: #ff5cc8;
+  --chart-pos: #3dffd2;
+  --chart-bar-fill: #1b2430;
+  --chart-bar-edge: #2a313a;
+  --chart-seg-a: #5ce1ff;
+  --chart-seg-b: #a78bff;
+  --chart-seg-c: #3dffd2;
+  --chart-seg-d: #f0c14a;
+  --chart-tip-bg: #12161c;
+  --chart-tip-border: #2a313a;
+  --chart-tip-label: #5ce1ff;
+  --chart-tip-text: #e8eef4;
+  --chart-tip-radius: 12px;
+}
+
+/* Void canvas: the page stage turns pure black so the chassis panels
+   float in the void; cards keep the panel tone via --c-black. */
+html.skin-modern body {
+  background-color: #000000;
+  color: #e8eef4;
+}
+html.skin-modern .skin-stage {
+  background-color: #000000;
+}
+
+/* The CRT overlay is a RETRO-only effect; the modern screen is a
+   clean HUD well. */
+html.skin-modern .boot-crt {
+  display: none;
+}
+
+/* Chamfered geometry: cards and wells get the 12px frame radius,
+   controls 8px — sharp 90° corners belong to the RETRO skin only. */
+html.skin-modern [class*="bg-black"][class*="border-"] {
+  border-radius: 12px;
+}
+html.skin-modern [class*="inline-flex"][class*="overflow-hidden"] {
+  border-radius: 8px;
+}
+html.skin-modern button,
+html.skin-modern input,
+html.skin-modern select,
+html.skin-modern textarea {
+  border-radius: 8px;
+}
+
+/* Recessed-well focus: iris ring + soft cyan bloom (spec §6 inputs). */
+html.skin-modern input:focus,
+html.skin-modern select:focus,
+html.skin-modern textarea:focus {
+  outline: none;
+  border-color: rgba(92, 225, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(92, 225, 255, 0.5), 0 0 16px rgba(92, 225, 255, 0.35);
+}
+html.skin-modern input,
+html.skin-modern textarea {
+  caret-color: #5ce1ff;
+}
+html.skin-modern ::selection {
+  background: rgba(92, 225, 255, 0.28);
+}
+
+/* Metal scrollbars in the void. */
+html.skin-modern ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html.skin-modern ::-webkit-scrollbar-track {
+  background: #000;
+}
+html.skin-modern ::-webkit-scrollbar-thumb {
+  background: #2a313a;
+  border-radius: 999px;
+  border: 2px solid #000;
+}
+
+/* Fee-flow routes march in iris cyan; broken routes dim magenta. */
+html.skin-modern .pot-flow-x {
+  background-image: repeating-linear-gradient(90deg, rgb(92 225 255 / 0.8) 0 4px, transparent 4px 8px);
+}
+html.skin-modern .pot-flow-y {
+  background-image: repeating-linear-gradient(180deg, rgb(92 225 255 / 0.8) 0 4px, transparent 4px 8px);
+}
+html.skin-modern .pot-flow-broken {
+  background-image: repeating-linear-gradient(90deg, rgb(255 92 200 / 0.45) 0 3px, transparent 3px 8px);
+}
+html.skin-modern .pot-flow-broken-y {
+  background-image: repeating-linear-gradient(180deg, rgb(255 92 200 / 0.45) 0 3px, transparent 3px 8px);
 }

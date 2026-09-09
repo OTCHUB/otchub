@@ -10,8 +10,10 @@ import {
   Legend,
 } from "recharts";
 import { fmtUsd } from "@/lib/format";
+import { useChartTheme, tipStyle, labelStyle, itemStyle, legendStyle } from "@/lib/chartTheme";
 
 export default function TrendChart({ history }) {
+  const T = useChartTheme();
   const data = (history || []).map((h) => {
     const token = h.token_price_usd;
     const floor = h.nft_floor_usd;
@@ -31,19 +33,19 @@ export default function TrendChart({ history }) {
       <div className="mt-3 h-52 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid stroke="#0a3a1a" strokeDasharray="2 4" />
+            <CartesianGrid stroke={T.grid} strokeDasharray="2 4" />
             <XAxis
               dataKey="t"
               tickFormatter={(t) => new Date(t).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}
-              stroke="#1a6b3a"
+              stroke={T.axis}
               fontSize={12}
-              tick={{ fill: "#2a8b4a" }}
+              tick={{ fill: T.tick }}
             />
             <YAxis
               yAxisId="usd"
-              stroke="#1a6b3a"
+              stroke={T.axis}
               fontSize={12}
-              tick={{ fill: "#2a8b4a" }}
+              tick={{ fill: T.tick }}
               tickFormatter={(v) => `$${+v.toFixed(2)}`}
               width={56}
             />
@@ -54,23 +56,23 @@ export default function TrendChart({ history }) {
               yAxisId="token"
               orientation="right"
               domain={["auto", "auto"]}
-              stroke="#22d3ee"
+              stroke={T.tertiary}
               fontSize={12}
-              tick={{ fill: "#22d3ee" }}
+              tick={{ fill: T.tertiary }}
               tickFormatter={(v) => `$${+v.toFixed(4)}`}
               width={52}
             />
             <Tooltip
               labelFormatter={(t) => new Date(t).toLocaleString()}
               formatter={(v) => fmtUsd(v)}
-              contentStyle={{ background: "#000", border: "1px solid #1a6b3a", borderRadius: 0, color: "#4ade80", fontFamily: "monospace", fontSize: 13 }}
-              labelStyle={{ color: "#22c55e" }}
-              itemStyle={{ color: "#4ade80" }}
+              contentStyle={tipStyle(T)}
+              labelStyle={labelStyle(T)}
+              itemStyle={itemStyle(T)}
             />
-            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "monospace", color: "#2a8b4a" }} />
-            <Line yAxisId="token" type="monotone" dataKey="token" name="OTC_USD" stroke="#4ade80" dot={false} strokeWidth={1.5} />
-            <Line yAxisId="usd" type="monotone" dataKey="floor" name="FLOOR_USD" stroke="#fbbf24" dot={false} strokeWidth={1.5} />
-            <Line yAxisId="usd" type="monotone" dataKey="diff" name="DIFF_USD" stroke="#22d3ee" dot={false} strokeWidth={1.5} strokeDasharray="4 3" />
+            <Legend wrapperStyle={legendStyle(T)} />
+            <Line yAxisId="token" type="monotone" dataKey="token" name="OTC_USD" stroke={T.primary} dot={false} strokeWidth={1.5} />
+            <Line yAxisId="usd" type="monotone" dataKey="floor" name="FLOOR_USD" stroke={T.secondary} dot={false} strokeWidth={1.5} />
+            <Line yAxisId="usd" type="monotone" dataKey="diff" name="DIFF_USD" stroke={T.tertiary} dot={false} strokeWidth={1.5} strokeDasharray="4 3" />
           </LineChart>
         </ResponsiveContainer>
       </div>
