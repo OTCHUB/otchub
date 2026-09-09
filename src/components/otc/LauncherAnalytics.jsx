@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Globe, Send, Twitter } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
@@ -222,20 +222,13 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     };
   };
   const tape = ranked.map(withDexQuote);
-  // GRAD RATE (browser): the server's DexScreener graduation scan is
-  // permanently 429'd from the shared runtime egress IP, so gradSample always
-  // ships empty (grad —%). Re-verify graduation client-side over the
-  // analytics cohort's top-volume launches: a mint is graduated once it
-  // trades on any AMM pair beyond pump.fun (e.g. pumpswap).
-  const cohortRanked = data?.ranked ?? [];
-  const { quotes: cohortQuotes } = useDexQuotes(cohortRanked.map((r) => r.mint));
-  const dexGrad = useMemo(() => {
-    const qs = Object.values(cohortQuotes);
-    if (!qs.length) return null;
-    const graduated = qs.filter((q) => q.graduated).length;
-    return { n: qs.length, graduated, rate: +(graduated / qs.length).toFixed(3) };
-  }, [cohortQuotes]);
-  const gradSample = dexGrad ?? c?.gradSample ?? null;
+  // GRAD RATE = verified GRADUATED launches vs ALL launches on the tape
+  // (exact server-side counts from the live feed — no cohort sampling). Rows
+  // outside the probed candidates stay UNKNOWN, so this is a verified
+  // graduation share of every launch, not a high-volume cohort bias.
+  const gradSample = counts.ALL
+    ? { n: counts.ALL, graduated: counts.GRADUATED, rate: +(counts.GRADUATED / counts.ALL).toFixed(3) }
+    : c?.gradSample ?? null;
   // The server clamps pages past the end when filters shrink the result set.
   // Sync ONLY when a new feed arrives: listing `page` as a dependency made the
   // effect run against the stale feed right after NEXT/PREV clicked, instantly
@@ -433,7 +426,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           </div>
         </div>
       </div>
-      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = {dexGrad ? `live browser DexScreener scan · ${dexGrad.graduated}/${dexGrad.n} top-volume launches` : "top-200 by 24h volume"} · pump.fun sample biased to active pairs</div>
+      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = verified GRADUATED ÷ ALL tape launches ({counts.GRADUATED ?? 0}/{counts.ALL ?? 0}) · pump.fun sample biased to active pairs</div>
       <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400/80">
         NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN · DYOR BEFORE BUYING · HIGH VOLUME &amp; LIQUIDITY PREFERRED
         — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL
