@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Globe, Send, Twitter } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
@@ -222,6 +222,20 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     };
   };
   const tape = ranked.map(withDexQuote);
+  // GRAD RATE (browser): the server's DexScreener graduation scan is
+  // permanently 429'd from the shared runtime egress IP, so gradSample always
+  // ships empty (grad —%). Re-verify graduation client-side over the
+  // analytics cohort's top-volume launches: a mint is graduated once it
+  // trades on any AMM pair beyond pump.fun (e.g. pumpswap).
+  const cohortRanked = data?.ranked ?? [];
+  const { quotes: cohortQuotes } = useDexQuotes(cohortRanked.map((r) => r.mint));
+  const dexGrad = useMemo(() => {
+    const qs = Object.values(cohortQuotes);
+    if (!qs.length) return null;
+    const graduated = qs.filter((q) => q.graduated).length;
+    return { n: qs.length, graduated, rate: +(graduated / qs.length).toFixed(3) };
+  }, [cohortQuotes]);
+  const gradSample = dexGrad ?? c?.gradSample ?? null;
   // The server clamps pages past the end when filters shrink the result set.
   // Sync ONLY when a new feed arrives: listing `page` as a dependency made the
   // effect run against the stale feed right after NEXT/PREV clicked, instantly
@@ -291,7 +305,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         {[
           ["LAUNCHES", c?.launches ?? "—"],
           ["24H VOLUME", c ? fmtUsd(c.vol24h) : "—"],
-          ["GRAD RATE*", c?.gradSample?.rate != null ? `${(c.gradSample.rate * 100).toFixed(1)}%` : "—"],
+          ["GRAD RATE*", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
           ["MEDIAN AGE", c ? fmtAge(c.medianAgeH) : "—"],
         ].map(([k, v]) => (
           <div key={k} className="border border-green-500/20 p-1.5">
@@ -409,17 +423,17 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <div className="border border-emerald-500/30 p-1.5">
           <div className="uppercase tracking-widest text-emerald-400/80">OTC LAUNCHER</div>
           <div className="mt-0.5 font-mono text-green-300">
-            grad {(c?.gradSample?.rate != null ? (c.gradSample.rate * 100).toFixed(1) : "—")}% · vol {fmtUsd(c?.vol24h)} · n={c?.launches ?? "—"}
+            grad {(gradSample?.rate != null ? (gradSample.rate * 100).toFixed(1) : "—")}% · vol {fmtUsd(c?.vol24h)} · n={c?.launches ?? "—"}
           </div>
         </div>
         <div className="border border-fuchsia-500/30 p-1.5">
           <div className="uppercase tracking-widest text-fuchsia-400/80">PUMP.FUN SAMPLE</div>
           <div className="mt-0.5 font-mono text-green-300">
-            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source === "browser" ? " ● BROWSER_SCAN" : ""}` : "— sample unavailable"}
+            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source?.startsWith("browser") ? " ● BROWSER_SCAN" : ""}` : "— sample unavailable"}
           </div>
         </div>
       </div>
-      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = top-200 by 24h volume · pump.fun sample biased to active pairs</div>
+      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = {dexGrad ? `live browser DexScreener scan · ${dexGrad.graduated}/${dexGrad.n} top-volume launches` : "top-200 by 24h volume"} · pump.fun sample biased to active pairs</div>
       <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400/80">
         NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN · DYOR BEFORE BUYING · HIGH VOLUME &amp; LIQUIDITY PREFERRED
         — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL

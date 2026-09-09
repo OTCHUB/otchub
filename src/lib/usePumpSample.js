@@ -21,6 +21,40 @@ const readCache = () => {
   }
 };
 
+// DexScreener search fallback — the same sample the server used to ship
+// before its shared egress IP got permanently 429'd. pumpfun pairs =
+// BONDING launches, pumpswap pairs = GRADUATED ones.
+async function dexSearchSample() {
+  const seen = new Set();
+  const rows = [];
+  for (const q of ["pumpfun", "pumpswap", "pump.fun", "frog", "maga", "dog", "moon"]) {
+    let pairs;
+    try {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) continue;
+      pairs = (await res.json()).pairs || [];
+    } catch {
+      continue;
+    }
+    for (const p of pairs) {
+      if (p.chainId !== "solana" || (p.dexId !== "pumpfun" && p.dexId !== "pumpswap")) continue;
+      const mint = p.baseToken?.address;
+      if (!mint || seen.has(mint)) continue;
+      seen.add(mint);
+      rows.push({ dex: p.dexId, vol: Number(p.volume?.h24 || 0) });
+    }
+  }
+  if (rows.length < 5) return null;
+  const vols = rows.map((r) => r.vol).filter(Number.isFinite).sort((a, b) => a - b);
+  return {
+    at: Date.now(),
+    n: rows.length,
+    graduatedShare: +(rows.filter((r) => r.dex === "pumpswap").length / rows.length).toFixed(3),
+    medianVol24: vols[Math.floor(vols.length / 2)],
+    source: "browser_dexscreener",
+  };
+}
+
 export function usePumpSample() {
   const [sample, setSample] = useState(readCache);
 
@@ -56,7 +90,18 @@ export function usePumpSample() {
         };
         try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
         setSample(s);
-      } catch { /* keep the server-side sample */ }
+      } catch {
+        // Gecko scan failed: try the browser-side DexScreener search sample
+        // before giving up on the box entirely.
+        if (cancelled) return;
+        try {
+          const s = await dexSearchSample();
+          if (s && !cancelled) {
+            try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
+            setSample(s);
+          }
+        } catch { /* keep the server-side sample */ }
+      }
     })();
     return () => { cancelled = true; };
   }, []);
