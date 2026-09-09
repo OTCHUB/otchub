@@ -363,6 +363,17 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                   ★ OFFICIAL OTC_HUB
                 </span>
               )}
+              {/* Source-reported reward pairing: e.g. $Nasduck rewards holders
+                  in $QQQx. Unverified upstream setting — the token details
+                  dialog carries the full payout metadata. */}
+              {t.payoutInfo?.rewardSymbol && (
+                <span
+                  className="shrink-0 border border-amber-400/50 bg-amber-400/10 px-1 font-mono text-[10px] font-bold text-amber-300"
+                  title={`$${t.symbol || t.mint.slice(0, 6)} reportedly rewards holders in $${t.payoutInfo.rewardSymbol} · source-reported reward pairing, unverified`}
+                >
+                  ⟳ $ {t.payoutInfo.rewardSymbol}
+                </span>
+              )}
               <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
               <span className="ml-auto shrink-0 text-green-500/50">{fmtAge(t.ageH)}</span>
             </span>

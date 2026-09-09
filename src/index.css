@@ -430,12 +430,13 @@ html.skin-modern {
   --c-slate-800: 42 49 58;
   --c-slate-900: 27 36 48;
 
-  /* Type: one modern geometric sans for UI + HUD wordmarks, Plex Mono only
-     for data/logs — every component (incl. the boot screen) converts. */
+  /* Type: the modern skin is fully sans-serif — UI, HUD wordmarks AND every
+     mono utility remap to Inter Tight, so data readouts, headers and boot
+     logs all render in the same modern geometric sans. */
   --font-heading: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
 
   /* shadcn tokens follow the chassis */
   --background: 240 6% 0%;
