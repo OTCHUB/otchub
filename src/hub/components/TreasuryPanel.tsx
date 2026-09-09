@@ -19,19 +19,12 @@ import { fmtBp, fmtBpPct, fmtHub, fmtNum, fmtSol, fmtUnits, fmtUtc } from "../li
 import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
 import { CollapsibleCard, Flag, Panel, Row, Stat } from "./ui/Panel";
+import { ProgressBar } from "./ui/ProgressBar";
 import { TreasuryPortfolio } from "./TreasuryPortfolio";
 import { VerificationPanel } from "./VerificationPanel";
 
 /** $OTC mint decimals fallback for the pot's lifetime-bought display. */
 const OTC_DECIMALS = 6;
-
-/** Same ASCII bar as `EpochTracker`'s round-progress display, reused for the fee-clear meter. */
-function ProgressBar({ value }: { value: number }) {
-  const cells = 32;
-  const filled = Math.round(Math.min(1, value) * cells);
-  const bar = `[${"█".repeat(filled)}${"░".repeat(cells - filled)}] ${Math.round(value * 100)}%`;
-  return <div className="my-2 text-xs tracking-tighter text-green-500">{bar}</div>;
-}
 
 /** §C6 — treasury transparency: what the protocol holds, has swept, and has burned. */
 export function TreasuryPanel({ state }: { state: ProtocolState }) {
@@ -141,7 +134,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           </div>
         ) : (
           <>
-            <ProgressBar value={creatorFeeClearProgress(creatorFee)} />
+            <ProgressBar frac={creatorFeeClearProgress(creatorFee)} suffix="to clear threshold" />
             <Row
               k="pending $OTC / threshold"
               v={`${fmtUnits(creatorFee.pendingOtcUnits, OTC_DECIMALS)} / ${fmtUnits(creatorFee.clearThresholdUnits, OTC_DECIMALS)} $OTC`}

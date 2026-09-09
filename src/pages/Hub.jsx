@@ -8,7 +8,15 @@ import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import Footer from "@/components/otc/Footer";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
-import { EnvBadge, HubProvider, HubRoutes, rpcHost, useHub } from "@/hub";
+import {
+  EnvBadge,
+  HubProvider,
+  HubRoutes,
+  rpcHost,
+  ThemeSwitch,
+  UIThemeProvider,
+  useHub,
+} from "@/hub";
 
 // $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/" so the
 // hub module's relative routes resolve to /treasury, /deployments, /desk/:asset.
@@ -78,6 +86,7 @@ function HubHeader() {
           </Link>
           <CommunityMenu />
           <ThemeToggle />
+          <ThemeSwitch />
         </div>
       </div>
       <div className="flex flex-wrap gap-x-4 px-3 py-1 text-[10px] text-green-500/50">
@@ -135,7 +144,9 @@ export default function Hub() {
       resolveSigner={getSignerForAddress}
       swapTransport={hubSwapTransport}
     >
-      <HubShell wallet={wallet} />
+      <UIThemeProvider>
+        <HubShell wallet={wallet} />
+      </UIThemeProvider>
     </HubProvider>
   );
 }
