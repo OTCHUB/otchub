@@ -10,7 +10,7 @@ export default function SkinToggle() {
   return (
     <button
       onClick={() => setSkin(toggleSkin())}
-      className="inline-flex items-center gap-1 border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 sm:py-1.5"
+      className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5"
       title={`Switch to the ${skin === "retro" ? "Iridescent Terminal (modern)" : "retro DOS terminal"} skin`}
     >
       <Sparkles className="h-3.5 w-3.5" />

@@ -249,7 +249,7 @@ export default function Home() {
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="inline-flex items-center border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 disabled:opacity-40 sm:py-1.5"
+                className="inline-flex items-center whitespace-nowrap border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 disabled:opacity-40 sm:px-2.5 sm:py-1.5"
                 title="Force a fresh data snapshot (admin)"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />

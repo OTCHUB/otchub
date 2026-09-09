@@ -517,11 +517,15 @@ html.skin-modern .term-window .bg-black {
 html.skin-modern .bg-black {
   background-color: rgb(var(--c-black) / 0.72);
 }
+/* One chamfer for every inline control — buttons, inputs, chips, badges,
+   anchor-buttons, media frames — so stacked controls read as one system. */
 html.skin-modern button,
 html.skin-modern input,
 html.skin-modern select,
-html.skin-modern textarea {
-  border-radius: 12px;
+html.skin-modern textarea,
+html.skin-modern :is(span, a)[class*="border-"],
+html.skin-modern span[class*="bg-black/"] {
+  border-radius: 8px;
 }
 
 /* Seamless zone model: the term window (and every glass dialog) is the ONE
@@ -538,12 +542,6 @@ html.skin-modern :is(.term-window, [role="dialog"]) :is(div, section, dl, ul, ol
 }
 html.skin-modern :is(.term-window, [role="dialog"]) :is(div, li)[class*="bg-black/"] {
   border-radius: 0;
-}
-/* Inline chrome — chips, badges, anchor-buttons, media frames — keeps its
-   soft chamfer everywhere. */
-html.skin-modern :is(span, a)[class*="border-"],
-html.skin-modern span[class*="bg-black/"] {
-  border-radius: 8px;
 }
 /* Floating glass roots (dialogs, menus, popovers, tooltips) keep one soft
    chamfer of their own — they are windows, not zones. */
