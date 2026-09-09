@@ -241,12 +241,12 @@ body {
   --chart-tertiary: #22d3ee;
   --chart-danger: #f87171;
   --chart-pos: #22c55e;
-  --chart-bar-fill: #0a3a1a;
-  --chart-bar-edge: #1a6b3a;
-  --chart-seg-a: #166534;
-  --chart-seg-b: #0e7490;
+  --chart-bar-fill: #14532d;
+  --chart-bar-edge: #22c55e;
+  --chart-seg-a: #1d9a52;
+  --chart-seg-b: #0891b2;
   --chart-seg-c: #22c55e;
-  --chart-seg-d: #b45309;
+  --chart-seg-d: #d97706;
   --chart-tip-bg: #000000;
   --chart-tip-border: #1a6b3a;
   --chart-tip-label: #22c55e;
@@ -258,24 +258,26 @@ html.light {
   color-scheme: light;
   background-color: rgb(236 243 236);
   --c-black: 236 243 236;
-  --c-green-200: 21 128 61;
-  --c-green-300: 21 128 61;
-  --c-green-400: 22 101 52;
+  /* Apple-grade text contrast: primary copy is near-black ink, not medium
+     green — hierarchy comes from weight and opacity of dark ink on paper. */
+  --c-green-200: 13 20 15;
+  --c-green-300: 27 40 30;
+  --c-green-400: 19 30 22;
   --c-green-500: 20 83 45;
   --c-green-600: 20 83 45;
   --c-green-700: 20 83 45;
   --c-green-800: 20 83 45;
   --c-green-900: 20 83 45;
-  --c-emerald-200: 5 150 105;
-  --c-emerald-300: 5 150 105;
+  --c-emerald-200: 4 120 87;
+  --c-emerald-300: 4 120 87;
   --c-emerald-400: 4 120 87;
   --c-emerald-500: 6 95 70;
   --c-emerald-600: 6 78 59;
   --c-emerald-700: 6 78 59;
   --c-emerald-800: 6 78 59;
   --c-emerald-900: 6 78 59;
-  --c-cyan-200: 8 145 178;
-  --c-cyan-300: 8 145 178;
+  --c-cyan-200: 14 116 144;
+  --c-cyan-300: 14 116 144;
   --c-cyan-400: 14 116 144;
   --c-cyan-500: 21 94 117;
   --c-cyan-600: 22 78 99;
@@ -314,11 +316,33 @@ html.light {
   --c-slate-700: 30 41 59;
   --c-slate-800: 30 41 59;
   --c-slate-900: 15 23 42;
+
+  /* Chart telemetry remapped for the paper surface: dark-ink series and
+     borders on pale paper so bars keep full contrast in light mode. */
+  --chart-grid: #c3d5c3;
+  --chart-axis: #7d9e7d;
+  --chart-tick: #3d5c3d;
+  --chart-primary: #15803d;
+  --chart-secondary: #b45309;
+  --chart-tertiary: #0e7490;
+  --chart-danger: #b91c1c;
+  --chart-pos: #15803d;
+  --chart-bar-fill: #166534;
+  --chart-bar-edge: #15803d;
+  --chart-seg-a: #166534;
+  --chart-seg-b: #0e7490;
+  --chart-seg-c: #15803d;
+  --chart-seg-d: #b45309;
+  --chart-tip-bg: #ecf3ec;
+  --chart-tip-border: #7d9e7d;
+  --chart-tip-label: #15803d;
+  --chart-tip-text: #14532d;
+  --chart-tip-radius: 0px;
 }
 
 html.light body {
   background-color: rgb(236 243 236);
-  color: rgb(20 83 45);
+  color: rgb(19 30 22);
 }
 
 /* Boot screen CRT scanlines + vignette are dark-mode-only effects; the
@@ -434,8 +458,8 @@ html.skin-modern {
   --chart-tertiary: #a78bff;
   --chart-danger: #ff5cc8;
   --chart-pos: #3dffd2;
-  --chart-bar-fill: #1b2430;
-  --chart-bar-edge: #2a313a;
+  --chart-bar-fill: #2c3b4f;
+  --chart-bar-edge: #5ce1ff;
   --chart-seg-a: #5ce1ff;
   --chart-seg-b: #a78bff;
   --chart-seg-c: #3dffd2;
@@ -465,8 +489,13 @@ html.skin-modern .boot-crt {
 
 /* Chamfered geometry: cards and wells get the 12px frame radius,
    controls 8px — sharp 90° corners belong to the RETRO skin only. */
-html.skin-modern [class*="bg-black"][class*="border-"] {
+/* One chamfer per window: the collapsible window root is the ONLY rounded
+   frame; every panel inside stays square, so expanding/collapsing reads as
+   one seamless window — never a rounded frame nested inside a rounded
+   frame. */
+html.skin-modern .term-window {
   border-radius: 12px;
+  overflow: hidden;
 }
 html.skin-modern [class*="inline-flex"][class*="overflow-hidden"] {
   border-radius: 8px;
@@ -539,8 +568,8 @@ html.skin-modern.light {
   --c-green-200: 18 25 34;
   --c-green-300: 42 50 62;
   --c-green-400: 26 34 44;
-  --c-green-500: 8 145 178; /* iris cyan, darkened for light surfaces */
-  --c-green-600: 14 116 144;
+  --c-green-500: 14 116 144; /* iris cyan, darkened for light surfaces */
+  --c-green-600: 21 94 117;
   --c-green-700: 124 92 224;
   --c-green-800: 124 92 224;
   --c-green-900: 100 74 190;
@@ -614,8 +643,8 @@ html.skin-modern.light {
   --chart-tertiary: #7c3aed;
   --chart-danger: #c026d3;
   --chart-pos: #059669;
-  --chart-bar-fill: #dce3ea;
-  --chart-bar-edge: #8a93a0;
+  --chart-bar-fill: #b7c6d5;
+  --chart-bar-edge: #0891b2;
   --chart-seg-a: #0891b2;
   --chart-seg-b: #7c3aed;
   --chart-seg-c: #0d9488;

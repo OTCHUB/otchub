@@ -209,7 +209,7 @@ export default function Home() {
       <TerminalTopBar label="OTC_HUB_TERMINAL" />
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
-        <header className="border border-green-500/30 bg-black p-3">
+        <header className="term-window border border-green-500/30 bg-black p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
@@ -338,7 +338,7 @@ export default function Home() {
               <SupplyChart history={data?.history} latest={latest} />
             </CollapsibleCard>
           </div>
-          <div className="hidden border border-green-500/30 bg-black lg:flex lg:flex-col">
+          <div className="term-window hidden border border-green-500/30 bg-black lg:flex lg:flex-col">
             <div className="flex items-center justify-between border-b border-green-500/20 px-3 py-2 text-[12px] uppercase tracking-widest text-green-500/70">
               <span>TERMINAL :: CHAIN_FEED</span>
               <span className="flex items-center gap-1.5 text-emerald-400">

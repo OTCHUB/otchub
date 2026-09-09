@@ -18,7 +18,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, m
   }, [openSignal]);
 
   return (
-    <div id={id} className="flex h-full flex-col break-inside-avoid">
+    <div id={id} className="term-window flex h-full flex-col break-inside-avoid">
       <div
         onClick={toggle}
         title={locked ? "Keep this panel open until the swap finishes" : undefined}
