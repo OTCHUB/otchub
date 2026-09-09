@@ -1,10 +1,18 @@
 // Server-side Jupiter aggregator relay: fetches quotes and builds swap
-// transactions from https://lite-api.jup.ag so the browser never calls
-// Jupiter directly (browser-side calls hit CORS / rate limits, which broke
-// swaps). The wallet still signs locally; only quote/build requests and the
-// already-signed bytes are relayed.
-const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
-const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
+// transactions from Jupiter so the browser never calls Jupiter directly
+// (browser-side calls hit CORS / rate limits, which broke swaps). The wallet
+// still signs locally; only quote/build requests and the already-signed
+// bytes are relayed.
+//
+// JUP_API_KEY (developers.jup.ag): when configured, requests go through the
+// KEYED api.jup.ag endpoints — a dedicated per-organisation quota (free
+// tier 1 rps / 60 rpm) instead of the keyless lite-api bucket shared with
+// every workload on this runtime's egress IP. A rejected key (401/403) or a
+// keyed network failure falls back to the keyless lite-api endpoints, so a
+// missing/bad key never breaks swaps.
+const KEYED_BASE = "https://api.jup.ag/swap/v1";
+const LITE_BASE = "https://lite-api.jup.ag/swap/v1";
+const JUP_API_KEY = process.env.JUP_API_KEY || "";
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -33,6 +41,23 @@ const fetchJup = async (url, opts = {}, attempts = 3) => {
   throw lastErr || new Error("Jupiter request failed");
 };
 
+// Keyed-first request with keyless fallback. Returns { res, auth } so callers
+// can surface which tier served the request; falls back only when the keyed
+// path rejects the key (401/403) or fails at the network level.
+const requestJup = async (path, opts = {}) => {
+  if (JUP_API_KEY) {
+    try {
+      const res = await fetchJup(`${KEYED_BASE}${path}`, {
+        ...opts,
+        headers: { ...(opts.headers || {}), "x-api-key": JUP_API_KEY },
+      });
+      if (res.status !== 401 && res.status !== 403) return { res, auth: "keyed" };
+    } catch { /* fall through to keyless */ }
+  }
+  const res = await fetchJup(`${LITE_BASE}${path}`, opts);
+  return { res, auth: "lite" };
+};
+
 export default async function (req) {
   try {
     const args = await req.json().catch(() => ({}));
@@ -51,10 +76,10 @@ export default async function (req) {
       ) {
         return Response.json({ error: "Invalid quote params" }, { status: 400 });
       }
-      const url =
-        `${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}` +
-        `&amount=${amount}&slippageBps=${slippageBps}&swapMode=ExactIn`;
-      const res = await fetchJup(url);
+      const { res, auth } = await requestJup(
+        `/quote?inputMint=${inputMint}&outputMint=${outputMint}` +
+        `&amount=${amount}&slippageBps=${slippageBps}&swapMode=ExactIn`
+      );
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         return Response.json(
@@ -63,7 +88,7 @@ export default async function (req) {
         );
       }
       const quote = await res.json();
-      return Response.json({ ok: true, quote });
+      return Response.json({ ok: true, quote, auth });
     }
 
     if (mode === "swap") {
@@ -79,7 +104,7 @@ export default async function (req) {
       const normalized = JSON.parse(JSON.stringify(quoteResponse), (key, value) =>
         key === "updateContextSlot" && typeof value === "number" ? String(value) : value
       );
-      const res = await fetchJup(SWAP_URL, {
+      const { res, auth } = await requestJup("/swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quoteResponse: normalized, userPublicKey }),
@@ -98,7 +123,7 @@ export default async function (req) {
       // The serialized swap tx is returned UNMODIFIED — the wallet signs the
       // exact bytes Jupiter built, and the browser broadcasts it through the
       // app's Helius RPC relay (plain sendTransaction).
-      return Response.json({ ok: true, swap });
+      return Response.json({ ok: true, swap, auth });
     }
 
     return Response.json({ error: "Unknown mode" }, { status: 400 });
