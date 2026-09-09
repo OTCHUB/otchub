@@ -516,14 +516,29 @@ html.skin-modern .term-window .bg-black {
 html.skin-modern .bg-black {
   background-color: rgb(var(--c-black) / 0.72);
 }
-html.skin-modern [class*="inline-flex"][class*="overflow-hidden"] {
-  border-radius: 10px;
-}
 html.skin-modern button,
 html.skin-modern input,
 html.skin-modern select,
 html.skin-modern textarea {
   border-radius: 12px;
+}
+
+/* Complete corner pass: every remaining chassis surface — bordered boxes,
+   glass panels, anchor-buttons, chips, badges — loses its square corners.
+   Boxes chamfer at 12px (one step inside the 18px window frame), tiny
+   overlay badges at 6px, thin bars pill at 10px. Full-bleed chrome (fixed
+   bars, page stage, window frame) keeps its own geometry. */
+html.skin-modern [class*="overflow-hidden"]:not(.term-window):not(.term-bar):not(.skin-stage) {
+  border-radius: 10px;
+}
+html.skin-modern [class*="border-"]:not(.term-window):not(.term-bar):not(.skin-stage),
+html.skin-modern [class*="bg-black"]:not(.term-window):not(.term-bar):not(.skin-stage) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+html.skin-modern [class*="bg-black/"]:not(.term-bar):not(.skin-stage) {
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 /* HUD wordmark: heavy geometric sans instead of the pixel font. */
