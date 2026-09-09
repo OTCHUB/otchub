@@ -6,8 +6,8 @@ import { getStoredSkin } from "@/lib/theme";
 
 const HEADER = [
   "+---------------------------------------------+",
-  "|  OTC_HUB :: SOLANA ANALYTICS TERMINAL        |",
-  "|  COMMUNITY_TOOLING - NOT OFFICIAL            |",
+  "|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |",
+  "|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |",
   "+---------------------------------------------+",
 ];
 
@@ -93,9 +93,7 @@ export default function BootScreen({ onComplete }) {
     <div className="skin-stage relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
       <TerminalTopBar label="OTC hub boot sequence" />
 
-      {/* Full-screen CRT treatment: scanlines + vignette fill any viewport.
-          Dark mode only — index.css (html.light .boot-crt) hides these so the
-          phosphor-paper light mode keeps a flat paper background. */}
+      {/* Full-screen CRT treatment: scanlines + vignette fill any viewport. */}
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(to_bottom,transparent,transparent_2px,rgba(0,255,80,0.025)_3px)]" />
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.75))]" />
 
@@ -108,7 +106,7 @@ export default function BootScreen({ onComplete }) {
                 OTC_HUB
               </div>
               <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-green-500/60 sm:text-[12px]">
-                Solana analytics · iridescent terminal · community tooling
+                OTC ecosystem tooling · created by Hub Yield Optimizer Protocol
               </div>
             </div>
           ) : (
