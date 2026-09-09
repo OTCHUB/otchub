@@ -322,7 +322,13 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       // sends in ONE approval. Passed to executeSwap only when the wallet
       // actually supports signAndSendTransaction, so wallets without it keep
       // the normal sign + relay-broadcast flow.
-      const walletCanSignAndSend = !!getSignerForAddress(wallet)?.canSignAndSend;
+      // Wallet-side sign & send is ONLY for Phantom's in-app mobile browser,
+      // whose signTransaction double-broadcasts (known bug). Other mobile
+      // wallets have working signTransaction — and Jupiter's
+      // signAndSendTransaction resolves with NO signature, killing the swap —
+      // so every other wallet keeps the normal sign → Helius relay broadcast.
+      const connectedSigner = getSignerForAddress(wallet);
+      const walletCanSignAndSend = !!connectedSigner?.canSignAndSend && connectedSigner?.name === "Phantom";
       const signAndSend = walletCanSignAndSend
         ? (tx) => {
             checkContext();

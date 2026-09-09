@@ -236,6 +236,10 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
   // the re-broadcast-unstick path for pending txs on congestion.
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  // Callers pass signAndSendRaw ONLY for Phantom (its mobile signTransaction
+  // double-broadcasts); other wallets — mobile included — sign and broadcast
+  // through our Helius relay, which works everywhere (Jupiter's wallet even
+  // resolves signAndSendTransaction with no signature, so it must not be used).
   const preferWalletSend = !!signAndSendRaw && isMobile;
   if (preferWalletSend) {
     if (!shouldContinue()) return aborted();
