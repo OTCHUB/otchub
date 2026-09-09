@@ -17,7 +17,7 @@ function Metric({ label, value, sub, accent = "text-green-300" }) {
   );
 }
 
-export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, perDesk7dSol = 0, refreshSignal = 0 }) {
+export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, perDesk7dSol = 0, refreshSignal = 0, onActivity }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -290,7 +290,10 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
             <ClaimPanel
               address={address}
               holdings={data.holdings}
-              onClaimed={() => load()}
+              onClaimed={() => {
+                load();
+                onActivity?.();
+              }}
               onScan={handleScan}
               lifetimeData={lifetime}
               refreshLifetime={loadLifetime}

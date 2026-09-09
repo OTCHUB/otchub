@@ -24,7 +24,7 @@ function snapshotTime(at) {
 
 // token: { mint, symbol, name?, mcap?, change24h?, vol24?, liquidity?, metricsAt? }.
 // Home owns selection; never key/remount this panel while a wallet is signing.
-export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected, token = DEFAULT_TOKEN, onBusyChange, onResetToken, onSwapComplete }) {
+export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected, token = DEFAULT_TOKEN, onBusyChange, onResetToken, onSwapComplete, balanceRefreshSignal = 0 }) {
   const mint = token?.mint || OTC_MINT;
   const symbol = token?.symbol || (mint === OTC_MINT ? "OTC" : "TOKEN");
   const tokenLabel = `$${symbol.replace(/^\$/, "")}`;
@@ -181,6 +181,17 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
     // Form edits reuse both in-flight reads and settled balances/errors.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mintEpoch, walletEpoch, tokenInfo, busy]);
+
+  // External wallet activity (e.g. a claim in the wallet panel) changed the
+  // on-chain balances: re-read SOL + token balances here too so this panel
+  // never shows a stale balance after any interaction on the dApp.
+  const balanceSignalRef = useRef(balanceRefreshSignal);
+  useEffect(() => {
+    if (balanceRefreshSignal === balanceSignalRef.current) return;
+    balanceSignalRef.current = balanceRefreshSignal;
+    if (!busyRef.current) loadBalance(lifetime.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balanceRefreshSignal]);
 
   const isBuy = mode === "BUY";
   const inputMint = isBuy ? SOL_MINT : mint;
