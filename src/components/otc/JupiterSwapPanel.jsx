@@ -24,7 +24,7 @@ function snapshotTime(at) {
 
 // token: { mint, symbol, name?, mcap?, change24h?, vol24?, liquidity?, metricsAt? }.
 // Home owns selection; never key/remount this panel while a wallet is signing.
-export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected, token = DEFAULT_TOKEN, onBusyChange, onResetToken }) {
+export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect, onConnected, token = DEFAULT_TOKEN, onBusyChange, onResetToken, onSwapComplete }) {
   const mint = token?.mint || OTC_MINT;
   const symbol = token?.symbol || (mint === OTC_MINT ? "OTC" : "TOKEN");
   const tokenLabel = `$${symbol.replace(/^\$/, "")}`;
@@ -334,6 +334,9 @@ export default function JupiterSwapPanel({ wallet, latest, history, onGoConnect,
       const res = await executeSwap(built.swapTransaction, sign, log, wallet, phase, shouldContinue, walletCurrent, signAndSend);
       if (res.ok) {
         log({ type: "ok", msg: "SWAP COMPLETE" });
+        // Landing is confirmed at this point: nudge the wallet panel so its
+        // OTC_BALANCE / desk holdings reflect the swap immediately.
+        onSwapComplete?.();
         if (isCurrent(life)) later(() => loadBalance(life), 3000);
       } else if (isCurrent(life)) setErr(`Swap stopped: ${res.reason || "not sent"}`);
     } catch (e) {

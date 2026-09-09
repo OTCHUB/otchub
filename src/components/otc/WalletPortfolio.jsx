@@ -17,7 +17,7 @@ function Metric({ label, value, sub, accent = "text-green-300" }) {
   );
 }
 
-export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, perDesk7dSol = 0 }) {
+export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, perDesk7dSol = 0, refreshSignal = 0 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -27,6 +27,7 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   const [claimPrices, setClaimPrices] = useState(null); // spot prices for valuing per-desk claimable stock
   const [deskCommand, setDeskCommand] = useState(null); // { assetId, mode, nonce } from the holdings dialog
   const claimRef = useRef(null);
+  const firstRefreshSignal = useRef(true); // skip the signal effect on mount
 
   const load = React.useCallback(() => {
     let active = true;
@@ -52,6 +53,17 @@ export default function WalletPortfolio({ address, onClear, perDesk24hSol = 0, p
   }, [address]);
 
   useEffect(() => load(), [load]);
+
+  // External refresh (e.g. a confirmed swap changed OTC/SOL balances): reload
+  // the portfolio. 0 = initial mount, which the load above already covers.
+  useEffect(() => {
+    if (firstRefreshSignal.current) {
+      firstRefreshSignal.current = false;
+      return;
+    }
+    if (refreshSignal) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal]);
 
   // LIFETIME_EARN: authoritative — seeded instantly from the persisted ClaimLog
   // DB, then kept current by an incremental on-chain claim scan. Re-fetch with

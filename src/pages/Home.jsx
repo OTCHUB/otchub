@@ -57,6 +57,7 @@ export default function Home() {
   const [selectedToken, setSelectedToken] = useState(null); // null keeps the default OTC/SOL pair
   const [swapOpenSignal, setSwapOpenSignal] = useState(0);
   const [swapBusy, setSwapBusy] = useState(false);
+  const [portfolioRefreshSignal, setPortfolioRefreshSignal] = useState(0);
   const swapBusyRef = useRef(false);
   const onSwapBusyChange = useCallback((busy) => {
     swapBusyRef.current = busy;
@@ -69,6 +70,11 @@ export default function Home() {
   }, []);
   const resetSwapToken = useCallback(() => {
     if (!swapBusyRef.current) setSelectedToken(null);
+  }, []);
+  // A confirmed swap changes the wallet's on-chain balances: bump a signal
+  // the WALLET panel watches so OTC_BALANCE / SOL / holdings refresh at once.
+  const onSwapComplete = useCallback(() => {
+    setPortfolioRefreshSignal((s) => s + 1);
   }, []);
   const updateLauncherSnapshot = useCallback((snapshot) => {
     setSelectedToken((selected) => selected
@@ -265,6 +271,7 @@ export default function Home() {
                 onClear={() => setWallet(null)}
                 perDesk24hSol={perDesk24hSol}
                 perDesk7dSol={perDesk7dSol}
+                refreshSignal={portfolioRefreshSignal}
               />
             ) : (
               <WalletConnect onConnected={setWallet} />
@@ -287,6 +294,7 @@ export default function Home() {
                 token={selectedToken || undefined}
                 onBusyChange={onSwapBusyChange}
                 onResetToken={resetSwapToken}
+                onSwapComplete={onSwapComplete}
               />
             </CollapsibleCard>
           </div>
