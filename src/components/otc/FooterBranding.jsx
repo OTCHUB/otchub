@@ -1,12 +1,10 @@
-import { Github, Globe, Send, Twitter } from "lucide-react";
+import { Globe, Twitter } from "lucide-react";
 import React from "react";
 
 // Brand footer: socials, website, copyright — replaces the old data-source /
 // affiliation disclaimer copy (the legal disclaimer lives on the About page).
 const LINKS = [
   { id: "x", label: "@otchubdev", hint: "OTC_HUB on X", href: "https://x.com/otchubdev", icon: Twitter },
-  { id: "telegram", label: "Telegram", hint: "OTC community on Telegram", href: "https://t.me/otcdesksofficial", icon: Send },
-  { id: "github", label: "GitHub", hint: "hubconnect source", href: "https://github.com/OTCHUB/hubconnect", icon: Github },
   { id: "web", label: "Website", hint: "otchub.dev", href: "https://otchub.dev", icon: Globe },
 ];
 
