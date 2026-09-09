@@ -524,22 +524,45 @@ html.skin-modern textarea {
   border-radius: 12px;
 }
 
-/* Complete corner pass: every remaining chassis surface — bordered boxes,
-   glass panels, anchor-buttons, chips, badges — loses its square corners.
-   Boxes chamfer at 12px (one step inside the 18px window frame), tiny
-   overlay badges at 6px, thin bars pill at 10px. Full-bleed chrome (fixed
-   bars, page stage, window frame) keeps its own geometry. */
-html.skin-modern [class*="overflow-hidden"]:not(.term-window):not(.term-bar):not(.skin-stage) {
-  border-radius: 10px;
+/* Seamless zone model: the term window (and every glass dialog) is the ONE
+   glass surface. Block containers inside stop being nested rounded blocks —
+   their backgrounds turn transparent and their corners square, so bordered
+   sections read as hairline zones of a single continuous frosted sheet
+   (accent tints like bg-emerald-500/5 survive as soft zone glows). Controls
+   keep the chamfer; full-bleed chrome keeps its own geometry — one chamfer
+   per window, never rounded-on-rounded. */
+html.skin-modern :is(.term-window, [role="dialog"]) :is(div, section, dl, ul, ol, li, details, table, thead, tbody, tr, td, th)[class*="border-"],
+html.skin-modern :is(.term-window, [role="dialog"]) :is(div, section, dl, ul, ol, li, details)[class*="bg-black"] {
+  border-radius: 0;
+  background-color: transparent;
 }
-html.skin-modern [class*="border-"]:not(.term-window):not(.term-bar):not(.skin-stage),
-html.skin-modern [class*="bg-black"]:not(.term-window):not(.term-bar):not(.skin-stage) {
-  border-radius: 12px;
-  overflow: hidden;
+html.skin-modern :is(.term-window, [role="dialog"]) :is(div, li)[class*="bg-black/"] {
+  border-radius: 0;
 }
-html.skin-modern [class*="bg-black/"]:not(.term-bar):not(.skin-stage) {
-  border-radius: 6px;
-  overflow: hidden;
+/* Inline chrome — chips, badges, anchor-buttons, media frames — keeps its
+   soft chamfer everywhere. */
+html.skin-modern :is(span, a)[class*="border-"],
+html.skin-modern span[class*="bg-black/"] {
+  border-radius: 8px;
+}
+/* Floating glass roots (dialogs, menus, popovers, tooltips) keep one soft
+   chamfer of their own — they are windows, not zones. */
+html.skin-modern [role="dialog"],
+html.skin-modern [role="menu"],
+html.skin-modern [role="listbox"],
+html.skin-modern [role="tooltip"] {
+  border-radius: 14px;
+}
+
+/* Copy voice: labels are typed in sentence case; RETRO renders them as
+   terminal ALL-CAPS through the .uppercase transform, while MODERN shows the
+   clean sentence-case text with relaxed label tracking (HUD hero readouts
+   keep their wide display spacing). */
+html.skin-modern .uppercase {
+  text-transform: none;
+}
+html.skin-modern .tracking-widest:not(.font-display) {
+  letter-spacing: 0.04em;
 }
 
 /* HUD wordmark: heavy geometric sans instead of the pixel font. */

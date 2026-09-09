@@ -19,15 +19,15 @@ export default function PotPumpTrace() {
   return (
     <div className="space-y-0.5 border border-amber-500/30 bg-amber-500/5 px-2 py-1 font-mono text-[11px]">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-amber-300">
-        <span>PUMP.FUN :: SWAP_FEE → PUMP GLOBAL VAULT {short(PUMP_GLOBAL_VAULT)} (34.6 SOL LIVE) + POOL VAULT · CREATOR_FEE 0% ON SAMPLED POOL · 0% → POT</span>
+        <span>pump.fun · swap fee → pump global vault {short(PUMP_GLOBAL_VAULT)} (34.6 SOL live) + pool vault · creator fee 0% on sampled pool · 0% → pot</span>
         <a href={scan(PUMP_PROGRAM)} target="_blank" rel="noopener noreferrer" className="ml-auto text-cyan-300/80 underline hover:text-cyan-300">PGM ↗</a>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-red-400">
-        <span>REWARD_SPLIT :: LAUNCHER-COIN HOLDERS ≈4186 SOL = 78% OF ALL DISTRIBUTED (GPRO 1403 · PUMP 982 · QQQx 616 · SPYx 413 …) — DESKS: 22% · 0.37 → 0.10 SOL/DESK/DAY</span>
+        <span>Reward split · launcher-coin holders ≈4186 SOL = 78% of all distributed (GPRO 1403 · PUMP 982 · QQQx 616 · SPYx 413 …) — desks: 22% · 0.37 → 0.10 SOL/desk/day</span>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-green-500/60">
-        <span>POT STILL GETS PER-SWAP MICRO-DEPOSITS (97/100 LATEST POT TXS ≈0.03 EA) BUT −85% vs 09-01 PEAK 828 SOL · TROUGH 61 (09-05)</span>
-        <span className="hidden sm:inline">CREATORS HOLD 0 SOL:</span>
+        <span>Pot still gets per-swap micro-deposits (97/100 latest pot txs ≈0.03 ea) but −85% vs 09-01 peak 828 SOL · trough 61 (09-05)</span>
+        <span className="hidden sm:inline">Creators hold 0 SOL:</span>
         {CREATORS.map(([sym, addr]) => (
           <a key={addr} href={scan(addr)} target="_blank" rel="noopener noreferrer" className="text-amber-300/70 underline hover:text-amber-300">
             {sym} {short(addr)} ↗
@@ -36,15 +36,15 @@ export default function PotPumpTrace() {
       </div>
       <details className="border border-green-500/15 px-1 py-0.5 text-[11px]">
         <summary className="cursor-pointer select-none uppercase tracking-widest text-green-500/50 hover:text-green-400">
-          [+] TRACE EVIDENCE
+          [+] Trace evidence
         </summary>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-green-500/60">
-          <a href={scan(PUMP_GLOBAL_VAULT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">PUMP_GLOBAL_VAULT {short(PUMP_GLOBAL_VAULT)} ↗</a>
-          <a href={scan(SAMPLE_POOL)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">POOL $401jk {short(SAMPLE_POOL)} ↗</a>
+          <a href={scan(PUMP_GLOBAL_VAULT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">Pump global vault {short(PUMP_GLOBAL_VAULT)} ↗</a>
+          <a href={scan(SAMPLE_POOL)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">Pool $401jk {short(SAMPLE_POOL)} ↗</a>
           {CREATORS.map(([sym, addr]) => (
-            <a key={addr} href={scan(addr)} target="_blank" rel="noopener noreferrer" className="text-amber-300/80 underline hover:text-amber-300">CREATOR {sym} {short(addr)} ↗</a>
+            <a key={addr} href={scan(addr)} target="_blank" rel="noopener noreferrer" className="text-amber-300/80 underline hover:text-amber-300">Creator {sym} {short(addr)} ↗</a>
           ))}
-          <a href={`${scan("BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR")}#transfers`} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">POT TRANSFERS ↗</a>
+          <a href={`${scan("BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR")}#transfers`} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">Pot transfers ↗</a>
         </div>
         <p className="mt-1 leading-snug text-green-500/50">
           Method: 20 swaps decoded on the $401jk pumpswap pool — every fee-sized SOL gain landed in the

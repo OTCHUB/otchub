@@ -16,10 +16,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 const fmtAge = (h) => (h == null ? "—" : h < 1 ? `${Math.round(h * 60)}m` : h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`);
 const KPIS = [
-  { key: "vol24", label: "VOLUME_24H" },
-  { key: "change24h", label: "TOP_GAINERS" },
-  { key: "mcap", label: "MARKET_CAP" },
-  { key: "curveProgress", label: "PROGRESS" },
+  { key: "vol24", label: "24h volume" },
+  { key: "change24h", label: "Top gainers" },
+  { key: "mcap", label: "Market cap" },
+  { key: "curveProgress", label: "Progress" },
 ];
 const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg-fuchsia-400/70"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
@@ -265,7 +265,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col border border-green-500/30 bg-black p-3">
       <div className="flex items-center justify-between">
         <span className="text-[12px] uppercase tracking-widest text-green-500/70">
-          OTC_ANALYTICS :: LAUNCHER ECOSYSTEM
+          Launcher ecosystem
         </span>
         <span className="text-[11px] text-green-500/40">{feed ? `${counts.ALL} matching · ${feed.stale || live.error ? "STALE" : "30s POLL"}` : "…"}</span>
       </div>
@@ -281,10 +281,10 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       {/* cohort KPIs */}
       <div className="mt-2 grid grid-cols-2 gap-1.5 text-center sm:grid-cols-4">
         {[
-          ["LAUNCHES", c?.launches ?? "—"],
-          ["24H VOLUME", c ? fmtUsd(c.vol24h) : "—"],
-          ["GRAD RATE*", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
-          ["MEDIAN AGE", c ? fmtAge(c.medianAgeH) : "—"],
+          ["Launches", c?.launches ?? "—"],
+          ["24h volume", c ? fmtUsd(c.vol24h) : "—"],
+          ["Grad rate*", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
+          ["Median age", c ? fmtAge(c.medianAgeH) : "—"],
         ].map(([k, v]) => (
           <div key={k} className="border border-green-500/20 p-1.5">
             <div className="text-[11px] uppercase tracking-widest text-green-500/50">{k}</div>
@@ -300,7 +300,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         </button>)}
       </div>
       <div role="tablist" aria-label="Launch timeframe" className="mt-1 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] uppercase tracking-widest text-green-500/50">SINCE</span>
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Since</span>
         {TIMEFRAMES.map(([tf]) => <button key={tf} type="button" role="tab" aria-selected={timeframe === tf}
           onClick={() => { setTimeframe(tf); setPage(1); }}
           className={`border px-1.5 py-1 text-[11px] ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
@@ -313,7 +313,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       {/* KPI ranking */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] uppercase tracking-widest text-green-500/50">RANK BY</span>
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Rank by</span>
         {KPIS.map((k) => (
           <button key={k.key} type="button" onClick={() => { setKpi(k.key); setPage(1); }}
             className={`border px-1.5 py-0.5 text-[11px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
@@ -345,7 +345,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                   className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold uppercase tracking-widest text-fuchsia-300"
                   title="Official OTC_HUB token — mint verified against the official CA"
                 >
-                  ★ OFFICIAL OTC_HUB
+                  ★ Official OTC_HUB
                 </span>
               )}
               {/* Source-reported reward pairing: e.g. $Nasduck rewards holders
@@ -380,7 +380,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
                    className="border border-emerald-500/50 px-1 font-mono text-[11px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
                    title={`Trade $${t.symbol} here via Jupiter (route availability varies)`}>
-                  [⇄ TRADE]
+                  [⇄ Trade]
                 </button>
                 <a href={`https://dexscreener.com/solana/${encodeURIComponent(t.mint)}`} target="_blank" rel="noreferrer" title="View market on DexScreener">[DEX ↗]</a>
                 <CopyCa mint={t.mint} />
@@ -388,11 +388,11 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
             </span>
           </div>
         ))}
-        {!ranked.length && <div className="px-2 py-3 text-center text-[12px] text-green-500/50">{feed ? "NO MATCHING LAUNCHES · try another status, timeframe or search" : live.error ? "UNAVAILABLE" : "LOADING…"}</div>}
+        {!ranked.length && <div className="px-2 py-3 text-center text-[12px] uppercase text-green-500/50">{feed ? "No matching launches · try another status, timeframe or search" : live.error ? "Unavailable" : "Loading…"}</div>}
       </div>
-      <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="LAUNCHES" />
-      <div className="mt-1 text-[11px] text-green-500/50">
-        PAGE {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
+      <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="launches" />
+      <div className="mt-1 text-[11px] uppercase text-green-500/50">
+        Page {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
         statuses live-checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} active candidates
         (top 60 volume + top 60 gainers + newest 30); the rest carry archived on-chain curve checks
         (swept every 5 min) — UNKNOWN fades as each sweep covers more of the tape.
@@ -402,31 +402,31 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       {tradingDisabled && <div className="mt-1 text-[11px] text-amber-400">Token selection locked while a swap is in progress.</div>}
 
       {/* fee model + comparison */}
-      <div className="mt-2 border border-green-500/20 px-2 py-1.5 text-[11px] text-green-500/60">
+      <div className="mt-2 border border-green-500/20 px-2 py-1.5 text-[11px] uppercase text-green-500/60">
         {err && <span className="text-amber-400">Cohort snapshot unavailable. </span>}
-        FEE_SPLIT :: {(data?.feeModel || []).map((s, i) => (
+        Fee split · {(data?.feeModel || []).map((s, i) => (
           <span key={s.key} className="mr-2"><span className={`inline-block h-1.5 w-1.5 ${SPLIT_CLS[i]}`} /> {s.label} {s.pct}%</span>
         ))}
         <span className="text-green-500/40">est from 24h vol × 1% curve fee</span>
       </div>
       <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-[11px]">
         <div className="border border-emerald-500/30 p-1.5">
-          <div className="uppercase tracking-widest text-emerald-400/80">OTC LAUNCHER</div>
+          <div className="uppercase tracking-widest text-emerald-400/80">OTC launcher</div>
           <div className="mt-0.5 font-mono text-green-300">
             grad {(gradSample?.rate != null ? (gradSample.rate * 100).toFixed(1) : "—")}% · vol {fmtUsd(c?.vol24h)} · n={c?.launches ?? "—"}
           </div>
         </div>
         <div className="border border-fuchsia-500/30 p-1.5">
-          <div className="uppercase tracking-widest text-fuchsia-400/80">PUMP.FUN SAMPLE</div>
+          <div className="uppercase tracking-widest text-fuchsia-400/80">pump.fun sample</div>
           <div className="mt-0.5 font-mono text-green-300">
-            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source?.startsWith("browser") ? " ● BROWSER_SCAN" : ""}` : "— sample unavailable"}
+            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source?.startsWith("browser") ? " ● browser scan" : ""}` : "— sample unavailable"}
           </div>
         </div>
       </div>
       <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = verified GRADUATED ÷ ALL tape launches ({counts.GRADUATED ?? 0}/{counts.ALL ?? 0}) · pump.fun sample biased to active pairs</div>
-      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400/80">
-        NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN · DYOR BEFORE BUYING · HIGH VOLUME &amp; LIQUIDITY PREFERRED
-        — THIS IS THE TRENCH: YOU WIN BIG OR LOSE IT ALL
+      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] uppercase text-red-400/80">
+        Not affiliated with the token launches shown · DYOR before buying · high volume &amp; liquidity preferred
+        — this is the trench: you win big or lose it all
       </div>
     </div>
     <DialogContent id={detailId} className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto border-green-500/40 bg-black p-4 text-green-300 sm:p-6"
@@ -440,7 +440,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <DialogTitle>Token unavailable</DialogTitle>
         <DialogDescription>This token is no longer in the latest launcher feed. Close this view to continue.</DialogDescription>
       </DialogHeader>}
-      {(feed?.stale || live.error) && <p role="status" className="text-xs text-amber-300">STALE · showing the last available token snapshot.</p>}
+      {(feed?.stale || live.error) && <p role="status" className="text-xs text-amber-300">Stale · showing the last available token snapshot.</p>}
     </DialogContent>
     </Dialog>
   );

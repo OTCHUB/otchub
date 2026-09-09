@@ -91,7 +91,7 @@ export default function BootScreen({ onComplete }) {
 
   return (
     <div className="skin-stage relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
-      <TerminalTopBar label="OTC_HUB_BOOT_SEQUENCE" />
+      <TerminalTopBar label="OTC hub boot sequence" />
 
       {/* Full-screen CRT treatment: scanlines + vignette fill any viewport.
           Dark mode only — index.css (html.light .boot-crt) hides these so the
@@ -160,7 +160,7 @@ export default function BootScreen({ onComplete }) {
         </div>
       </div>
 
-      <TerminalBottomBar>COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH</TerminalBottomBar>
+      <TerminalBottomBar>Community tooling · not affiliated with otcdesks.cash</TerminalBottomBar>
     </div>
   );
 }

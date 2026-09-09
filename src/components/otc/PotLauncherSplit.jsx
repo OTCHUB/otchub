@@ -9,10 +9,10 @@ import { fmtSol } from "@/lib/format";
 // on-chain 2026-09-09: pot inflows land at ~1/min in txs bundling the
 // pump.fun claim, the pump-AMM stock buy and the 4-way split.
 const SHARES = [
-  { pct: "70%", to: "HOLDERS", tone: "text-emerald-300", note: "BUYS THE COIN'S CHOSEN STOCK · SENT PRO-RATA TO HOLDERS · NOTHING TO CLAIM" },
-  { pct: "10%", to: "DESK_POT", tone: "text-cyan-300", note: "BUYS STOCK FOR DESKS · LANDS IN THE POT EVERY MIN" },
-  { pct: "15%", to: "PROTOCOL", tone: "text-green-300", note: "PROTOCOL SHARE" },
-  { pct: "5%", to: "OTC_BUYBACK", tone: "text-amber-300", note: "COLLECTS IN A WALLET · BOUGHT BACK BY HAND, NO SCHEDULE" },
+  { pct: "70%", to: "Holders", tone: "text-emerald-300", note: "Buys the coin's chosen stock · sent pro-rata to holders · nothing to claim" },
+  { pct: "10%", to: "Desk pot", tone: "text-cyan-300", note: "Buys stock for desks · lands in the pot every min" },
+  { pct: "15%", to: "Protocol", tone: "text-green-300", note: "Protocol share" },
+  { pct: "5%", to: "OTC buyback", tone: "text-amber-300", note: "Collects in a wallet · bought back by hand, no schedule" },
 ];
 
 export default function PotLauncherSplit({ launchpadSol = 0 }) {
@@ -20,17 +20,17 @@ export default function PotLauncherSplit({ launchpadSol = 0 }) {
     <div className="border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 font-mono text-[11px]">
         <span className="font-bold uppercase tracking-widest text-emerald-400">
-          LAUNCHER_CREATOR_FEES :: CLAIMED EVERY MIN · SPLIT IN SAME TX
+          Launcher creator fees · claimed every min · split in same tx
         </span>
-        <span className="shrink-0 text-emerald-300">
-          POT_SHARE TODAY +{fmtSol(launchpadSol, 2)} SOL
+        <span className="shrink-0 uppercase text-emerald-300">
+          Pot share today +{fmtSol(launchpadSol, 2)} SOL
         </span>
       </div>
       <div className="mt-1 space-y-0.5">
         {SHARES.map((s) => (
           <div key={s.pct} className="flex min-w-0 flex-wrap items-center gap-x-2 font-mono text-[11px]">
             <span className={`w-8 shrink-0 font-bold ${s.tone}`}>{s.pct}</span>
-            <span className={`w-24 shrink-0 font-bold ${s.tone}`}>{s.to}</span>
+            <span className={`w-24 shrink-0 font-bold uppercase ${s.tone}`}>{s.to}</span>
             <span className="min-w-0 flex-1 uppercase text-green-500/60">{s.note}</span>
           </div>
         ))}

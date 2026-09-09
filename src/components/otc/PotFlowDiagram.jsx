@@ -89,35 +89,35 @@ export default function PotFlowDiagram({ latest }) {
     <div className="space-y-1.5 border border-green-500/20 px-2 py-2">
       <div className="flex flex-wrap items-center justify-between gap-1">
         <span className="font-mono text-[12px] uppercase tracking-widest text-green-500/70">
-          FLOW :: {day ? day.slice(5) : "—"} · CLOSED DAY · BAR = SOL
+          Fee flow · {day ? day.slice(5) : "—"} · closed day · bar = SOL
         </span>
-        <span className="font-mono text-[11px] text-green-500/60">
-          IN {fmtSol(inflow, 1)} · DIST {fmtSol(dist, 1)} · KEPT {fmtSol(retained, 1)}
+        <span className="font-mono text-[11px] uppercase text-green-500/60">
+          in {fmtSol(inflow, 1)} · dist {fmtSol(dist, 1)} · kept {fmtSol(retained, 1)}
         </span>
       </div>
 
       {inflow > 0 || day ? (
         <>
-          <Bar label="DESK_MINTS" value={mint} total={inflow} color={COLORS.mint} note="0.45/mint" />
-          <Bar label="ME_SALES" value={royalty} total={inflow} color={COLORS.royalty} note="5% royalty" />
-          <Bar label="CREATOR_FEES" value={launchpad} total={inflow} color={COLORS.launchpad} note="10% pot share" />
-          <Bar label="SWEEPS" value={other} total={inflow} color={COLORS.other} note="unattrib" />
+          <Bar label="Desk mints" value={mint} total={inflow} color={COLORS.mint} note="0.45/mint" />
+          <Bar label="ME sales" value={royalty} total={inflow} color={COLORS.royalty} note="5% royalty" />
+          <Bar label="Creator fees" value={launchpad} total={inflow} color={COLORS.launchpad} note="10% pot share" />
+          <Bar label="Sweeps" value={other} total={inflow} color={COLORS.other} note="unattrib" />
 
-          <Arrow label="IN" value={inflow} />
+          <Arrow label="in" value={inflow} />
 
           <div className="mx-auto max-w-[200px] border-2 border-emerald-400 bg-emerald-400/10 px-3 py-1 text-center">
             <div className="font-mono text-[13px] font-bold uppercase tracking-widest text-emerald-300">POT</div>
             <div className="font-mono text-[11px] text-green-500/70">{fmtSol(latest?.pot_sol_balance ?? null, 1)} SOL</div>
           </div>
 
-          <Arrow label="OUT" />
-          <Bar label="DESK_HOLDERS" value={dist} total={inflow} color={COLORS.dist}
+          <Arrow label="out" />
+          <Bar label="Desk holders" value={dist} total={inflow} color={COLORS.dist}
             note={perDesk != null ? `${fmtSol(perDesk, 3)}/desk` : null} />
-          <Bar label="RETAINED" value={retained} total={inflow} color={COLORS.retained} note="in pot" />
+          <Bar label="Retained" value={retained} total={inflow} color={COLORS.retained} note="in pot" />
         </>
       ) : (
-        <div className="py-3 text-center font-mono text-[12px] text-green-500/50">
-          NO FLOW DATA FOR THE LAST CLOSED DAY
+        <div className="py-3 text-center font-mono text-[12px] uppercase text-green-500/50">
+          No flow data for the last closed day
         </div>
       )}
 
@@ -126,22 +126,22 @@ export default function PotFlowDiagram({ latest }) {
         <div className="space-y-1 border border-fuchsia-500/30 bg-fuchsia-500/5 px-2 py-1.5">
           <div className="flex flex-wrap items-center justify-between gap-1">
             <span className="font-mono text-[12px] uppercase tracking-widest text-fuchsia-300/80">
-              REWARD_SPLIT :: WHO GETS ENRICHED
+              Reward split · who gets enriched
             </span>
-            <span className="font-mono text-[11px] text-green-500/60">
-              {fmtSol(totalDist, 0)} SOL DISTRIBUTED · {launcherPct}/{100 - launcherPct} SPLIT
+            <span className="font-mono text-[11px] uppercase text-green-500/60">
+              {fmtSol(totalDist, 0)} SOL distributed · {launcherPct}/{100 - launcherPct} split
             </span>
           </div>
-          <Bar label="LAUNCH_HOLDERS" value={launcherSol} total={totalDist} color="#e879f9"
+          <Bar label="Launch holders" value={launcherSol} total={totalDist} color="#e879f9"
             note={launcherPct != null ? `${launcherPct}%` : null} />
-          <Bar label="DESK_HOLDERS" value={deskLedgerSol} total={totalDist} color="#4ade80"
+          <Bar label="Desk holders" value={deskLedgerSol} total={totalDist} color="#4ade80"
             note={`${100 - launcherPct}%`} />
-          <div className="font-mono text-[10px] text-green-500/50">
-            LAUNCH_BASKETS: GPRO · PUMP · QQQx · SPYx · TTWO · HOODx … → LAUNCHER-COIN HOLDERS · DESKS: 13-STOCK ROTATION · LEDGER: otcdesks.cash
+          <div className="font-mono text-[10px] uppercase text-green-500/50">
+            Launch baskets: GPRO · PUMP · QQQx · SPYx · TTWO · HOODx … → launcher-coin holders · Desks: 13-stock rotation · Ledger: otcdesks.cash
           </div>
-          <div className="font-mono text-[11px] text-fuchsia-300/90">
-            ✦ LAUNCH HOLDERS OUT-EARN DESKS ≈{(deskLedgerSol > 0 ? (launcherSol / deskLedgerSol).toFixed(1) : "—")}:1
-            — LAUNCHPAD FEES ENRICH LAUNCHERS &amp; HOLDERS FIRST
+          <div className="font-mono text-[11px] uppercase text-fuchsia-300/90">
+            ✦ Launch holders out-earn desks ≈{(deskLedgerSol > 0 ? (launcherSol / deskLedgerSol).toFixed(1) : "—")}:1
+            — launchpad fees enrich launchers &amp; holders first
           </div>
         </div>
       )}

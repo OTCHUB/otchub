@@ -16,7 +16,7 @@ const Chip = ({ tone, children }) => {
       : tone === "amber"
         ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
         : "border-emerald-500/50 bg-emerald-500/10 text-emerald-300";
-  return <span className={`shrink-0 border px-1 font-mono text-[11px] ${cls}`}>{children}</span>;
+  return <span className={`shrink-0 border px-1 font-mono text-[11px] uppercase ${cls}`}>{children}</span>;
 };
 
 export default function PotWatchStrip() {
@@ -51,15 +51,15 @@ export default function PotWatchStrip() {
       {/* desk owing — the pivotal obligation, always first */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-mono text-[12px] font-bold uppercase tracking-widest text-green-300">
-          DESKS OWED :: {fmtSol(owed, 2)}
+          Desks owed · {fmtSol(owed, 2)}
         </span>
-        {c.covered === true && <Chip tone="green">POT COVERS OWED</Chip>}
-        {c.covered === false && <Chip tone="red">SHORTFALL −{fmtSol(c.shortfall_sol, 2)}</Chip>}
+        {c.covered === true && <Chip tone="green">Pot covers owed</Chip>}
+        {c.covered === false && <Chip tone="red">Shortfall −{fmtSol(c.shortfall_sol, 2)}</Chip>}
         {watch?.desks != null && (
-          <span className="font-mono text-[11px] text-green-500/50">{watch.desks} DESKS</span>
+          <span className="font-mono text-[11px] uppercase text-green-500/50">{watch.desks} desks</span>
         )}
-        <span className="ml-auto shrink-0 font-mono text-[11px] text-green-500/60">
-          POT {fmtSol(potSol, 2)}
+        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase text-green-500/60">
+          Pot {fmtSol(potSol, 2)}
           {watch?.at ? ` · checked ${timeAgo(new Date(watch.at).toISOString())}` : ""}
         </span>
       </div>
@@ -81,10 +81,10 @@ export default function PotWatchStrip() {
 
       {/* config watch — catches any on-chain fee-config change */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
-        <span className="uppercase tracking-widest text-green-500/50">CONFIG_WATCH</span>
-        {watch == null && <span className="text-green-500/40">{err ? "OFFLINE" : "…"}</span>}
+        <span className="uppercase tracking-widest text-green-500/50">Config watch</span>
+        {watch == null && <span className="text-green-500/40">{err ? "offline" : "…"}</span>}
         {watch?.config?.changed ? (
-          <Chip tone="red">⚠ CONFIG CHANGED — ROUTE MAP STALE — RE-VERIFY</Chip>
+          <Chip tone="red">⚠ Config changed — route map stale — re-verify</Chip>
         ) : watch?.config?.hash ? (
           <span className="text-green-500/50">
             fp:{watch.config.hash.slice(0, 8)} · unchanged since{" "}
@@ -105,17 +105,17 @@ export default function PotWatchStrip() {
 
       {/* live pot inflow */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
-        <span className="uppercase tracking-widest text-green-500/50">POT_LAST_INFLOW</span>
+        <span className="uppercase tracking-widest text-green-500/50">Pot last inflow</span>
         {inflow ? (
           <>
             <span className="text-emerald-300">+{fmtSol(inflow.sol, 3)}</span>
             <span className="text-green-500/50">{timeAgo(new Date(inflow.at).toISOString())}</span>
             {c.pot_live === false && (
-              <Chip tone="red">NO FRESH INFLOW &gt; {watch.pot_activity.window_h}H</Chip>
+              <Chip tone="red">No fresh inflow &gt; {watch.pot_activity.window_h}h</Chip>
             )}
           </>
         ) : watch ? (
-          <Chip tone="red">NO INFLOW IN RECENT TX SAMPLE</Chip>
+          <Chip tone="red">No inflow in recent tx sample</Chip>
         ) : null}
         {!!watch?.pot_activity?.inflow_window_sol && (
           <span className="text-green-500/40">
@@ -125,7 +125,7 @@ export default function PotWatchStrip() {
         )}
       </div>
 
-      {err && <div className="font-mono text-[11px] text-amber-400">WATCH_ERR: {err}</div>}
+      {err && <div className="font-mono text-[11px] text-amber-400">Watch err: {err}</div>}
     </div>
   );
 }

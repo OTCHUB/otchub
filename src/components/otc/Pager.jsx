@@ -2,10 +2,10 @@ import React from "react";
 
 // Shared pager for paged panels (gallery, distribution tables): large datasets
 // page inside their allocated panel space instead of stretching the layout.
-export default function Pager({ page, pages, onPage, total, label = "ROWS" }) {
+export default function Pager({ page, pages, onPage, total, label = "rows" }) {
   if (pages <= 1) {
     return (
-      <div className="mt-2 text-center font-mono text-[11px] text-green-500/40">
+      <div className="mt-2 text-center font-mono text-[11px] uppercase text-green-500/40">
         {total} {label}
       </div>
     );
@@ -15,13 +15,13 @@ export default function Pager({ page, pages, onPage, total, label = "ROWS" }) {
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-2 font-mono text-[12px]">
       <button className={btn} disabled={page === 0} onClick={() => onPage(page - 1)}>
-        [◀ PREV]
+        [◀ Prev]
       </button>
-      <span className="text-green-500/60">
-        PAGE {page + 1}/{pages} · {total} {label}
+      <span className="uppercase text-green-500/60">
+        Page {page + 1}/{pages} · {total} {label}
       </span>
       <button className={btn} disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>
-        [NEXT ▶]
+        [Next ▶]
       </button>
     </div>
   );

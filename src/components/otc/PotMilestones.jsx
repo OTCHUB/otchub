@@ -17,10 +17,10 @@ const DEAD_VAULTS = [
 ];
 
 const SEGMENTS = [
-  ["mint", "MINT_SURCHARGE"],
-  ["royalty", "ME_ROYALTY"],
-  ["launchpad", "CREATOR_FEES"],
-  ["other", "UNATTRIB"],
+  ["mint", "Mint surcharge"],
+  ["royalty", "ME royalty"],
+  ["launchpad", "Creator fees"],
+  ["other", "Unattrib"],
 ];
 
 const d = (day) => (day ? day.slice(5) : "—");
@@ -77,48 +77,48 @@ export default function PotMilestones({ latest }) {
       {/* milestones timeline */}
       <div className="border border-green-500/20 px-2 py-1.5">
         <div className="text-[12px] uppercase tracking-widest text-green-500/70">
-          MILESTONES :: ROUTING_TIMELINE{since ? ` · tracked since ${d(since)}` : ""}
+          Milestones · routing timeline{since ? ` · tracked since ${d(since)}` : ""}
         </div>
         <div className="mt-1 space-y-0.5">
           {online.map((m) => (
             <Row key={m.key}>
               {m.day
-                ? `${d(m.day)} · ${m.label} ONLINE (first +${fmtSol(m.sol, 2)}/day)`
-                : `${m.label} :: NOT_YET_SEEN on the pot`}
+                ? `${d(m.day)} · ${m.label} online (first +${fmtSol(m.sol, 2)}/day)`
+                : `${m.label} · not yet seen on the pot`}
             </Row>
           ))}
-          <Row>{`${d(peak.day)} · CREATOR_FEES PEAK ${fmtSol(peak.val, 1)}/day`}</Row>
+          <Row>{`${d(peak.day)} · Creator fees peak ${fmtSol(peak.val, 1)}/day`}</Row>
           {cliff ? (
             <Row tone="text-red-400">
-              {`${d(cliff.day)} · ROUTING CLIFF −${cliff.pct}% (${fmtSol(cliff.prev, 1)} → ${fmtSol(cliff.cur, 1)} SOL/day)`}
+              {`${d(cliff.day)} · Routing cliff −${cliff.pct}% (${fmtSol(cliff.prev, 1)} → ${fmtSol(cliff.cur, 1)} SOL/day)`}
             </Row>
           ) : null}
           {deskNow ? (
             <Row tone="text-red-400">
-              {`${d(deskNow.day)} · DESK TAKE ${fmtSol(deskNow.per_desk_sol, 3)}/desk${
+              {`${d(deskNow.day)} · Desk take ${fmtSol(deskNow.per_desk_sol, 3)}/desk${
                 deskPct != null ? ` (−${deskPct}% vs peak ${d(deskPeak?.day)})` : ""
               }`}
             </Row>
           ) : null}
-          <Row tone="text-emerald-400/80">{`${d(lastEntry?.[0])} · LATEST ${fmtSol(lastVal, 1)} SOL/day creator fees reaching the pot`}</Row>
+          <Row tone="text-emerald-400/80">{`${d(lastEntry?.[0])} · Latest ${fmtSol(lastVal, 1)} SOL/day creator fees reaching the pot`}</Row>
         </div>
       </div>
 
       {/* verified on-chain fee config */}
       <div className="border border-green-500/20 px-2 py-1.5">
         <div className="text-[12px] uppercase tracking-widest text-green-500/70">
-          CONFIG :: FEE ROUTING (VERIFIED ON-CHAIN 2026-09-06)
+          Config · fee routing (verified on-chain 2026-09-06)
         </div>
         <div className="mt-1 space-y-0.5">
           <Row>
-            OTC_CONFIG{" "}
+            OTC config{" "}
             <a href={scan(CONFIG_ACCOUNT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {short(CONFIG_ACCOUNT)} ↗
             </a>{" "}
             · owned by the OTC program · no fee-vault routing entry found
           </Row>
           <Row tone="text-amber-300/90">
-            PUMP_VAULT{" "}
+            Pump vault{" "}
             <a href={scan(PUMP_GLOBAL_VAULT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {short(PUMP_GLOBAL_VAULT)} ↗
             </a>{" "}
@@ -126,7 +126,7 @@ export default function PotMilestones({ latest }) {
           </Row>
           {DEAD_VAULTS.map((v) => (
             <Row key={v.key} tone="text-amber-300/70">
-              OLD_VAULT{" "}
+              Old vault{" "}
               <a href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
                 {short(v.key)} ↗
               </a>{" "}
@@ -134,18 +134,18 @@ export default function PotMilestones({ latest }) {
             </Row>
           ))}
           <Row>
-            $OTC_POOL{" "}
+            $OTC pool{" "}
             <a href={scan(OTC_POOL)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {short(OTC_POOL)} ↗
             </a>{" "}
             · POT not referenced in the pool account
           </Row>
           <Row>
-            PROTOCOL_WALLET{" "}
+            Protocol wallet{" "}
             <a href={scan(PROTOCOL_WALLET)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {short(PROTOCOL_WALLET)} ↗
             </a>{" "}
-            · POT{" "}
+            · Pot{" "}
             <a href={scan(POT)} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {short(POT)} ↗
             </a>{" "}
@@ -156,7 +156,7 @@ export default function PotMilestones({ latest }) {
 
       {/* the desk-owner ask */}
       <div className="border border-red-500/40 bg-red-500/5 px-2 py-1.5">
-        <div className="text-[12px] uppercase tracking-widest text-red-400">ASK_THE_DEV :: THE DESK-OWNER CASE</div>
+        <div className="text-[12px] uppercase tracking-widest text-red-400">Ask the dev · the desk-owner case</div>
         <ul className="mt-1 list-inside list-decimal space-y-0.5 font-mono text-[11px] text-red-400/90 marker:text-red-400/60">
           <li>
             Which config change on {cliff ? d(cliff.day) : "the cliff date"} cut creator-fee inflow to the pot

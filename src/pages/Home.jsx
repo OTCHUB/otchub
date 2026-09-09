@@ -206,20 +206,20 @@ export default function Home() {
 
   return (
     <div className="skin-stage min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
-      <TerminalTopBar label="OTC_HUB_TERMINAL" />
+      <TerminalTopBar label="OTC hub terminal" />
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
         <header className="term-window border border-green-500/30 bg-black p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base">
-                &gt; OTC_HUB :: OTC_DESK TOOLS
+                &gt; OTC hub · OTC desk tools
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
-              <p className="text-[12px] text-green-500/50">
-                LAST_UPDATE {timeAgo(latest?.updated_date || latest?.created_date)}
+              <p className="text-[12px] uppercase text-green-500/50">
+                Last update {timeAgo(latest?.updated_date || latest?.created_date)}
                 {live ? " · " : ""}{live && <span className="text-emerald-400">● LIVE</span>}
-                {" · "}{data?.snapshot_count || 0} SNAPSHOTS
+                {" · "}{data?.snapshot_count || 0} snapshots
               </p>
             </div>
             {/* actions row: wraps + shrinks on narrow screens so the header
@@ -230,10 +230,10 @@ export default function Home() {
                 href="https://otcdesks.cash"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
+                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] uppercase text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
                 title="Official otcdesks.cash protocol app"
               >
-                [OTC_APP ↗]
+                [OTC app ↗]
               </a>
               <a
                 href="https://fomo.otchub.dev"
@@ -258,7 +258,7 @@ export default function Home() {
           </div>
           {error && (
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[13px] text-amber-400">
-              ERR: {error}
+            Error · {error}
             </div>
           )}
           {/* Official $HUB CA banner — hidden until the real mint is set */}
@@ -267,7 +267,7 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
-          <CollapsibleCard title="WALLET" id="otc-wallet" openSignal={walletOpenSignal}>
+          <CollapsibleCard title="Wallet" id="otc-wallet" openSignal={walletOpenSignal}>
             {wallet ? (
               <WalletPortfolio
                 address={wallet}
@@ -287,7 +287,7 @@ export default function Home() {
             under the wallet panel so a connected wallet can swap right away */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2" id="otc-swap">
-            <CollapsibleCard title={selectedToken ? `TRADE :: $${selectedToken.symbol || "TOKEN"}` : "TRADE :: $OTC TOKEN"}
+            <CollapsibleCard title={selectedToken ? `Trade · $${selectedToken.symbol || "token"}` : "Trade · $OTC token"}
               openSignal={swapOpenSignal} locked={swapBusy}>
               <JupiterSwapPanel
                 wallet={wallet}
@@ -303,7 +303,7 @@ export default function Home() {
               />
             </CollapsibleCard>
           </div>
-          <CollapsibleCard title="TRADE :: NFT DESKS">
+          <CollapsibleCard title="Trade · NFT desks">
             <NftTradeCard />
           </CollapsibleCard>
         </div>
@@ -314,18 +314,18 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
           <div className="h-full lg:col-span-2">
-            <CollapsibleCard title="ARBITRAGE" id="otc-arbitrage">
+            <CollapsibleCard title="Arbitrage" id="otc-arbitrage">
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>
           </div>
-          <CollapsibleCard title="PROTOCOL">
+          <CollapsibleCard title="Protocol">
             <ProtocolPanel latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Live launch rankings select a mint in the shared SOL swap panel. */}
         <div className="mt-3">
-          <CollapsibleCard title="OTC_ANALYTICS" id="otc-analytics" right={null} openSignal={0}>
+          <CollapsibleCard title="OTC analytics" id="otc-analytics" right={null} openSignal={0}>
             <LauncherAnalytics onTrade={tradeLauncher} selectedMint={selectedToken?.mint}
               tradingDisabled={swapBusy} onSnapshot={updateLauncherSnapshot} />
           </CollapsibleCard>
@@ -334,13 +334,13 @@ export default function Home() {
         {/* Supply vs desks minted + live terminal filler (desktop) */}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <CollapsibleCard title="SUPPLY vs DESKS">
+            <CollapsibleCard title="Supply vs desks">
               <SupplyChart history={data?.history} latest={latest} />
             </CollapsibleCard>
           </div>
           <div className="term-window hidden border border-green-500/30 bg-black lg:flex lg:flex-col">
             <div className="flex items-center justify-between border-b border-green-500/20 px-3 py-2 text-[12px] uppercase tracking-widest text-green-500/70">
-              <span>TERMINAL :: CHAIN_FEED</span>
+              <span>Terminal · chain feed</span>
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                 LIVE
@@ -354,7 +354,7 @@ export default function Home() {
 
         {/* Listings: secondary-market desk inventory feeding the swap above */}
         <div className="mt-3">
-          <CollapsibleCard title="LISTINGS :: NFT HOLDINGS" id="otc-listings">
+          <CollapsibleCard title="Listings · NFT holdings" id="otc-listings">
             <ListingsDepthChart holdings={data?.holdings} />
             <div className="mt-3">
               <HoldingsGallery holdings={data?.holdings} byStock={latest?.by_stock?.items} floorSol={latest?.nft_floor_sol} />
@@ -364,73 +364,73 @@ export default function Home() {
 
         {/* Pot fee routing map: live source → vault → pot → desks flow */}
         <div className="mt-3">
-          <CollapsibleCard title="POT_ROUTING :: LIVE FEE_FLOW">
+          <CollapsibleCard title="Pot routing · live fee flow">
             <PotRoutingPanel latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Charts */}
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="ARBITRAGE TREND">
+          <CollapsibleCard title="Arbitrage trend">
             <ArbitrageChart history={data?.history} />
           </CollapsibleCard>
-          <CollapsibleCard title="EARNINGS">
+          <CollapsibleCard title="Earnings">
             <EarningsChart latest={latest} history={data?.history} />
           </CollapsibleCard>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="ROUNDS">
+          <CollapsibleCard title="Rounds">
             <RoundsChart latest={latest} />
           </CollapsibleCard>
-          <CollapsibleCard title="BUYBACKS">
+          <CollapsibleCard title="Buybacks">
             <BuybacksPanel latest={latest} />
           </CollapsibleCard>
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="PER_DESK_EARN">
+          <CollapsibleCard title="Per-desk earn">
             <PerDeskTrendChart latest={latest} />
           </CollapsibleCard>
-          <CollapsibleCard title="BY_STOCK">
+          <CollapsibleCard title="By stock">
             <ByStockChart latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Desk pot revenue by source (stacked) */}
         <div className="mt-3">
-          <CollapsibleCard title="POT_REVENUE :: DESK SOURCES">
+          <CollapsibleCard title="Pot revenue · desk sources">
             <PotSourcesChart latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* Tables */}
         <div className="mt-3">
-          <CollapsibleCard title="DESKS :: DISTRIBUTION">
+          <CollapsibleCard title="Desks · distribution">
             <DesksTables latest={latest} />
           </CollapsibleCard>
         </div>
 
         {/* On-chain map: every contract/account/mint/source the app is built on */}
         <div className="mt-3">
-          <CollapsibleCard title="CONTRACTS :: MAP & AGENT_CONNECT" defaultOpen={false}>
+          <CollapsibleCard title="Contracts · map & agent connect" defaultOpen={false}>
             <ContractsPanel />
           </CollapsibleCard>
         </div>
 
         {/* Keeper: housekeeping panel — automated distribute crank details, kept last */}
         <div className="mt-3">
-          <CollapsibleCard title="KEEPER :: AUTO_DISTRIBUTE" defaultOpen={false}>
+          <CollapsibleCard title="Keeper · auto-distribute" defaultOpen={false}>
             <KeeperPanel />
           </CollapsibleCard>
         </div>
 
-        <footer className="mt-4 space-y-1 text-center text-[12px] text-green-500/30">
-          <div>OTC_HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTCDESKS.CASH</div>
-          <div>DATA: HELIUS / DEXSCREENER / MAGIC_EDEN / OTCDESKS.CASH · OFFICIAL APP: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
+        <footer className="mt-4 space-y-1 text-center text-[12px] uppercase text-green-500/30">
+          <div>OTC_HUB · community tooling · not affiliated with otcdesks.cash</div>
+          <div>Data: Helius / DexScreener / Magic Eden / otcdesks.cash · official app: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
         </footer>
       </div>
-      <TerminalBottomBar>COMMUNITY_TOOLING :: NOT AFFILIATED WITH OTCDESKS.CASH</TerminalBottomBar>
+      <TerminalBottomBar>Community tooling · not affiliated with otcdesks.cash</TerminalBottomBar>
     </div>
   );
 }

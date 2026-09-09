@@ -75,7 +75,7 @@ export default function PotRoutingPanel({ latest }) {
       {/* one-line header */}
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-[12px] uppercase tracking-widest text-green-500/70">
-          POT_ROUTING :: {dayLbl ?? "—"} · IN +{fmtSol(inflow, 2)} SOL
+          Pot routing · {dayLbl ?? "—"} · in +{fmtSol(inflow, 2)} SOL
         </span>
         <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-emerald-400">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -90,17 +90,17 @@ export default function PotRoutingPanel({ latest }) {
       <PotFlowDiagram latest={latest} />
 
       {/* live routes — one line each */}
-      <RouteRow mark="✓" markCls="text-emerald-400" label="DESK_MINTS · MINT_SURCHARGE"
+      <RouteRow mark="✓" markCls="text-emerald-400" label="Desk mints · mint surcharge"
         value={`+${fmtSol(last.mint, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
-      <RouteRow mark="✓" markCls="text-emerald-400" label="ME_SALES · 5% ROYALTY"
+      <RouteRow mark="✓" markCls="text-emerald-400" label="ME sales · 5% royalty"
         value={`+${fmtSol(last.royalty, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
-      <RouteRow mark="✓" markCls="text-emerald-400" label="LAUNCHER_CREATOR_FEES · 10% POT_SHARE"
+      <RouteRow mark="✓" markCls="text-emerald-400" label="Launcher creator fees · 10% pot share"
         value={`+${fmtSol(launchToday, 2)}`} valueCls="text-emerald-300" href={potTxs()} />
-      <RouteRow mark="△" markCls="text-amber-300" label="SWEEPS · UNATTRIB"
+      <RouteRow mark="△" markCls="text-amber-300" label="Sweeps · unattrib"
         value={`+${fmtSol(last.other, 2)}`} valueCls="text-amber-300" href={potTxs()} />
-      <RouteRow mark="▶" markCls="text-emerald-400" label="POT → DESK_HOLDERS · AUTO_DISTRIBUTE"
+      <RouteRow mark="▶" markCls="text-emerald-400" label="Pot → desk holders · auto-distribute"
         note={`${latest?.desks_minted ?? "—"} desks`} valueCls="text-emerald-300"
-        value={lastClosed?.per_desk_sol != null ? `${fmtSol(lastClosed.per_desk_sol, 3)}/DESK` : "—"}
+        value={lastClosed?.per_desk_sol != null ? `${fmtSol(lastClosed.per_desk_sol, 3)}/desk` : "—"}
         href={scan(OTC_PROGRAM)} />
 
       {/* launcher creator-fee split — 70/10/15/5 inside the per-minute claim tx */}
@@ -110,17 +110,17 @@ export default function PotRoutingPanel({ latest }) {
       <PotPumpTrace />
 
       {/* everything else collapsed */}
-      <Detail label="[+] EVIDENCE">
+      <Detail label="[+] Evidence">
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-green-500/60">
           {[
-            ["PGM:OTC_MINT/DISTRIBUTE", scan(OTC_PROGRAM)],
-            ["PGM:PUMP_FUN", scan(PUMPFUN_PROGRAM)],
-            ["PGM:PUMP_AMM", scan(PUMPAMM_PROGRAM)],
-            ["PGM:ME_V1", scan(ME_V1_PROGRAM)],
-            ["PGM:ME_V2", scan(ME_V2_PROGRAM)],
-            ["POOL:$OTC_SWAP", scan(OTC_POOL)],
-            ["TXS:POT_TRANSFERS", potTxs()],
-            ["OFFICIAL FEE_MAP", "https://otcdesks.cash/analytics"],
+            ["PGM · OTC mint/distribute", scan(OTC_PROGRAM)],
+            ["PGM · pump.fun", scan(PUMPFUN_PROGRAM)],
+            ["PGM · pump AMM", scan(PUMPAMM_PROGRAM)],
+            ["PGM · ME v1", scan(ME_V1_PROGRAM)],
+            ["PGM · ME v2", scan(ME_V2_PROGRAM)],
+            ["Pool · $OTC swap", scan(OTC_POOL)],
+            ["Txs · pot transfers", potTxs()],
+            ["Official fee map", "https://otcdesks.cash/analytics"],
           ].map(([label, url]) => (
             <a key={label} href={url} target="_blank" rel="noopener noreferrer" className="text-cyan-300/80 underline hover:text-cyan-300">
               {label} ↗
@@ -128,7 +128,7 @@ export default function PotRoutingPanel({ latest }) {
           ))}
           {DEAD_VAULTS.map((v) => (
             <a key={v.key} href={scan(v.key)} target="_blank" rel="noopener noreferrer" className="text-amber-300/80 underline hover:text-amber-300">
-              OLD_VAULT:{v.src} {short(v.key)} ↗
+              Old vault · {v.src} {short(v.key)} ↗
             </a>
           ))}
         </div>
@@ -143,7 +143,7 @@ export default function PotRoutingPanel({ latest }) {
           were never the real route. Community tooling — verify on Solscan before drawing conclusions.
         </p>
       </Detail>
-      <Detail label="[+] HISTORY & CONFIG">
+      <Detail label="[+] History & config">
         <PotMilestones latest={latest} />
       </Detail>
     </div>
