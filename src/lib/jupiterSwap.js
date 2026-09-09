@@ -231,9 +231,12 @@ export async function executeSwap(base64Tx, signTransactionRaw, onLog, userPubli
   // intent, two transactions. In those environments skip signTransaction
   // entirely: the wallet signs AND sends in a single approval and returns the
   // real signature, so there is no second broadcast path at all.
+  // Mobile-only: desktop wallets (including desktop Phantom) have a working
+  // signTransaction, and keeping their broadcast on our Helius relay preserves
+  // the re-broadcast-unstick path for pending txs on congestion.
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const preferWalletSend =
-    !!signAndSendRaw && (/Phantom/i.test(ua) || /Android|iPhone|iPad|iPod/i.test(ua));
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  const preferWalletSend = !!signAndSendRaw && isMobile;
   if (preferWalletSend) {
     if (!shouldContinue()) return aborted();
     if (!shouldBroadcast()) {
