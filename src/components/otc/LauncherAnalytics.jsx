@@ -7,6 +7,7 @@ import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
 import { fetchLauncherAnalyticsMirror } from "@/lib/launcherFeed";
 import { isOfficialHubMint } from "@/lib/hubMint";
+import { useDexQuotes } from "@/lib/useDexQuotes";
 import Pager from "@/components/otc/Pager";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -201,6 +202,26 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const counts = feed?.statusCounts ?? EMPTY_COUNTS;
   const pageCount = feed?.pageCount ?? 1;
   const matches = feed?.matches ?? 0;
+  // LIVE DEX QUOTES (browser): the upstream market snapshots lag minutes
+  // behind DexScreener and the shared runtime egress IP is 429'd by it, so
+  // the visitor's browser re-quotes the visible page's mcap/vol/liquidity/
+  // 24h change every ~15s; merged over the served rows at render time.
+  const { quotes: dexQuotes, at: dexAt } = useDexQuotes(
+    ranked.slice(0, 30).map((t) => t.mint)
+  );
+  const withDexQuote = (t) => {
+    const q = dexQuotes[t.mint];
+    if (!q) return t;
+    return {
+      ...t,
+      mcap: q.mcap ?? t.mcap,
+      vol24: q.vol24 ?? t.vol24,
+      liquidity: q.liquidity ?? t.liquidity,
+      change24h: q.change24h ?? t.change24h,
+      dexLive: true,
+    };
+  };
+  const tape = ranked.map(withDexQuote);
   // The server clamps pages past the end when filters shrink the result set.
   // Sync ONLY when a new feed arrives: listing `page` as a dependency made the
   // effect run against the stale feed right after NEXT/PREV clicked, instantly
@@ -219,7 +240,8 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     if (pendingGraduation.length) confirmPendingGraduations(pendingGraduation);
   }, [pendingGraduation]);
   // Keep the modal attached to a mint, not a stale row or current ranking/filter.
-  const detailToken = (feed?.ranked || []).find((row) => row.mint === detailMint);
+  const detailTokenRaw = (feed?.ranked || []).find((row) => row.mint === detailMint);
+  const detailToken = detailTokenRaw ? withDexQuote(detailTokenRaw) : null;
 
   // Blink + flip: when a fresh poll reorders the tape, moved rows flash once
   // (green slide up / red slide down). Movement is measured on the visible
@@ -257,7 +279,12 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       </div>
 
       {live.error && <div role="status" className="mt-2 text-[12px] text-amber-400">{live.error}</div>}
-      {feed?.at && <div className="mt-1 text-[11px] text-green-500/50">Feed fetched {new Date(feed.at).toLocaleTimeString()} · source snapshots may lag</div>}
+      {feed?.at && (
+        <div className="mt-1 text-[11px] text-green-500/50">
+          Feed fetched {new Date(feed.at).toLocaleTimeString()} · source snapshots may lag
+          {dexAt && <span className="text-emerald-400"> · DEX quotes live {new Date(dexAt).toLocaleTimeString()}</span>}
+        </div>
+      )}
 
       {/* cohort KPIs */}
       <div className="mt-2 grid grid-cols-2 gap-1.5 text-center sm:grid-cols-4">
@@ -305,7 +332,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       {/* launch feed */}
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-80 lg:max-h-none">
-        {ranked.map((t, i) => (
+        {tape.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
             className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 hover:border-green-500/40 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
             {/* line 1 — identity: rank, logo, symbol, status, age */}
@@ -339,6 +366,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                   {momentum(t.change24h)}
                 </span>
               )}
+              {t.dexLive && <span className="text-emerald-400" title="Live DexScreener quote (browser, ~15s)">●</span>}
               <span>mc {fmtUsd(t.mcap)}</span>
               <span>vol {fmtUsd(t.vol24)}</span>
             </span>
