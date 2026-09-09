@@ -61,13 +61,19 @@ export async function getQuote(inputMint, outputMint, amountRaw, slippageBps = 1
   const amount = checkPair(inputMint, outputMint, amountRaw, slippageBps);
   // Routed through the jupiterSwapRelay backend function — the browser never
   // calls Jupiter directly (CORS / rate limits broke browser-side swaps).
-  const res = await base44.functions.invoke("jupiterSwapRelay", {
-    mode: "quote",
-    inputMint,
-    outputMint,
-    amount,
-    slippageBps,
-  });
+  let res;
+  try {
+    res = await base44.functions.invoke("jupiterSwapRelay", {
+      mode: "quote",
+      inputMint,
+      outputMint,
+      amount,
+      slippageBps,
+    });
+  } catch (e) {
+    // Surface the relay's failure reason (host-by-host), not a bare "502".
+    throw new Error(e?.response?.data?.error || e.message);
+  }
   const data = res?.data || {};
   if (data.error) throw new Error(data.error);
   return validateQuote(data.quote, inputMint, outputMint, amount, slippageBps);
@@ -155,11 +161,17 @@ export async function getSwapTx(quoteResponse, userPublicKey) {
   if (new PublicKey(userPublicKey).toBase58() !== userPublicKey) throw new Error("Invalid wallet address");
   // Swap tx built server-side by the jupiterSwapRelay function (Jupiter
   // aggregator); only the serialized tx bytes come back for local signing.
-  const res = await base44.functions.invoke("jupiterSwapRelay", {
-    mode: "swap",
-    quoteResponse,
-    userPublicKey,
-  });
+  let res;
+  try {
+    res = await base44.functions.invoke("jupiterSwapRelay", {
+      mode: "swap",
+      quoteResponse,
+      userPublicKey,
+    });
+  } catch (e) {
+    // Surface the relay's failure reason (host-by-host), not a bare "502".
+    throw new Error(e?.response?.data?.error || e.message);
+  }
   const data = res?.data || {};
   if (data.error) throw new Error(data.error);
   if (typeof data.swap?.swapTransaction !== "string" || !data.swap.swapTransaction.length) throw new Error("Swap build returned no transaction");

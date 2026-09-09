@@ -4,36 +4,38 @@
 // still signs locally; only quote/build requests and the already-signed
 // bytes are relayed.
 //
-// JUP_API_KEY (developers.jup.ag): when configured, requests go through the
-// KEYED api.jup.ag endpoints — a dedicated per-organisation quota (free
-// tier 1 rps / 60 rpm) instead of the keyless lite-api bucket shared with
-// every workload on this runtime's egress IP. A rejected key (401/403) or a
-// keyed network failure falls back to the keyless lite-api endpoints, so a
-// missing/bad key never breaks swaps.
+// Jupiter serves THREE independent hosts, and any one of them can have an
+// outage window (observed 503 "upstream connect error / remote connection
+// failure" bursts from api.jup.ag lasting minutes). Requests try the hosts in
+// order — KEYED api.jup.ag (per-organisation quota via JUP_API_KEY, free tier
+// 1 rps / 60 rpm), then the keyless lite-api bucket, then the legacy v6 host
+// — and a failing host falls through to the next instead of failing the
+// user's trade. A missing/bad key (401/403) or a payload that does not match
+// the expected shape also falls through, so swaps keep working through any
+// single-host degradation.
 const KEYED_BASE = "https://api.jup.ag/swap/v1";
 const LITE_BASE = "https://lite-api.jup.ag/swap/v1";
+const LEGACY_BASE = "https://quote-api.jup.ag/v6";
 const JUP_API_KEY = process.env.JUP_API_KEY || "";
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-// Jupiter's lite API intermittently 429s (rate limit) or throws (timeouts /
-// connection resets) — a single attempt surfaced as user-facing quote/swap
-// failures. Retry transient failures a few times with backoff; only give up
-// after the retries are exhausted.
-const fetchJup = async (url, opts = {}, attempts = 3) => {
+// Retry transient failures (429 / 5xx / network resets) a few times with
+// backoff on the SAME host before declaring that host dead.
+const fetchJup = async (url, opts = {}, attempts = 2) => {
   let lastErr = null;
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(12000) });
+      const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(8000) });
       if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
-        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
         continue;
       }
       return res;
     } catch (e) {
       lastErr = e;
       if (i < attempts - 1) {
-        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
         continue;
       }
     }
@@ -41,21 +43,41 @@ const fetchJup = async (url, opts = {}, attempts = 3) => {
   throw lastErr || new Error("Jupiter request failed");
 };
 
-// Keyed-first request with keyless fallback. Returns { res, auth } so callers
-// can surface which tier served the request; falls back only when the keyed
-// path rejects the key (401/403) or fails at the network level.
-const requestJup = async (path, opts = {}) => {
+// Host-ordered request with fall-through. `validate` guards the payload shape
+// per host (a 200 with a garbage/legacy-incompatible body counts as a host
+// failure too). Throws an Error carrying every host's failure reason when all
+// hosts fail, so the client sees WHY the quote/build could not be served.
+const requestJup = async (path, opts = {}, validate) => {
+  const candidates = [];
   if (JUP_API_KEY) {
-    try {
-      const res = await fetchJup(`${KEYED_BASE}${path}`, {
-        ...opts,
-        headers: { ...(opts.headers || {}), "x-api-key": JUP_API_KEY },
-      });
-      if (res.status !== 401 && res.status !== 403) return { res, auth: "keyed" };
-    } catch { /* fall through to keyless */ }
+    candidates.push({
+      url: `${KEYED_BASE}${path}`,
+      headers: { ...(opts.headers || {}), "x-api-key": JUP_API_KEY },
+      auth: "keyed",
+    });
   }
-  const res = await fetchJup(`${LITE_BASE}${path}`, opts);
-  return { res, auth: "lite" };
+  candidates.push({ url: `${LITE_BASE}${path}`, headers: opts.headers || {}, auth: "lite" });
+  candidates.push({ url: `${LEGACY_BASE}${path}`, headers: opts.headers || {}, auth: "legacy" });
+
+  const reasons = [];
+  for (const c of candidates) {
+    try {
+      const res = await fetchJup(c.url, { ...opts, headers: c.headers });
+      if (!res.ok) {
+        reasons.push(`${c.auth}:${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      if (!validate(data)) {
+        reasons.push(`${c.auth}:bad_payload`);
+        continue;
+      }
+      return { data, auth: c.auth };
+    } catch (e) {
+      reasons.push(`${c.auth}:${(e && e.message) || "failed"}`);
+    }
+  }
+  throw new Error((reasons.join(" | ") || "all Jupiter hosts failed").slice(0, 300));
 };
 
 export default async function (req) {
@@ -76,19 +98,24 @@ export default async function (req) {
       ) {
         return Response.json({ error: "Invalid quote params" }, { status: 400 });
       }
-      const { res, auth } = await requestJup(
-        `/quote?inputMint=${inputMint}&outputMint=${outputMint}` +
-        `&amount=${amount}&slippageBps=${slippageBps}&swapMode=ExactIn`
-      );
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        return Response.json(
-          { error: `QUOTE_FAIL (${res.status}) ${t.slice(0, 200)}` },
-          { status: 502 }
+      try {
+        const { data: quote, auth } = await requestJup(
+          `/quote?inputMint=${inputMint}&outputMint=${outputMint}` +
+            `&amount=${amount}&slippageBps=${slippageBps}&swapMode=ExactIn`,
+          {},
+          (j) =>
+            j &&
+            typeof j === "object" &&
+            j.inputMint === inputMint &&
+            j.outputMint === outputMint &&
+            typeof j.outAmount === "string" &&
+            Array.isArray(j.routePlan) &&
+            j.routePlan.length > 0
         );
+        return Response.json({ ok: true, quote, auth });
+      } catch (e) {
+        return Response.json({ error: `QUOTE_FAIL ${e.message}` }, { status: 502 });
       }
-      const quote = await res.json();
-      return Response.json({ ok: true, quote, auth });
     }
 
     if (mode === "swap") {
@@ -104,26 +131,27 @@ export default async function (req) {
       const normalized = JSON.parse(JSON.stringify(quoteResponse), (key, value) =>
         key === "updateContextSlot" && typeof value === "number" ? String(value) : value
       );
-      const { res, auth } = await requestJup("/swap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quoteResponse: normalized, userPublicKey }),
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        return Response.json(
-          { error: `SWAP_BUILD_FAIL (${res.status}) ${t.slice(0, 200)}` },
-          { status: 502 }
+      try {
+        const { data: swap, auth } = await requestJup(
+          "/swap",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quoteResponse: normalized, userPublicKey }),
+          },
+          (j) =>
+            j &&
+            typeof j === "object" &&
+            typeof j.swapTransaction === "string" &&
+            j.swapTransaction.length > 0
         );
+        // The serialized swap tx is returned UNMODIFIED — the wallet signs the
+        // exact bytes Jupiter built, and the browser broadcasts it through the
+        // app's Helius RPC relay (plain sendTransaction).
+        return Response.json({ ok: true, swap, auth });
+      } catch (e) {
+        return Response.json({ error: `SWAP_BUILD_FAIL ${e.message}` }, { status: 502 });
       }
-      const swap = await res.json();
-      if (!swap?.swapTransaction) {
-        return Response.json({ error: "SWAP_BUILD_FAIL: no transaction" }, { status: 502 });
-      }
-      // The serialized swap tx is returned UNMODIFIED — the wallet signs the
-      // exact bytes Jupiter built, and the browser broadcasts it through the
-      // app's Helius RPC relay (plain sendTransaction).
-      return Response.json({ ok: true, swap, auth });
     }
 
     return Response.json({ error: "Unknown mode" }, { status: 400 });
