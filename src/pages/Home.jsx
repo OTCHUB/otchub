@@ -30,6 +30,7 @@ import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars
 import KeeperPanel from "@/components/otc/KeeperPanel";
 import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
+import FooterBranding from "@/components/otc/FooterBranding";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import HubOfficialCa from "@/components/otc/HubOfficialCa";
 import { timeAgo } from "@/lib/format";
@@ -453,12 +454,9 @@ export default function Home() {
           </CollapsibleCard>
         </div>
 
-        <footer className="mt-4 space-y-1 text-center text-[12px] uppercase text-green-500/30">
-          <div>OTC_HUB · community tooling · not affiliated with otcdesks.cash</div>
-          <div>Data: Helius / DexScreener / Magic Eden / otcdesks.cash · official app: <a href="https://otcdesks.cash" target="_blank" rel="noopener noreferrer" className="underline hover:text-green-400">otcdesks.cash ↗</a></div>
-        </footer>
+        <FooterBranding />
       </div>
-      <TerminalBottomBar>Community tooling · not affiliated with otcdesks.cash</TerminalBottomBar>
+      <TerminalBottomBar>© 2026 otchub.dev</TerminalBottomBar>
     </div>
   );
 }

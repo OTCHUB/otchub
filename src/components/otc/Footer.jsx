@@ -11,7 +11,7 @@ const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 export default function Footer() {
   return (
     <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
-      <div>$HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTC DESKS</div>
+      <div>© 2026 otchub.dev</div>
       <div>
         DATA: SOLANA RPC (ON-CHAIN READS) · ECOSYSTEM:{" "}
         <a

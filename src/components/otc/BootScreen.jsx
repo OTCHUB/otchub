@@ -160,7 +160,7 @@ export default function BootScreen({ onComplete }) {
         </div>
       </div>
 
-      <TerminalBottomBar>Community tooling · not affiliated with otcdesks.cash</TerminalBottomBar>
+      <TerminalBottomBar>© 2026 otchub.dev</TerminalBottomBar>
     </div>
   );
 }
