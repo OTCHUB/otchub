@@ -634,7 +634,7 @@ html.skin-modern .pot-flow-broken-y {
    ================================================================== */
 html.skin-modern.light {
   color-scheme: light;
-  --c-black: 244 247 250; /* chassis panel #F4F7FA */
+  --c-black: 217 226 236; /* chassis panel #D9E2EC — pearlescent, dimmed */
   --c-green-200: 18 25 34;
   --c-green-300: 42 50 62;
   --c-green-400: 26 34 44;
@@ -693,34 +693,34 @@ html.skin-modern.light {
   --c-slate-900: 203 213 225;
 
   /* shadcn tokens follow the light chassis */
-  --background: 210 29% 91%;
+  --background: 212 24% 84%;
   --foreground: 216 33% 14%;
-  --card: 210 43% 97%;
-  --popover: 210 43% 97%;
-  --border: 213 15% 78%;
-  --input: 213 15% 78%;
+  --card: 212 26% 90%;
+  --popover: 212 26% 90%;
+  --border: 212 16% 71%;
+  --input: 212 16% 71%;
   --ring: 192 94% 36%;
   --primary: 192 94% 36%;
   --primary-foreground: 210 43% 97%;
   --muted-foreground: 213 9% 40%;
 
   /* Chart telemetry on light panels */
-  --chart-grid: #d5dce4;
-  --chart-axis: #b4bec9;
-  --chart-tick: #5c6570;
+  --chart-grid: #b8c5d4;
+  --chart-axis: #96a6b8;
+  --chart-tick: #4c5763;
   --chart-primary: #0891b2;
   --chart-secondary: #b45309;
   --chart-tertiary: #7c3aed;
   --chart-danger: #c026d3;
   --chart-pos: #059669;
-  --chart-bar-fill: #b7c6d5;
+  --chart-bar-fill: #a9bacb;
   --chart-bar-edge: #0891b2;
   --chart-seg-a: #0891b2;
   --chart-seg-b: #7c3aed;
   --chart-seg-c: #0d9488;
   --chart-seg-d: #b45309;
-  --chart-tip-bg: #f4f7fa;
-  --chart-tip-border: #b4bec9;
+  --chart-tip-bg: #d9e2ec;
+  --chart-tip-border: #96a6b8;
   --chart-tip-label: #0891b2;
   --chart-tip-text: #1b2430;
   --chart-tip-radius: 12px;
@@ -729,19 +729,19 @@ html.skin-modern.light {
 /* Pale-metal canvas with a soft aurora: light glass panels float and
    blur the darkened iris glows drifting behind them. */
 html.skin-modern.light body {
-  background-color: #e3e9ef;
+  background-color: #c9d3df;
   color: #1b2430;
 }
 html.skin-modern.light .skin-stage {
   background:
-    radial-gradient(1200px 800px at 15% -10%, rgb(8 145 178 / 0.1), transparent 60%),
-    radial-gradient(1000px 700px at 85% 15%, rgb(124 58 237 / 0.07), transparent 60%),
-    radial-gradient(900px 900px at 50% 110%, rgb(192 38 211 / 0.06), transparent 60%),
-    #e3e9ef;
+    radial-gradient(1200px 800px at 15% -10%, rgb(8 145 178 / 0.14), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(124 58 237 / 0.1), transparent 60%),
+    radial-gradient(900px 900px at 50% 110%, rgb(192 38 211 / 0.08), transparent 60%),
+    #c9d3df;
 }
 /* Pearlescent glass: white glass sheet with a darker iris ring. */
 html.skin-modern.light .term-window {
-  background: rgb(var(--c-black) / 0.6);
+  background: rgb(var(--c-black) / 0.66);
   box-shadow:
     0 0 0 1px rgb(8 145 178 / 0.25),
     0 0 0 2px rgb(124 58 237 / 0.1),
@@ -765,9 +765,9 @@ html.skin-modern.light ::selection {
   background: rgba(8, 145, 178, 0.2);
 }
 html.skin-modern.light ::-webkit-scrollbar-track {
-  background: #e3e9ef;
+  background: #c9d3df;
 }
 html.skin-modern.light ::-webkit-scrollbar-thumb {
-  background: #b4bec9;
-  border: 2px solid #e3e9ef;
+  background: #97a7b9;
+  border: 2px solid #c9d3df;
 }

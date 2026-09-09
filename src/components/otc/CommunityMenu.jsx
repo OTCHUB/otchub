@@ -1,7 +1,11 @@
 // CommunityMenu — "COMMUNITY" header dropdown: hover on desktop, tap-toggle
 // on mobile (this header has no hamburger; the menu opens in place). Modular:
 // add entries to LINKS. Terminal aesthetic matches the header links.
+// The open panel is portaled to <body> and placed from the button's live
+// rect — panel windows (overflow-hidden glass in the MODERN skin, stacking
+// contexts anywhere) can never clip or cover it.
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MessagesSquare, Users, Send, Eye, Globe } from "lucide-react";
 
 const LINKS = [
@@ -52,24 +56,50 @@ const LINKS = [
 
 export default function CommunityMenu() {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  const wrapRef = useRef(null);
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
 
-  // tap-outside closes (mobile tap-toggle path)
+  // tap-outside closes (mobile tap-toggle path) — the portaled panel counts
+  // as inside, so navigating the menu never closes it.
   useEffect(() => {
     if (!open) return;
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = (e) => {
+      if (wrapRef.current?.contains(e.target) || panelRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
 
+  // Place the floating panel from the button's rect: anchored right on >=sm,
+  // left on wrapped/mobile rows — never bleeds off either edge; width caps at
+  // viewport. Re-anchored on resize.
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const place = () => {
+      const r = btnRef.current.getBoundingClientRect();
+      const width = Math.min(288, window.innerWidth - 16);
+      const left = window.innerWidth >= 640
+        ? Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8))
+        : Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+      setPos({ top: r.bottom + 4, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
   return (
     <div
-      ref={ref}
+      ref={wrapRef}
       className="relative"
       onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseLeave={() => { if (!panelRef.current?.matches(":hover")) setOpen(false); }}
     >
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -79,16 +109,22 @@ export default function CommunityMenu() {
       >
         [COMMUNITY {open ? "▴" : "▾"}]
       </button>
-      {open && (
-        /* anchor left on wrapped/mobile rows (opens toward free space),
-           right on >=sm — never bleeds off either edge; width caps at viewport */
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-1.5rem)] border border-green-500/50 bg-black font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)] sm:left-auto sm:right-0">
+      {open && pos && createPortal(
+        <div
+          ref={panelRef}
+          role="menu"
+          aria-label="OTC community links"
+          onMouseLeave={() => setOpen(false)}
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          className="z-50 w-72 max-w-[calc(100vw-1.5rem)] border border-green-500/50 bg-black font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)] backdrop-blur-md"
+        >
           <div className="border-b border-green-500/20 px-3 py-1.5 text-[11px] uppercase tracking-widest text-green-500/50">
-            community ::
+            Community links
           </div>
           {LINKS.map((l) => (
             <a
               key={l.id}
+              role="menuitem"
               href={l.href}
               target="_blank"
               rel="noopener noreferrer"
@@ -107,7 +143,8 @@ export default function CommunityMenu() {
               )}
             </a>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
