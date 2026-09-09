@@ -9,11 +9,12 @@ const SKIN_KEY = "otc_skin";
 // telemetry via src/lib/chartTheme.js) re-read their CSS tokens live.
 export const THEME_CHANGE_EVENT = "otc-theme-change";
 
+// MODERN is the default skin for new visitors; "retro" is opt-in.
 export function getStoredSkin() {
   try {
-    return window.localStorage.getItem(SKIN_KEY) === "modern" ? "modern" : "retro";
+    return window.localStorage.getItem(SKIN_KEY) === "retro" ? "retro" : "modern";
   } catch {
-    return "retro";
+    return "modern";
   }
 }
 
