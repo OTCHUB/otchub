@@ -9,6 +9,7 @@ import { fetchLauncherAnalyticsMirror } from "@/lib/launcherFeed";
 import { isOfficialHubMint } from "@/lib/hubMint";
 import { useDexQuotes } from "@/lib/useDexQuotes";
 import Pager from "@/components/otc/Pager";
+import RewardPayoutSection from "@/components/otc/RewardPayoutSection";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Live roster is independent of the five-minute cohort/comparison snapshot.
@@ -53,12 +54,11 @@ function TokenAsset({ token, large = false }) {
   );
 }
 
-function TokenDetails({ token }) {
+function TokenDetails({ token, symbols = {} }) {
   const socials = [{ key: "twitter", label: "Twitter / X", Icon: Twitter }, { key: "telegram", label: "Telegram", Icon: Send },
     { key: "website", label: "Website", Icon: Globe }]
     .map(({ key, label, Icon }) => ({ label, Icon, url: metadataUrl(token.socials?.[key]) })).filter((link) => link.url);
   const payout = token.payoutInfo;
-  const basket = Array.isArray(payout?.rewardBasket) ? payout.rewardBasket : [];
   const logo = logoOf(token);
   return <>
     <DialogHeader className="pr-6 text-left">
@@ -92,22 +92,7 @@ function TokenDetails({ token }) {
           <br />Status evidence: {token.statusAt ? new Date(token.statusAt).toLocaleString() : "unavailable"}</p>
       </div>
     </div>
-    <section aria-label="Stonk payout" className="min-w-0 space-y-2 border border-amber-400/30 bg-amber-400/5 p-3 text-xs">
-      <h3 className="font-bold uppercase tracking-widest text-amber-300">Stonk payout</h3>
-      {payout ? <>
-        <p className="break-words text-green-300">Reported primary reward: {payout.rewardSymbol ? `$${payout.rewardSymbol}` : "symbol unavailable"}</p>
-        {payout.rewardMint && <a href={`https://solscan.io/token/${encodeURIComponent(payout.rewardMint)}`} target="_blank" rel="noopener noreferrer"
-          className="block break-all font-mono text-cyan-300 underline">{payout.rewardMint} ↗</a>}
-        {!!basket.length && <div><p className="text-green-300">Reported reward basket ({basket.length} tokens)</p>
-          <ul className="mt-1 space-y-1">{basket.map((mint, i) => <li key={mint} className="break-all font-mono">
-            <span className="text-green-500/60">{i + 1}. </span><a href={`https://solscan.io/token/${encodeURIComponent(mint)}`}
-              target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">{mint} ↗</a>
-          </li>)}</ul>
-        </div>}
-        <p className="text-green-500/70">Reported rewardCycle: {Number.isSafeInteger(payout.rewardCycle) && payout.rewardCycle >= 0 ? payout.rewardCycle : "unavailable"} · units/meaning unverified</p>
-      </> : <p className="text-green-500/70">Payout metadata unavailable; this does not mean no rewards.</p>}
-      <p className="text-[13px] text-amber-200/70">Allocation, eligibility and payout timing are not provided by this feed. These are source-reported settings, not verified distributions or guaranteed returns.</p>
-    </section>
+    <RewardPayoutSection payout={payout} symbols={symbols} />
     <p className="text-[12px] text-green-500/60">Assets and links are third-party metadata, not endorsements. Verify payout mints and launch terms before trading.</p>
   </>;
 }
@@ -451,7 +436,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         const target = detailTrigger.current?.isConnected ? detailTrigger.current : panelRef.current;
         target?.focus();
       }}>
-      {detailToken ? <TokenDetails token={detailToken} /> : <DialogHeader>
+      {detailToken ? <TokenDetails token={detailToken} symbols={feed?.rewardSymbols || {}} /> : <DialogHeader>
         <DialogTitle>Token unavailable</DialogTitle>
         <DialogDescription>This token is no longer in the latest launcher feed. Close this view to continue.</DialogDescription>
       </DialogHeader>}

@@ -216,6 +216,18 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       } catch { errors.add("LAUNCHER_ARCHIVE_UNAVAILABLE"); }
     }
     const rows = rosterRows({ coins }, at);
+    // Reward-pairing symbol map: reward baskets ship as raw mints, but the
+    // roster itself reports each pairing's community symbol across its
+    // launches (e.g. XsvNBAY… → HOODx, J1toso… → JitoSOL). Serving the
+    // mint→symbol map once per payload lets the token details card name what
+    // is in each MemeStock reward basket without per-mint lookups.
+    const rewardSymbols = {};
+    for (const row of rows) {
+      const p = row.payoutInfo;
+      if (p?.rewardMint && p?.rewardSymbol && !(p.rewardMint in rewardSymbols)) {
+        rewardSymbols[p.rewardMint] = p.rewardSymbol;
+      }
+    }
     // Global graduation ledger: visitor-confirmed AMM migrations persisted in
     // the DB, shared by every isolate and visitor. Best-effort by design — an
     // unavailable ledger must never fail the live feed.
@@ -355,7 +367,7 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     })() : [];
     return {
       at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
-      statusCounts, rosterTotal: rows.length, pendingGraduation,
+      statusCounts, rewardSymbols, rosterTotal: rows.length, pendingGraduation,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,
