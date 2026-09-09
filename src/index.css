@@ -297,3 +297,9 @@ html.light body {
   background-color: rgb(236 243 236);
   color: rgb(20 83 45);
 }
+
+/* Boot screen CRT scanlines + vignette are dark-mode-only effects; the
+   phosphor-paper light mode keeps a flat paper background (no gradients). */
+html.light .boot-crt {
+  display: none;
+}
