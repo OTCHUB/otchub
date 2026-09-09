@@ -8,38 +8,40 @@ import { fmtSol } from "@/lib/format";
 const COLORS = {
   mint: "#3b82f6",
   royalty: "#22d3ee",
+  launchpad: "#a78bfa",
   other: "#fbbf24",
   dist: "#4ade80",
   retained: "#f59e0b",
-  broken: "#f43f5e",
 };
 
-function Bar({ label, value, total, color, broken = false, note }) {
-  const pct = !broken && total > 0 ? Math.min(100, (value / total) * 100) : 0;
+// Every bar row shares the same fixed label / value / note column widths, so
+// all tracks are exactly the same width and stack pixel-aligned — including
+// rows with no note (the note column is always reserved on sm+). The share
+// percentage reads out inside the track so short fills still carry their info.
+function Bar({ label, value, total, color, note = null }) {
+  const pct = total > 0 ? Math.min(100, (value / total) * 100) : 0;
   return (
     <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] sm:gap-2">
-      <span className="w-[70px] shrink-0 truncate uppercase tracking-wide text-green-500/70 sm:w-24">
+      <span className="w-28 shrink-0 truncate uppercase tracking-wide text-green-500/70">
         {label}
       </span>
-      <span
-        className={`relative h-4 min-w-0 flex-1 overflow-hidden border ${
-          broken ? "border-dashed border-red-500/60 bg-red-500/5" : "border-green-500/15 bg-green-500/5"
-        }`}
-      >
-        {!broken && pct > 0 && (
+      <span className="relative h-4 min-w-0 flex-1 overflow-hidden border border-green-500/15 bg-green-500/5">
+        {pct > 0 && (
           <span
             className="absolute inset-y-0 left-0 transition-[width] duration-500"
             style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
           />
         )}
+        <span className="absolute inset-y-0 right-1 flex items-center text-[9px] leading-none text-green-400/80">
+          {pct >= 1 ? `${Math.round(pct)}%` : total > 0 ? "<1%" : "—"}
+        </span>
       </span>
-      <span
-        className={`w-[64px] shrink-0 text-right sm:w-16 ${broken ? "text-red-400" : ""}`}
-        style={!broken ? { color } : undefined}
-      >
-        {broken ? "✖ 0.00" : `+${fmtSol(value, 2)}`}
+      <span className="w-[72px] shrink-0 text-right sm:w-20" style={{ color }}>
+        +{fmtSol(value, 2)}
       </span>
-      {note && <span className="hidden shrink-0 text-[10px] text-green-500/40 sm:block">{note}</span>}
+      <span className="hidden w-24 shrink-0 truncate text-right text-[10px] text-green-500/40 sm:block">
+        {note ?? ""}
+      </span>
     </div>
   );
 }
@@ -58,8 +60,9 @@ export default function PotFlowDiagram({ latest }) {
   const [day, seg] = closedRows.at(-1) || dayRows.at(-1) || [];
   const mint = seg?.mint || 0;
   const royalty = seg?.royalty || 0;
+  const launchpad = seg?.launchpad || 0;
   const other = seg?.other || 0;
-  const inflow = mint + royalty + other;
+  const inflow = mint + royalty + launchpad + other;
 
   const deskRows = (latest?.per_desk?.items || [])
     .filter((r) => String(r.day || "") < todayKey)
@@ -97,8 +100,8 @@ export default function PotFlowDiagram({ latest }) {
         <>
           <Bar label="DESK_MINTS" value={mint} total={inflow} color={COLORS.mint} note="0.45/mint" />
           <Bar label="ME_SALES" value={royalty} total={inflow} color={COLORS.royalty} note="5% royalty" />
+          <Bar label="CREATOR_FEES" value={launchpad} total={inflow} color={COLORS.launchpad} note="10% pot share" />
           <Bar label="SWEEPS" value={other} total={inflow} color={COLORS.other} note="unattrib" />
-          <Bar label="CREATOR_FEES" value={0} total={inflow} color={COLORS.broken} broken note="vaults ≠ pot" />
 
           <Arrow label="IN" value={inflow} />
 
@@ -117,10 +120,6 @@ export default function PotFlowDiagram({ latest }) {
           NO FLOW DATA FOR THE LAST CLOSED DAY
         </div>
       )}
-
-      <div className="text-center font-mono text-[10px] text-red-400/80">
-        ✖ CREATOR_FEES · 10% DESK SHARE OF LAUNCHPAD FEES NOT LANDING
-      </div>
 
       {/* who gets enriched: launcher-coin holders vs desk holders */}
       {totalDist != null && deskLedgerSol > 0 && launcherSol != null && (
