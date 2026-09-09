@@ -1,4 +1,4 @@
-import getLauncherAnalytics from "../getLauncherAnalytics/entry.ts";
+import { createLauncherAnalyticsHandler } from "../../shared/launcherAnalytics.ts";
 import { createPublicMetricsHandler } from "./handler.js";
 
-export default createPublicMetricsHandler({ getAnalytics: getLauncherAnalytics });
+export default createPublicMetricsHandler({ getAnalytics: createLauncherAnalyticsHandler() });
