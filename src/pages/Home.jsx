@@ -34,7 +34,6 @@ import FooterBranding from "@/components/otc/FooterBranding";
 import TerminalVisual from "@/components/otc/TerminalVisual";
 import HubOfficialCa from "@/components/otc/HubOfficialCa";
 
-import { Image } from "@/components/ui/image";
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
 import { silentReconnect } from "@/lib/solanaWallets";
 
@@ -215,12 +214,6 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="flex items-center gap-3 text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg xl:text-xl">
-                <Image
-                  src="https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/7166bbd89_hub_mt.png"
-                  alt="OTC_HUB logo"
-                  fittingType="fit"
-                  className="h-8 w-8 shrink-0 sm:h-10 sm:w-10"
-                />
                 OTC_HUB · OTC Analytics and Tools
                 <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
               </h1>
