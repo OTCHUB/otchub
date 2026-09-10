@@ -1,10 +1,11 @@
-import { Globe, Twitter } from "lucide-react";
+import { Globe } from "lucide-react";
 import React from "react";
+import XIcon from "@/components/otc/XIcon";
 
 // Brand footer: socials, website, copyright — replaces the old data-source /
 // affiliation disclaimer copy (the legal disclaimer lives on the About page).
 const LINKS = [
-  { id: "x", label: "@otchubdev", hint: "OTC_HUB on X", href: "https://x.com/otchubdev", icon: Twitter },
+  { id: "x", label: "@otchubdev", hint: "OTC_HUB on X", href: "https://x.com/otchubdev", icon: XIcon },
   { id: "web", label: "Website", hint: "otchub.dev", href: "https://otchub.dev", icon: Globe },
 ];
 

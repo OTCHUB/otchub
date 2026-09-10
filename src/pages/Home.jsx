@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { fetchDashboardBody } from "@/lib/dashboardFeed";
-import { RefreshCw, Twitter } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import XIcon from "@/components/otc/XIcon";
+import MascotLogo from "@/components/otc/MascotLogo";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import MetricsStrip from "@/components/otc/MetricsStrip";
@@ -223,8 +225,13 @@ export default function Home() {
         {/* Header */}
         <header className="term-window border border-green-500/30 bg-black p-2.5 sm:p-3">
           <div className="flex items-center justify-between gap-2">
-            <h1 className="flex min-w-0 items-center gap-2 truncate text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg">
-              <span className="truncate">OTC_HUB · OTC Analytics and Tools</span>
+            <h1 className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 leading-none">
+                <MascotLogo className="h-8 w-8 object-contain sm:h-9 sm:w-9" />
+              </span>
+              <span className="truncate text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg">
+                OTC_HUB
+              </span>
               <span className="inline-block animate-pulse text-green-500">▋</span>
             </h1>
             {/* single-line actions: hamburger nav + X profile + theme/refresh */}
@@ -238,7 +245,7 @@ export default function Home() {
                 title="OTC_HUB on X (@otchubdev)"
                 aria-label="OTC_HUB profile on X"
               >
-                <Twitter className="h-4 w-4" />
+                <XIcon className="h-4 w-4" />
               </a>
               <ThemeToggle />
               <button

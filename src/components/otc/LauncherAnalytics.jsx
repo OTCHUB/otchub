@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Globe, Send, Twitter } from "lucide-react";
+import { Globe, Send } from "lucide-react";
+import XIcon from "@/components/otc/XIcon";
 import { base44 } from "@/api/base44Client";
 import { fmtUsd } from "@/lib/format";
 import { useLauncherLive } from "@/lib/useLauncherLive";
@@ -56,7 +57,7 @@ function TokenAsset({ token, large = false }) {
 }
 
 function TokenDetails({ token, symbols = {} }) {
-  const socials = [{ key: "twitter", label: "Twitter / X", Icon: Twitter }, { key: "telegram", label: "Telegram", Icon: Send },
+  const socials = [{ key: "twitter", label: "X", Icon: XIcon }, { key: "telegram", label: "Telegram", Icon: Send },
     { key: "website", label: "Website", Icon: Globe }]
     .map(({ key, label, Icon }) => ({ label, Icon, url: metadataUrl(token.socials?.[key]) })).filter((link) => link.url);
   const payout = token.payoutInfo;
