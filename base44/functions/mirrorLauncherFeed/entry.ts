@@ -38,6 +38,7 @@ export default async function (req) {
       payload: {
         at: live.at, rows: live.rows, riskCoverage: live.riskCoverage,
         statusCounts: live.statusCounts, rosterTotal: live.rosterTotal,
+        rewardSymbols: live.rewardSymbols || {}, rewardCatalog: live.rewardCatalog,
         pendingGraduation: live.pendingGraduation, candidateCount: live.candidateCount,
         statusChecked: live.statusChecked, statusError: live.statusError,
         nearThreshold: live.nearThreshold,

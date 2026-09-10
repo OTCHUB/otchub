@@ -4,7 +4,6 @@ import XIcon from "@/components/otc/XIcon";
 import RowPayout from "@/components/otc/RowPayout";
 import { base44 } from "@/api/base44Client";
 import { fmtUsdCompact } from "@/lib/format";
-import { useTokenSymbols } from "@/lib/useTokenSymbols";
 import { useLauncherLive } from "@/lib/useLauncherLive";
 import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
@@ -62,7 +61,7 @@ function TokenAsset({ token, large = false }) {
   );
 }
 
-function TokenDetails({ token, symbols = {} }) {
+function TokenDetails({ token, symbols = {}, catalog = {} }) {
   const socials = [{ key: "twitter", label: "X", Icon: XIcon }, { key: "telegram", label: "Telegram", Icon: Send },
     { key: "website", label: "Website", Icon: Globe }]
     .map(({ key, label, Icon }) => ({ label, Icon, url: metadataUrl(token.socials?.[key]) })).filter((link) => link.url);
@@ -103,7 +102,7 @@ function TokenDetails({ token, symbols = {} }) {
           <br />Status evidence: {token.statusAt ? new Date(token.statusAt).toLocaleString() : "unavailable"}</p>
       </div>
     </div>
-    <RewardPayoutSection payout={payout} symbols={symbols} />
+    <RewardPayoutSection payout={payout} symbols={symbols} catalog={catalog} />
     <p className="text-[12px] text-green-500/60">Assets and links are third-party metadata, not endorsements. Verify payout mints and launch terms before trading.</p>
   </>;
 }
@@ -231,14 +230,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     };
   };
   const tape = ranked.map(withDexQuote);
-  // Payout icons on the tape: resolve the visible page's reward mints (basket
-  // members included) to logos/symbols once, cached for the session.
-  const payoutMints = [...new Set(tape.flatMap((t) => {
-    const p = t.payoutInfo;
-    if (!p) return [];
-    return p.rewardBasket?.length > 1 ? p.rewardBasket : p.rewardMint ? [p.rewardMint] : [];
-  }))];
-  const resolvePayout = useTokenSymbols(payoutMints);
+  // Payout icons on the tape come from the feed's rewardCatalog — the exact
+  // 1:1 resolution the official site uses (stock icons / mint-keyed custom
+  // reward images). No symbol-pattern guessing, no DexScreener probing.
   // GRAD RATE = verified GRADUATED launches vs ALL launches on the tape
   // (exact server-side counts from the live feed — no cohort sampling). Rows
   // outside the probed candidates stay UNKNOWN, so this is a verified
@@ -432,7 +426,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                   title="Official OTC_HUB token — mint verified against the official CA">★</span>
               )}
               {t.payoutInfo && (
-                <RowPayout payout={t.payoutInfo} symbols={feed?.rewardSymbols || {}} resolve={resolvePayout} />
+                <RowPayout payout={t.payoutInfo} symbols={feed?.rewardSymbols || {}} catalog={feed?.rewardCatalog} />
               )}
               <span className={`shrink-0 font-mono text-[10px] ${STATUS_SHORT[statusOf(t)]?.[1] ?? "text-green-500/40"}`}>
                 {STATUS_SHORT[statusOf(t)]?.[0] ?? "UNK"}
@@ -503,7 +497,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         const target = detailTrigger.current?.isConnected ? detailTrigger.current : panelRef.current;
         target?.focus();
       }}>
-      {detailToken ? <TokenDetails token={detailToken} symbols={feed?.rewardSymbols || {}} /> : <DialogHeader>
+      {detailToken ? <TokenDetails token={detailToken} symbols={feed?.rewardSymbols || {}} catalog={feed?.rewardCatalog} /> : <DialogHeader>
         <DialogTitle>Token unavailable</DialogTitle>
         <DialogDescription>This token is no longer in the latest launcher feed. Close this view to continue.</DialogDescription>
       </DialogHeader>}

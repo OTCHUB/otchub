@@ -1,27 +1,22 @@
 import React, { useState } from "react";
-import { useTokenSymbols } from "@/lib/useTokenSymbols";
 
 // Reward payout card for the launcher token details dialog: the source-
 // reported primary reward and its mint and — for MemeStock baskets — the full
-// basket composition, each member resolved to its community symbol and token
-// icon (feed map first, DexScreener fallback second). All of it is an
-// upstream setting, not a verified distribution.
+// basket composition. Icons and names come from the feed's rewardCatalog:
+// the exact 1:1 resolution the official site itself uses (catalog stocks →
+// otcdesks.cash/stocks icons; custom rewards → the site's firebase rewards
+// image keyed by the exact reward mint). All of it is an upstream setting,
+// not a verified distribution.
 
 const solscanUrl = (mint) => `https://solscan.io/token/${encodeURIComponent(mint)}`;
 const shortMint = (mint) => `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 
-// Official launcher payout icons live at otcdesks.cash/stocks/<SYMBOL>.png
-// (the same stock icons the official launcher's reward picker uses); the
-// DexScreener logo is the fallback, then the symbol's first letter.
-const stockIconUrl = (symbol) => (typeof symbol === "string" && symbol
-  ? `https://otcdesks.cash/stocks/${encodeURIComponent(symbol.toUpperCase())}.png`
-  : "");
-
-export function PayoutIcon({ mint, symbol, logo }) {
+// Icon src is ONLY the site-sourced catalog URL — never a symbol-pattern
+// guess. Unknown rewards fall back to the symbol's first letter.
+export function PayoutIcon({ mint, symbol, icon }) {
   const [failedUrl, setFailedUrl] = useState("");
   const label = symbol || shortMint(mint);
-  const srcs = [stockIconUrl(symbol), logo].filter(Boolean);
-  const src = srcs.find((u) => u !== failedUrl) || "";
+  const src = icon && icon !== failedUrl ? icon : "";
   return (
     <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-[9px] font-bold leading-none text-slate-900">
       {src ? (
@@ -32,13 +27,16 @@ export function PayoutIcon({ mint, symbol, logo }) {
   );
 }
 
-export default function RewardPayoutSection({ payout, symbols = {} }) {
+export default function RewardPayoutSection({ payout, symbols = {}, catalog = {} }) {
+  const byMint = catalog?.byMint || {}, bySymbol = catalog?.bySymbol || {};
   const basket = Array.isArray(payout?.rewardBasket) ? payout.rewardBasket : [];
-  const lookupMints = basket.length ? basket : payout?.rewardMint ? [payout.rewardMint] : [];
-  const dexMetaOf = useTokenSymbols(lookupMints);
+  const metaOf = (mint) => byMint[mint] || null;
   const nameOf = (mint) => (payout?.rewardMint === mint && payout?.rewardSymbol)
-    || symbols[mint] || dexMetaOf(mint)?.symbol || null;
-  const logoOf = (mint) => dexMetaOf(mint)?.logo || null;
+    || metaOf(mint)?.symbol || symbols[mint] || null;
+  const iconOf = (mint) => metaOf(mint)?.icon || null;
+  const primaryMeta = payout?.rewardMint
+    ? metaOf(payout.rewardMint)
+    : payout?.rewardSymbol ? bySymbol[payout.rewardSymbol] : null;
 
   return (
     <section aria-label="Stonk payout" className="min-w-0 space-y-2 border border-amber-400/30 bg-amber-400/5 p-3 text-xs">
@@ -46,16 +44,21 @@ export default function RewardPayoutSection({ payout, symbols = {} }) {
       {payout ? <>
         {payout.rewardMint ? (
           <a href={solscanUrl(payout.rewardMint)} target="_blank" rel="noopener noreferrer"
-            title={`${payout.rewardMint} — source-reported primary reward`}
+            title={`${payout.rewardMint} — source-reported primary reward${primaryMeta?.name ? ` (${primaryMeta.name})` : ""}`}
             className="flex max-w-full items-center gap-2 text-green-300 hover:text-emerald-300">
-            <PayoutIcon mint={payout.rewardMint} symbol={nameOf(payout.rewardMint)} logo={logoOf(payout.rewardMint)} />
+            <PayoutIcon mint={payout.rewardMint} symbol={nameOf(payout.rewardMint)} icon={iconOf(payout.rewardMint)} />
             <span className="min-w-0 break-words">
-              <span className="font-bold">${payout.rewardSymbol || nameOf(payout.rewardMint) || "?"}</span> · reported
+              <span className="font-bold">${payout.rewardSymbol || nameOf(payout.rewardMint) || "?"}</span>
+              {primaryMeta?.name && <span className="text-green-500/70"> · {primaryMeta.name}</span>}
+              {primaryMeta?.custom && <span className="text-amber-300"> · custom</span>}
+              <span className="text-green-500/60"> · reported</span>
             </span>
           </a>
         ) : (
           <p className="break-words text-green-300">
-            {payout.rewardSymbol ? `$${payout.rewardSymbol} · reported` : "symbol unavailable"}
+            {payout.rewardSymbol
+              ? <>{`$${payout.rewardSymbol}`}{primaryMeta?.custom ? " · custom" : ""} · reported</>
+              : "symbol unavailable"}
           </p>
         )}
         {basket.length > 1 && (
@@ -67,7 +70,7 @@ export default function RewardPayoutSection({ payout, symbols = {} }) {
                   <a href={solscanUrl(mint)} target="_blank" rel="noopener noreferrer"
                     title={`${mint} — source-reported basket member${payout.rewardMint === mint ? "; current reward" : ""}`}
                     className={`inline-flex max-w-full items-center gap-1.5 border px-2 py-1 hover:bg-green-500/10 ${payout.rewardMint === mint ? "border-amber-400/70 bg-amber-400/10 text-amber-200" : "border-green-500/30 text-green-300"}`}>
-                    <PayoutIcon mint={mint} symbol={nameOf(mint)} logo={logoOf(mint)} />
+                    <PayoutIcon mint={mint} symbol={nameOf(mint)} icon={iconOf(mint)} />
                     <span className="truncate font-mono">${nameOf(mint) || shortMint(mint)}</span>
                     {payout.rewardMint === mint && <span className="shrink-0 text-[10px] text-amber-300">· active</span>}
                   </a>

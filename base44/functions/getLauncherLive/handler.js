@@ -109,6 +109,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
         candidateCount: cache.candidateCount, statusChecked: cache.statusChecked,
         statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
         rewardSymbols: cache.rewardSymbols || {},
+        rewardCatalog: cache.rewardCatalog || { byMint: {}, bySymbol: {} },
         pendingGraduation: cache.pendingGraduation,
         ...(sourceError ? { sourceError } : {}) };
     }
@@ -134,6 +135,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
       rosterTotal: cache.rosterTotal, candidateCount: cache.candidateCount,
       statusChecked: cache.statusChecked, statusError: cache.statusError, nearThreshold: NEAR_THRESHOLD,
       rewardSymbols: cache.rewardSymbols || {},
+      rewardCatalog: cache.rewardCatalog || { byMint: {}, bySymbol: {} },
       pendingGraduation: cache.pendingGraduation,
       ...(sourceError ? { sourceError } : {}) };
   };

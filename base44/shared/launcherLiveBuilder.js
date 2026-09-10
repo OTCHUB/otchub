@@ -6,6 +6,7 @@
 
 import { decodeLauncherCurve, hasConfirmedAmmPair, launcherStatus, NEAR_THRESHOLD } from "./launcherCurve.js";
 import { createLauncherRiskService, emptyLauncherRisk } from "./launcherRisk.js";
+import { resolveRewardMeta } from "./rewardStockCatalog.js";
 
 const COINS_URL = "https://otcdesks.cash/api/coins";
 const DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/";
@@ -228,6 +229,27 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
         rewardSymbols[p.rewardMint] = p.rewardSymbol;
       }
     }
+    // Reward catalog (1:1 site resolution): every payout mint and basket
+    // member resolves to the icon + name the official site itself renders —
+    // catalog stocks via otcdesks.cash/stocks/<icon>, non-catalog ("custom")
+    // rewards via the site's firebase rewards bucket keyed by the exact
+    // reward mint. Clients render from this map instead of guessing icon
+    // URLs by symbol pattern or probing DexScreener.
+    const rewardCatalog = { byMint: {}, bySymbol: {} };
+    for (const row of rows) {
+      const p = row.payoutInfo;
+      if (!p) continue;
+      const primary = resolveRewardMeta(p.rewardMint, p.rewardSymbol);
+      if (primary) {
+        if (p.rewardMint && !(p.rewardMint in rewardCatalog.byMint)) rewardCatalog.byMint[p.rewardMint] = primary;
+        if (primary.symbol && !(primary.symbol in rewardCatalog.bySymbol)) rewardCatalog.bySymbol[primary.symbol] = primary;
+      }
+      for (const mint of p.rewardBasket || []) {
+        if (mint in rewardCatalog.byMint) continue;
+        const member = resolveRewardMeta(mint, rewardSymbols[mint] || null);
+        if (member) rewardCatalog.byMint[mint] = member;
+      }
+    }
     // Global graduation ledger: visitor-confirmed AMM migrations persisted in
     // the DB, shared by every isolate and visitor. Best-effort by design — an
     // unavailable ledger must never fail the live feed.
@@ -367,7 +389,7 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     })() : [];
     return {
       at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
-      statusCounts, rewardSymbols, rosterTotal: rows.length, pendingGraduation,
+      statusCounts, rewardSymbols, rewardCatalog, rosterTotal: rows.length, pendingGraduation,
       candidateCount: candidates.length,
       statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
       statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,

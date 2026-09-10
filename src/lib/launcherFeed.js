@@ -106,6 +106,7 @@ export function projectLauncherView(mirror, params = {}) {
     pageSize,
     rosterTotal: mirror.rosterTotal,
     rewardSymbols: mirror.rewardSymbols || {},
+    rewardCatalog: mirror.rewardCatalog || { byMint: {}, bySymbol: {} },
     candidateCount: mirror.candidateCount,
     statusChecked: mirror.statusChecked,
     statusError: mirror.statusError,
