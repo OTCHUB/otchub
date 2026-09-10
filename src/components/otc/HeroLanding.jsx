@@ -57,7 +57,7 @@ const FEATURES = [
   },
 ];
 
-export default function HeroLanding({ latest, onGoPanel }) {
+export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
   const [copied, setCopied] = useState(false);
   const desks = latest?.desks_minted ?? 0;
   const desksPct = Math.max(0, Math.min(100, (desks / DESK_CAP) * 100));
@@ -99,8 +99,7 @@ export default function HeroLanding({ latest, onGoPanel }) {
             <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
               <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
               <span className="shrink-0 text-green-500/50">CA</span>
-              <span className="min-w-0 truncate sm:hidden" title={OTC_MINT}>{OTC_MINT.slice(0, 8)}…{OTC_MINT.slice(-8)}</span>
-              <span className="hidden break-all sm:inline">{OTC_MINT}</span>
+              <span className="min-w-0 break-all" title={OTC_MINT}>{OTC_MINT}</span>
             </span>
             <button
               onClick={copyCa}
@@ -122,12 +121,13 @@ export default function HeroLanding({ latest, onGoPanel }) {
             >
               <LineChart className="h-4 w-4" /> DEXSCREENER
             </a>
-            <a
-              href="#otc-wallet"
+            <button
+              type="button"
+              onClick={onConnectWallet}
               className="inline-flex items-center gap-2 border border-green-500/50 px-4 py-2 text-[12px] tracking-wider text-green-400 hover:bg-green-500/10"
             >
               CONNECT WALLET <ArrowDown className="h-3.5 w-3.5" />
-            </a>
+            </button>
           </div>
 
           {/* Lifetime reward totals: desk NFT holders + launch holders */}

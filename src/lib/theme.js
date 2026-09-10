@@ -8,12 +8,28 @@ const KEY = "otc_theme";
 // telemetry via src/lib/chartTheme.js) re-read their CSS tokens live.
 export const THEME_CHANGE_EVENT = "otc-theme-change";
 
-// RETRO (hubconnect's classic green terminal) is the one and only skin —
-// the modern "Iridescent Terminal" was retired: the retro terminal carries
-// the modernized layout just as well. Any previously stored "modern" choice
-// is ignored, so every visitor gets the legacy terminal look back.
+// Skin: RETRO (classic green terminal) by default, MODERN ("Iridescent
+// Terminal" HUD) opt-in via the icon-only header toggle. Persisted per
+// visitor alongside the dark/light theme.
+const SKIN_KEY = "otc_skin";
+
 export function getStoredSkin() {
-  return "retro";
+  try {
+    return window.localStorage.getItem(SKIN_KEY) === "modern" ? "modern" : "retro";
+  } catch {
+    return "retro";
+  }
+}
+
+export function toggleSkin() {
+  const next = getStoredSkin() === "modern" ? "retro" : "modern";
+  applySkin(next);
+  try {
+    window.localStorage.setItem(SKIN_KEY, next);
+  } catch {
+    /* storage unavailable — skin lasts for this session only */
+  }
+  return next;
 }
 
 export function applySkin(skin) {
