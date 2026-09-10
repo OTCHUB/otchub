@@ -1,5 +1,5 @@
 import React from "react";
-import { Rocket, Repeat, Scale, Wallet } from "lucide-react";
+import { Crosshair, Rocket, Repeat, Wallet } from "lucide-react";
 import RuFomoIcon from "@/components/otc/RuFomoIcon";
 
 // Fixed bottom quick-nav: the dashboard's five primary destinations as
@@ -12,7 +12,9 @@ export default function QuickNavBar({ onWallet }) {
     { label: "Wallet", icon: Wallet, onClick: onWallet },
     { id: "otc-analytics", label: "Launches", icon: Rocket },
     { id: "otc-swap", label: "Swap", icon: Repeat },
-    { id: "otc-arbitrage", label: "Arbitrage", icon: Scale },
+    // Snipe: crosshair → arbitrage panel, which lists the live-vault
+    // NEAR_FLOOR desks ranked by net cost with direct Magic Eden buy links.
+    { id: "otc-arbitrage", label: "Snipe", icon: Crosshair },
     { href: "https://fomo.otchub.dev", label: "RU_FOMO", icon: RuFomoIcon, external: true },
   ];
 
