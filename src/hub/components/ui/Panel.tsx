@@ -46,7 +46,7 @@ export function Panel({
 
   return (
     <section
-      className={`rounded-none border border-green-500/30 bg-black font-mono text-green-400 ${className}`}
+      className={`term-window rounded-none border border-green-500/30 bg-black font-mono text-green-400 ${className}`}
     >
       <header className="flex items-center justify-between gap-2 border-b border-green-500/30 px-3 py-1.5 text-xs">
         <span className="tracking-widest text-green-300">[ {title} ]</span>

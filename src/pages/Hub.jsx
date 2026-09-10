@@ -59,7 +59,7 @@ const navCls = ({ isActive }) =>
 function HubHeader() {
   const { cluster, programId, connection } = useHub();
   return (
-    <header className="border border-green-500/30 bg-black">
+    <header className="term-window border border-green-500/30 bg-black">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-green-500/30 p-3">
         <div className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
