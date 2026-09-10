@@ -1,9 +1,6 @@
 // Public surface for hosts (otchub) and the standalone shell. Everything else is internal.
 export { HubProvider, useHub } from "./HubProvider";
 export type { HubProviderProps, HubContextValue } from "./HubProvider";
-export { UIThemeProvider, useUITheme } from "./ThemeProvider";
-export type { UITheme, ThemeContextValue } from "./ThemeProvider";
-export { ThemeSwitch } from "./components/ui/ThemeSwitch";
 export { HubRoutes } from "./HubRoutes";
 export type { HubRoutesProps } from "./HubRoutes";
 export { useProtocolState } from "./hooks/useProtocolState";

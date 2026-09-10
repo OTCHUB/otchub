@@ -13,8 +13,6 @@ import {
   HubProvider,
   HubRoutes,
   rpcHost,
-  ThemeSwitch,
-  UIThemeProvider,
   useHub,
 } from "@/hub";
 
@@ -86,7 +84,6 @@ function HubHeader() {
           </Link>
           <CommunityMenu />
           <ThemeToggle />
-          <ThemeSwitch />
         </div>
       </div>
       <div className="flex flex-wrap gap-x-4 px-3 py-1 text-[10px] text-green-500/50">
@@ -144,9 +141,7 @@ export default function Hub() {
       resolveSigner={getSignerForAddress}
       swapTransport={hubSwapTransport}
     >
-      <UIThemeProvider>
-        <HubShell wallet={wallet} />
-      </UIThemeProvider>
+      <HubShell wallet={wallet} />
     </HubProvider>
   );
 }
