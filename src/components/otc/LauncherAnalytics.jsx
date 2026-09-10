@@ -21,9 +21,10 @@ const KPIS = [
   { key: "mcap", label: "Market cap" },
   { key: "curveProgress", label: "Progress" },
 ];
-const SPLIT_CLS = ["bg-emerald-400/70", "bg-cyan-400/70", "bg-amber-400/70", "bg-fuchsia-400/70"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
+// Compact status chips for dense rows (full status stays in the details dialog).
+const STATUS_SHORT = { GRADUATED: ["GRAD", "text-emerald-400"], BONDING: ["BOND", "text-cyan-400/80"], ABOUT_TO_GRADUATE: ["NEAR", "text-amber-400"], UNKNOWN: ["UNK", "text-green-500/40"] };
 // Launch-age windows for the tape; ALL shows every launch, historical included.
 /** @type {Array<[string, number|null]>} */
 const TIMEFRAMES = [["1H", 1], ["24H", 24], ["7D", 168], ["30D", 720], ["ALL", null]];
@@ -140,11 +141,13 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const detailId = useId();
   const [timeframe, setTimeframe] = useState("ALL");
   const [page, setPage] = useState(1);
+  // Dense tape: fit many more launches per screen on mobile and desktop.
+  const [pageSize] = useState(() => (window.innerWidth >= 1024 ? 50 : 30));
   const maxAgeHours = TIMEFRAMES.find(([tf]) => tf === timeframe)?.[1] ?? null;
   // The FULL tape (every launch, historical included) is filtered, sorted and
   // paged server-side; the poller re-fetches whenever the view changes.
   const live = useLauncherLive({
-    page, pageSize: 20, status, sort: kpi,
+    page, pageSize, status, sort: kpi,
     ...(search.trim() ? { search: search.trim().toLowerCase() } : {}),
     ...(maxAgeHours != null ? { maxAgeHours } : {}),
   });
@@ -273,8 +276,8 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       {live.error && <div role="status" className="mt-2 text-[12px] text-amber-400">{live.error}</div>}
       {feed?.at && (
         <div className="mt-1 text-[11px] text-green-500/50">
-          Feed fetched {new Date(feed.at).toLocaleTimeString()} · source snapshots may lag
-          {dexAt && <span className="text-emerald-400"> · DEX quotes live {new Date(dexAt).toLocaleTimeString()}</span>}
+          Updated {new Date(feed.at).toLocaleTimeString()}
+          {dexAt && <span className="text-emerald-400"> · DEX live {new Date(dexAt).toLocaleTimeString()}</span>}
         </div>
       )}
 
@@ -283,7 +286,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         {[
           ["Launches", c?.launches ?? "—"],
           ["24h volume", c ? fmtUsd(c.vol24h) : "—"],
-          ["Grad rate*", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
+          ["Grad rate", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
           ["Median age", c ? fmtAge(c.medianAgeH) : "—"],
         ].map(([k, v]) => (
           <div key={k} className="border border-green-500/20 p-1.5">
@@ -323,68 +326,44 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       </div>
 
       {/* launch feed */}
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-80 lg:max-h-none">
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-[60dvh] lg:max-h-none">
         {tape.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
-            className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-green-500/10 px-2 py-1.5 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 hover:border-green-500/40 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
-            {/* line 1 — identity: rank, logo, symbol, status, age */}
-            <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-              <span className="text-green-500/40">#{(page - 1) * (feed?.pageSize ?? 20) + i + 1}</span>
+            className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-1.5 py-1 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            {/* identity: rank, logo, symbol, badges, status chip */}
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span className="shrink-0 text-[10px] text-green-500/40">#{(page - 1) * (feed?.pageSize ?? pageSize) + i + 1}</span>
               <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
                 aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
                 onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
                 <TokenAsset token={t} />
               </button>
               <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-                className="max-w-full break-all text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
+                className="min-w-0 truncate text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
                 ${t.symbol || t.mint.slice(0, 6)}
               </button>
               {isOfficialHubMint(t.mint) && (
-                <span
-                  className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold uppercase tracking-widest text-fuchsia-300"
-                  title="Official OTC_HUB token — mint verified against the official CA"
-                >
-                  ★ Official OTC_HUB
-                </span>
+                <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold text-fuchsia-300"
+                  title="Official OTC_HUB token — mint verified against the official CA">★</span>
               )}
-              {/* Source-reported reward pairing: e.g. $Nasduck rewards holders
-                  in $QQQx. Unverified upstream setting — the token details
-                  dialog carries the full payout metadata. */}
               {t.payoutInfo?.rewardSymbol && (
-                <span
-                  className="shrink-0 border border-amber-400/50 bg-amber-400/10 px-1 font-mono text-[10px] font-bold text-amber-300"
-                  title={`$${t.symbol || t.mint.slice(0, 6)} reportedly rewards holders in $${t.payoutInfo.rewardSymbol} · source-reported reward pairing, unverified`}
-                >
-                  ⟳ $ {t.payoutInfo.rewardSymbol}
-                </span>
+                <span className="shrink-0 border border-amber-400/50 bg-amber-400/10 px-1 font-mono text-[10px] font-bold text-amber-300"
+                  title={`$${t.symbol || t.mint.slice(0, 6)} reportedly rewards holders in $${t.payoutInfo.rewardSymbol} · unverified`}>⟳{t.payoutInfo.rewardSymbol}</span>
               )}
-              <span className={t.status === "GRADUATED" ? "text-emerald-400" : "text-cyan-400/80"}>[{statusOf(t)}]</span>
-              <span className="ml-auto shrink-0 text-green-500/50">{fmtAge(t.ageH)}</span>
+              <span className={`shrink-0 font-mono text-[10px] ${STATUS_SHORT[statusOf(t)]?.[1] ?? "text-green-500/40"}`}>
+                {STATUS_SHORT[statusOf(t)]?.[0] ?? "UNK"}
+              </span>
             </span>
-            {/* line 2 — market metrics: momentum, market cap, volume */}
-            <span className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-green-500/70 sm:ml-auto sm:w-auto">
+            {/* market metrics: momentum, mcap, volume, age */}
+            <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-green-500/70">
               {Number.isFinite(t.change24h) && (
-                <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>
-                  {momentum(t.change24h)}
-                </span>
+                <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>{momentum(t.change24h)}</span>
               )}
               {t.dexLive && <span className="text-emerald-400" title="Live DexScreener quote (browser, ~15s)">●</span>}
               <span>mc {fmtUsd(t.mcap)}</span>
-              <span>vol {fmtUsd(t.vol24)}</span>
-            </span>
-            {/* line 3 — curve progress + row actions */}
-            <span className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
-              <CurveProgress token={t} />
-              <span className="ml-auto flex flex-wrap items-center gap-2 font-mono text-green-500/70 sm:ml-2 sm:flex-nowrap">
-                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-                   className="border border-emerald-500/50 px-1 font-mono text-[11px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
-                   title={`Trade $${t.symbol} here via Jupiter (route availability varies)`}>
-                  [⇄ Trade]
-                </button>
-                <a href={`https://dexscreener.com/solana/${encodeURIComponent(t.mint)}`} target="_blank" rel="noreferrer" title="View market on DexScreener">[DEX ↗]</a>
-                <CopyCa mint={t.mint} />
-              </span>
+              <span className="hidden sm:inline">vol {fmtUsd(t.vol24)}</span>
+              <span className="text-green-500/50">{fmtAge(t.ageH)}</span>
             </span>
           </div>
         ))}
@@ -392,23 +371,13 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       </div>
       <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="launches" />
       <div className="mt-1 text-[11px] uppercase text-green-500/50">
-        Page {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total ·
-        statuses live-checked for {feed?.statusChecked ?? 0}/{feed?.candidateCount ?? 0} active candidates
-        (top 60 volume + top 60 gainers + newest 30); the rest carry archived on-chain curve checks
-        (swept every 5 min) — UNKNOWN fades as each sweep covers more of the tape.
-        Near graduation = ≥{feed?.nearThreshold ?? 90}% funding · completed curves are AMM-verified, persisted globally in the DB and shown GRADUATED for every visitor.
+        Page {feed?.page ?? page}/{pageCount} · {matches} matches · {feed?.rosterTotal ?? "—"} launches total
       </div>
       {!!feed?.statusError?.length && <div className="mt-1 text-[11px] text-amber-400">Some status/progress checks unavailable; UNKNOWN is not BONDING.</div>}
       {tradingDisabled && <div className="mt-1 text-[11px] text-amber-400">Token selection locked while a swap is in progress.</div>}
 
       {/* fee model + comparison */}
-      <div className="mt-2 border border-green-500/20 px-2 py-1.5 text-[11px] uppercase text-green-500/60">
-        {err && <span className="text-amber-400">Cohort snapshot unavailable. </span>}
-        Fee split · {(data?.feeModel || []).map((s, i) => (
-          <span key={s.key} className="mr-2"><span className={`inline-block h-1.5 w-1.5 ${SPLIT_CLS[i]}`} /> {s.label} {s.pct}%</span>
-        ))}
-        <span className="text-green-500/40">est from 24h vol × 1% curve fee</span>
-      </div>
+      {err && <div className="mt-2 text-[11px] text-amber-400">Cohort snapshot unavailable.</div>}
       <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-[11px]">
         <div className="border border-emerald-500/30 p-1.5">
           <div className="uppercase tracking-widest text-emerald-400/80">OTC launcher</div>
@@ -423,11 +392,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           </div>
         </div>
       </div>
-      <div className="mt-1 text-[10px] text-green-500/40">*Cohort/comparison cached 5 min{data?.stale ? " · STALE" : ""}; grad rate = verified GRADUATED ÷ ALL tape launches ({counts.GRADUATED ?? 0}/{counts.ALL ?? 0}) · pump.fun sample biased to active pairs</div>
-      <div className="mt-1 border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] uppercase text-red-400/80">
-        Not affiliated with the token launches shown · DYOR before buying · high volume &amp; liquidity preferred
-        — this is the trench: you win big or lose it all
-      </div>
+      <div className="mt-1 text-[10px] uppercase text-red-400/70">Not affiliated with the launches shown · DYOR</div>
     </div>
     <DialogContent id={detailId} className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto border-green-500/40 bg-black p-4 text-green-300 sm:p-6"
       onCloseAutoFocus={(e) => {

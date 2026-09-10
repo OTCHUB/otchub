@@ -1,21 +1,47 @@
 import React, { useState } from "react";
-import { Activity, ArrowDown, Check, Coins, Copy, Flame, Gem, LineChart } from "lucide-react";
+import { ArrowDown, Check, Coins, Copy, DollarSign, Flame, Gem, HandCoins, LineChart, TrendingUp } from "lucide-react";
 import MascotLogo from "@/components/otc/MascotLogo";
 import HeroRewardStats from "@/components/otc/HeroRewardStats";
-import { fmtNum, fmtSol } from "@/lib/format";
+import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
 
 const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 const DEX_URL = `https://dexscreener.com/solana/${OTC_MINT}`;
 const DESK_CAP = 5000;
 
-// Headline + feature stats read live from the latest snapshot; every value
-// renders as a pill/badge in the memecoin-landing language while staying on
-// the app's token classes so RETRO and MODERN skins both render it.
+// Headline + feature stats read live from the latest snapshot. $HUB twins
+// for these cards can be added next to the $OTC ones once the HUB mint
+// launches.
+// Latest CLOSED-day per-desk earning — today's row is still in progress.
+const perDesk24hSolOf = (s) => {
+  const items = s?.per_desk?.items || [];
+  const today = new Date().toISOString().slice(0, 10);
+  const closed = items
+    .filter((d) => String(d.day || "") < today)
+    .sort((a, b) => String(b.day).localeCompare(String(a.day)));
+  return closed[0]?.per_desk_sol ?? null;
+};
 const FEATURES = [
-  { icon: Coins, label: "POT", value: (s) => `${fmtSol(s?.pot_sol_balance)} SOL`, desc: "Live desk pot balance" },
-  { icon: Gem, label: "FLOOR", value: (s) => `${fmtSol(s?.nft_floor_sol)} SOL`, desc: "Desk NFT floor price" },
-  { icon: Activity, label: "ROUNDS", value: (s) => fmtNum(s?.rounds_total), desc: "Lifetime distribution rounds" },
-  { icon: Flame, label: "BUYBACKS", value: (s) => `${fmtSol(s?.protocol_buyback_sol)} SOL`, desc: "Protocol buyback spend" },
+  { icon: Coins, label: "$OTC MCAP", value: (s) => fmtUsd(s?.token_market_cap), desc: () => "Live market cap" },
+  { icon: DollarSign, label: "$OTC PRICE", value: (s) => fmtUsd(s?.token_price_usd), desc: () => "Live price per token" },
+  {
+    icon: Flame,
+    label: "SUPPLY BURNT",
+    value: (s) => (s?.token_burnt != null ? `${(s.token_burnt / 1e6).toFixed(2)}M` : "—"),
+    desc: (s) => (s?.token_total_supply ? `${((s.token_burnt / s.token_total_supply) * 100).toFixed(1)}% of supply burnt` : "—"),
+  },
+  { icon: Gem, label: "DESK SUPPLY", value: (s) => fmtNum(s?.nft_total_supply), desc: () => "OTC Desks NFT live supply" },
+  {
+    icon: HandCoins,
+    label: "EARN / DESK",
+    value: (s) => `${fmtSol(perDesk24hSolOf(s))} SOL`,
+    desc: (s) => `≈ ${fmtUsd((perDesk24hSolOf(s) ?? 0) * (s?.sol_price_usd ?? 0))} per desk · 24h`,
+  },
+  {
+    icon: TrendingUp,
+    label: "ARB SPREAD",
+    value: (s) => (s?.spread_pct != null ? `${s.spread_pct.toFixed(1)}%` : "—"),
+    desc: (s) => `${fmtSol(s?.spread_sol)} SOL edge`,
+  },
 ];
 
 export default function HeroLanding({ latest }) {
@@ -93,14 +119,14 @@ export default function HeroLanding({ latest }) {
           <HeroRewardStats latest={latest} />
 
           {/* Live feature cards */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {FEATURES.map(({ icon: Icon, label, value, desc }) => (
-              <div key={label} className="border border-green-500/20 bg-green-500/5 p-2.5">
+              <div key={label} className="border border-green-500/20 bg-green-500/5 p-2">
                 <div className="flex items-center gap-1.5 text-[10px] tracking-widest text-green-500/60">
-                  <Icon className="h-3.5 w-3.5" /> {label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" /> {label}
                 </div>
                 <div className="mt-1.5 text-[15px] font-bold text-green-300">{value(latest)}</div>
-                <div className="mt-0.5 text-[10px] leading-snug text-green-500/50">{desc}</div>
+                <div className="mt-0.5 text-[10px] leading-snug text-green-500/50">{desc(latest)}</div>
               </div>
             ))}
           </div>
