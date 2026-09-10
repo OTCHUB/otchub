@@ -61,6 +61,11 @@ jobs:
           VITE_HUB_MINT=
 
           VITE_BASE44_APP_ID=${{ secrets.VITE_BASE44_APP_ID }}
+
+          # Base44 backend — required when deployed outside Base44's own hosting.
+          # On Base44 preview the platform reverse-proxies /api/* for you; on
+          # Cloudflare Pages there is no proxy, so the SDK must call Base44 directly.
+          VITE_BASE44_APP_BASE_URL=https://base44.app
           EOF
 
       - name: Build
