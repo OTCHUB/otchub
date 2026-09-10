@@ -169,6 +169,15 @@ export default function HeroLanding({ latest, onGoPanel }) {
             <div className="mt-1 h-1.5 w-full overflow-hidden bg-green-500/10">
               <div className="h-full bg-emerald-400/80 transition-all duration-500" style={{ width: `${desksPct}%` }} />
             </div>
+            <a
+              href="https://otcdesks.cash/mint"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Mint an OTC Desk on the official site"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-[12px] font-bold tracking-wider text-emerald-400 hover:bg-emerald-500/20"
+            >
+              <Gem className="h-3.5 w-3.5" /> MINT A DESK ↗
+            </a>
           </div>
         </div>
       </div>

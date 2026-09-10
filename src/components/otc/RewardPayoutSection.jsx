@@ -10,16 +10,23 @@ import { useTokenSymbols } from "@/lib/useTokenSymbols";
 const solscanUrl = (mint) => `https://solscan.io/token/${encodeURIComponent(mint)}`;
 const shortMint = (mint) => `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 
-// Per-payout stonk icon: the member token's own logo, falling back to its
-// first letter when no image is available or it fails to load.
+// Official launcher payout icons live at otcdesks.cash/stocks/<SYMBOL>.png
+// (the same stock icons the official launcher's reward picker uses); the
+// DexScreener logo is the fallback, then the symbol's first letter.
+const stockIconUrl = (symbol) => (typeof symbol === "string" && symbol
+  ? `https://otcdesks.cash/stocks/${encodeURIComponent(symbol.toUpperCase())}.png`
+  : "");
+
 export function PayoutIcon({ mint, symbol, logo }) {
   const [failedUrl, setFailedUrl] = useState("");
   const label = symbol || shortMint(mint);
+  const srcs = [stockIconUrl(symbol), logo].filter(Boolean);
+  const src = srcs.find((u) => u !== failedUrl) || "";
   return (
-    <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-green-500/30 bg-green-500/10 text-[9px] leading-none text-green-300">
-      {logo && logo !== failedUrl ? (
-        <img src={logo} alt="" width={16} height={16} loading="lazy" decoding="async" referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(logo)} className="h-full w-full object-cover" />
+    <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-[9px] font-bold leading-none text-slate-900">
+      {src ? (
+        <img src={src} alt="" width={16} height={16} loading="lazy" decoding="async" referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(src)} className="h-full w-full object-contain" />
       ) : label.slice(0, 1)}
     </span>
   );
