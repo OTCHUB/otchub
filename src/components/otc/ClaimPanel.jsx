@@ -261,7 +261,7 @@ export default function ClaimPanel({
             msg: `BACKLOG :: ${newClaimable.length} desk(s) received newly delivered stock — claiming...`,
           });
           const pairs = await buildClaimPairs(newClaimable, address, tpMap);
-          const r2 = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+          const r2 = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 3, setProgress);
           results.push(...r2);
           setCleared((prev) => {
             const n = new Set(prev);
@@ -277,7 +277,7 @@ export default function ClaimPanel({
         // This is the smooth default for claiming already-owed stock.
         const pairs = await buildClaimPairs(claimable, address, tpMap);
         log({ type: "info", msg: `PAIRS :: ${pairs.length} atomic distribute+claim pair(s).` });
-        results = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 60, setProgress);
+        results = await executePairedClaim(pairs, address, signer.signAllTransactionsRaw, log, 3, setProgress);
       }
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;

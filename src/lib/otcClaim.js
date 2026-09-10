@@ -1083,7 +1083,7 @@ export async function executePairedClaim(
   user,
   signAllTransactionsRaw,
   onLog,
-  pairsPerGroup = 60,
+  desksPerGroup = 3,
   onProgress
 ) {
   const results = [];
@@ -1124,10 +1124,28 @@ export async function executePairedClaim(
     return results;
   }
 
-  const totalGroups = Math.ceil(goodPairs.length / pairsPerGroup);
+  // Group pairs by desk (assetId) so all tickers for a desk share the same
+  // signing group.  This prevents cross-group state contamination: when group N
+  // confirms its distribute+claim txs it advances the desk's on-chain round
+  // counter, which would invalidate a pre-computed distCount for the same desk
+  // in a later group — causing that group's simulation to fail silently and
+  // the wallet prompt to never appear (the "missing last approval" bug).
+  const deskMap = new Map(); // assetId -> pair[]
+  for (const p of goodPairs) {
+    if (!deskMap.has(p.assetId)) deskMap.set(p.assetId, []);
+    deskMap.get(p.assetId).push(p);
+  }
+  const deskIds = [...deskMap.keys()];
+  // Batch desks into groups of up to desksPerGroup.
+  const pairGroups = [];
+  for (let i = 0; i < deskIds.length; i += desksPerGroup) {
+    pairGroups.push(deskIds.slice(i, i + desksPerGroup).flatMap((id) => deskMap.get(id)));
+  }
+
+  const totalGroups = pairGroups.length;
   onLog({
     type: "info",
-    msg: `PAIRED :: ${goodPairs.length} ticker(s) in ${totalGroups} group(s) :: ~${totalGroups} wallet approval(s).`,
+    msg: `PAIRED :: ${goodPairs.length} ticker(s) across ${deskIds.length} desk(s) in ${totalGroups} group(s) of ≤${desksPerGroup} desk(s) :: ~${totalGroups} wallet approval(s).`,
   });
   onProgress?.({
     group: 0,
@@ -1138,7 +1156,7 @@ export async function executePairedClaim(
   });
   for (let g = 0; g < totalGroups; g++) {
     const groupNo = g + 1;
-    const groupPairs = goodPairs.slice(g * pairsPerGroup, (g + 1) * pairsPerGroup);
+    const groupPairs = pairGroups[g];
     // Distinct desk names covered by this signing group, in first-seen order —
     // shown in the progress UI so the user knows which desks are signing now.
     const desks = [...new Set(groupPairs.map((p) => p.deskName))];
