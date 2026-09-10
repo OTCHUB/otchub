@@ -223,25 +223,19 @@ export default function Home() {
   // 24H window = the latest CLOSED daily row; shown next to the 7D trailing average.
   const perDesk24hSol = sortedPd[0]?.per_desk_sol ?? 0;
 
-  if (loading || !bootDone) {
-    // Session already booted: a quiet spinner while data loads, never a
-    // boot replay.
-    if (bootDone) {
-      return (
-        <div className="skin-stage fixed inset-0 flex items-center justify-center bg-black">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500/20 border-t-green-400" />
-        </div>
-      );
-    }
-    // First visit this session: the boot sequence IS the loading screen —
-    // it plays while the dashboard fetch runs in parallel and holds at
-    // SYNCING_MARKET_DATA until the data lands, then reveals instantly.
+  // First visit this session: the boot sequence plays while the dashboard
+  // fetch runs in parallel and reveals the app the moment data lands.
+  if (!bootDone) {
     return (
       <React.Suspense fallback={null}>
         <BootScreen ready={!loading} onComplete={() => setBootDone(true)} />
       </React.Suspense>
     );
   }
+  // Returning visitors see the app INSTANTLY: the dashboard renders right
+  // away with a slim "syncing" banner in the header (panels show live "—"
+  // placeholders) while the first snapshot resolves — no full-screen
+  // spinner gate.
 
   return (
     <div className="skin-stage min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[52px] font-mono text-green-400">
@@ -286,6 +280,14 @@ export default function Home() {
           {error && (
             <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[13px] text-amber-400">
             Error · {error}
+            </div>
+          )}
+          {/* First snapshot still in flight (or auto-refresh running): slim
+              inline sync indicator instead of a blocking full-screen gate. */}
+          {!data && !error && (
+            <div className="mt-2 flex items-center gap-2 border border-cyan-500/40 bg-cyan-500/5 px-2 py-1.5 text-[13px] text-cyan-300">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+              Syncing live data…
             </div>
           )}
           {/* Official $HUB CA banner — hidden until the real mint is set */}
