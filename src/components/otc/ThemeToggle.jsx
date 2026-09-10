@@ -9,7 +9,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(toggleTheme())}
-      className="inline-flex items-center justify-center whitespace-nowrap border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5"
+      className="inline-flex items-center justify-center border border-green-500/50 p-1.5 text-green-400 hover:bg-green-500/10 sm:p-2"
       title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
       aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
     >
