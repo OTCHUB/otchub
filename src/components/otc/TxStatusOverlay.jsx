@@ -72,7 +72,7 @@ export default function TxStatusOverlay({ phase, detail = null, onCancel = null 
   const p = PHASES[phase] || PHASES.prep;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[60] flex justify-center px-3">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[60px] z-[60] flex justify-center px-3">
       <div className={`w-full max-w-lg border bg-black/95 px-3 py-2 ${p.cls} ${onCancel ? "pointer-events-auto" : ""}`}>
         <div className="flex items-center gap-2.5">
           <span
