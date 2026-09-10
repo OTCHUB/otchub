@@ -21,7 +21,7 @@ export default function QuickNavBar() {
       <div className="mx-auto flex max-w-3xl items-center justify-center gap-1">
         {ITEMS.map((it) => {
           const base =
-            "flex min-h-[32px] flex-1 items-center justify-center gap-1.5 px-1 text-[10px] uppercase tracking-widest sm:flex-none sm:px-3";
+            "flex min-h-[32px] flex-1 items-center justify-center px-1 sm:flex-none sm:px-3";
           return it.external ? (
             <a
               key={it.label}
@@ -29,15 +29,13 @@ export default function QuickNavBar() {
               target="_blank"
               rel="noopener noreferrer"
               title="RU_FOMO — alpha terminal"
-              className={`${base} whitespace-nowrap text-amber-400 hover:text-amber-300`}
+              className={`${base} text-amber-400 hover:text-amber-300`}
             >
-              <it.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="whitespace-nowrap">{it.label}</span>
+              <it.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             </a>
           ) : (
             <a key={it.id} href={`#${it.id}`} title={it.label} className={`${base} text-green-500/70 hover:text-green-300`}>
-              <it.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              <span className="whitespace-nowrap">{it.label}</span>
+              <it.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             </a>
           );
         })}

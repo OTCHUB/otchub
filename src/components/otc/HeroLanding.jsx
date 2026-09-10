@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { ArrowDown, Check, Coins, Copy, Flame, Gem, HandCoins, LineChart } from "lucide-react";
+import { Activity, ArrowDown, Check, Coins, Copy, Flame, Gem, LineChart } from "lucide-react";
 import MascotLogo from "@/components/otc/MascotLogo";
+import HeroRewardStats from "@/components/otc/HeroRewardStats";
 import { fmtNum, fmtSol } from "@/lib/format";
 
 const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
@@ -13,7 +14,7 @@ const DESK_CAP = 5000;
 const FEATURES = [
   { icon: Coins, label: "POT", value: (s) => `${fmtSol(s?.pot_sol_balance)} SOL`, desc: "Live desk pot balance" },
   { icon: Gem, label: "FLOOR", value: (s) => `${fmtSol(s?.nft_floor_sol)} SOL`, desc: "Desk NFT floor price" },
-  { icon: HandCoins, label: "PAID OUT", value: (s) => `${fmtSol(s?.protocol_distributed_sol)} SOL`, desc: "Lifetime distributed to desks" },
+  { icon: Activity, label: "ROUNDS", value: (s) => fmtNum(s?.rounds_total), desc: "Lifetime distribution rounds" },
   { icon: Flame, label: "BUYBACKS", value: (s) => `${fmtSol(s?.protocol_buyback_sol)} SOL`, desc: "Protocol buyback spend" },
 ];
 
@@ -57,6 +58,7 @@ export default function HeroLanding({ latest }) {
           {/* CA copy bar */}
           <div className="mt-4 flex max-w-xl items-center gap-2">
             <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
+              <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
               <span className="shrink-0 text-green-500/50">CA</span>
               <span className="truncate">{OTC_MINT}</span>
             </span>
@@ -86,6 +88,9 @@ export default function HeroLanding({ latest }) {
               CONNECT WALLET <ArrowDown className="h-3.5 w-3.5" />
             </a>
           </div>
+
+          {/* Lifetime reward totals: desk NFT holders + launch holders */}
+          <HeroRewardStats latest={latest} />
 
           {/* Live feature cards */}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
