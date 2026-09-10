@@ -14,8 +14,8 @@ import { HUB_ENABLED } from "@/lib/hubFlag";
 // navigates via react-router (spa: true) instead of a full page load. The
 // mainnet entry stays dark in the menu until launch, same gate as the route
 // itself in App.jsx (hubGated: true below). The devnet sandbox at
-// otchub.dev/devnet has no such gate — it's a risk-free QA environment and
-// is always listed, independent of HUB_ENABLED.
+// otchub.dev/devnet is ungated in App.jsx for direct-URL QA, but is
+// intentionally left out of this menu until its program logic is verified.
 //
 // Grouped into three sections, ordered so the two ecosystems stay visually
 // separate as each grows independently, with social/chat kept apart from
@@ -39,16 +39,6 @@ const LINKS = [
     icon: Sparkles,
     spa: true,
     hubGated: true,
-  },
-  {
-    id: "hub-devnet",
-    group: "otc-hub",
-    label: "$HUB Protocol (Devnet)",
-    hint: "QA sandbox — devnet only, no real funds",
-    href: "/devnet",
-    icon: Sparkles,
-    spa: true,
-    badge: "DEVNET",
   },
   {
     id: "ru-fomo-web",
