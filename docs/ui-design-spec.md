@@ -35,8 +35,10 @@ this document stays the definition of "default".
 | Startup init (`initTheme()`) | `src/main.jsx` |
 | Chart telemetry tokens + `useChartTheme()` hook + shared recharts styles | `src/lib/chartTheme.js` |
 | Light/dark toggle (icon-only, Sun/Moon = mode it switches TO) | `src/components/otc/ThemeToggle.jsx` |
-| Boot screen (first-session BIOS sequence, CRT overlay) | `src/components/otc/BootScreen.jsx` |
+| Boot screen (first-session BIOS sequence, strictly text/ASCII, CRT overlay) | `src/components/otc/BootScreen.jsx` |
 | Fixed top/bottom terminal bars | `src/components/otc/TerminalBars.jsx` |
+| Bottom quick-nav bar (wallet → wallet panel, Snipe → arbitrage panel) | `src/components/otc/QuickNavBar.jsx` |
+| Mascot logo (canvas-keyed transparent background) | `src/components/otc/MascotLogo.jsx`, `src/components/otc/RuFomoIcon.jsx` |
 | Collapsible panel window (the ONE frame per panel) | `src/components/otc/CollapsibleCard.jsx` |
 | Dashboard composition (header layout, panel stack) | `src/pages/Home.jsx` |
 | Portaled dropdown (pattern for all menus) | `src/components/otc/CommunityMenu.jsx` |
@@ -118,7 +120,12 @@ like, mobile-first.
   bg-emerald-400`) + ALL-CAPS text (`LIVE`, `CONNECTED · xxxx…xxxx`).
 - Boot screen (first visit per session): full-screen CRT treatment — scanline
   overlay + vignette (`.boot-crt` divs in `BootScreen.jsx`), one printed line
-  = one progress step.
+  = one progress step. **Strictly text/ASCII — no images at all**: the
+  OTC_HUB wordmark is 3-row block-element glyph art (`▄████▄ ██████ …`),
+  the sub-banner is a box-drawing `+---+` frame, boot lines are typed
+  milestone text with a blinking `▋` cursor, and progress is a hairline bar
+  tracking the printed lines. Replays once per browser session only
+  (`sessionStorage` flag).
 - Fee-flow marching dashes (`.pot-flow-x/y`) are green when live, dim red
   (`.pot-flow-broken`) when a route is down.
 
@@ -128,6 +135,8 @@ like, mobile-first.
 | --- | --- |
 | Panel | `CollapsibleCard` — `[−]/[+]` header, ALL-CAPS title, `openSignal` counter to force-open from other panels, `locked` while a flow is busy |
 | Page frame | Fixed `TerminalTopBar` + `TerminalBottomBar` bars, `max-w-7xl` center column, `px-3 py-4 sm:px-4 sm:py-6`, panels stacked with `mt-3`, `lg:grid-cols-*` splits |
+| Bottom quick-nav | `QuickNavBar` — fixed bottom icon bar; **wallet button routes to the wallet panel** (expand signal + scroll, never to the swap); **Snipe** uses the Crosshair icon and jumps to the arbitrage panel (live-vault NEAR_FLOOR desks ranked by net cost with buy links) |
+| Branded icons | Transparent background-removed images only — logos go through the canvas-keying components (`MascotLogo`, `RuFomoIcon`); plain `<img>` with background kept is not allowed in chrome/nav |
 | Header | Transparent logo image + ALL-CAPS wordmark + blinking `▋` cursor; single square action row (menu, X icon link `p-1.5 sm:p-2`, theme toggle, refresh) — all frames the same compact square size |
 | Hero | Terminal window with badge chips, ALL-CAPS headline, full-length CA copy bar, bordered CTA buttons, live stat cards that click-through to their panel |
 | Buttons | `border px-… py-1 text-[10px]–[12px] font-bold uppercase` + family color; primary CTAs get `bg-<accent>/10`–`/15` |
