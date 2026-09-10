@@ -6,7 +6,6 @@ import XIcon from "@/components/otc/XIcon";
 import MascotLogo from "@/components/otc/MascotLogo";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
-import SkinToggle from "@/components/otc/SkinToggle";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import LauncherAnalytics from "@/components/otc/LauncherAnalytics";
@@ -267,7 +266,6 @@ export default function Home() {
               >
                 <XIcon className="h-4 w-4" />
               </a>
-              <SkinToggle />
               <ThemeToggle />
               <button
                 onClick={refresh}

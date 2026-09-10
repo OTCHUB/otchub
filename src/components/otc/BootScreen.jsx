@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
-import { getStoredSkin } from "@/lib/theme";
 
 // Session-scoped flag: the boot sequence plays ONCE per browser session —
 // reloads and same-session navigation skip straight to the dashboard with a
@@ -30,9 +29,6 @@ const LINES = [
 export default function BootScreen({ onComplete, ready = true }) {
   const [lines, setLines] = useState([]);
   const [done, setDone] = useState(false);
-  // Boot-time skin: the modern skin renders a sans hero instead of the
-  // ASCII banner, so the boot sequence is fully converted too.
-  const [skin] = useState(getStoredSkin);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -84,20 +80,9 @@ export default function BootScreen({ onComplete, ready = true }) {
       {/* Scrollable terminal body: stays inside the viewport on every screen */}
       <div className="relative z-20 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
         <div className="w-full max-w-3xl xl:max-w-4xl">
-          {skin === "modern" ? (
-            <div className="text-left sm:text-center">
-              <div className="font-display text-2xl font-bold uppercase tracking-[0.22em] text-green-300 sm:text-4xl">
-                OTC_HUB
-              </div>
-              <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-green-500/60 sm:text-[12px]">
-                OTC ecosystem tooling · created by Hub Yield Optimizer Protocol
-              </div>
-            </div>
-          ) : (
-            <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
-              {"+---------------------------------------------+\n|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |\n|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |\n+---------------------------------------------+"}
-            </div>
-          )}
+          <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
+            {"+---------------------------------------------+\n|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |\n|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |\n+---------------------------------------------+"}
+          </div>
           <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
             {lines.map((l, idx) => (
               <div key={idx}>

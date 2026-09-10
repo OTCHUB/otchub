@@ -80,8 +80,7 @@ function TokenDetails({ token, symbols = {} }) {
       </div>
       <div className="min-w-0 space-y-3">
         <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] text-green-500/70">
-          <span className="min-w-0 truncate sm:hidden" title={token.mint}>{token.mint.slice(0, 6)}…{token.mint.slice(-6)}</span>
-          <span className="hidden break-all sm:inline">{token.mint}</span>
+          <span className="min-w-0 break-all" title={token.mint}>{token.mint}</span>
           <CopyCa mint={token.mint} />
         </div>
         <div className="flex flex-wrap gap-2" aria-label="Token social links">

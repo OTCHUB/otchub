@@ -4,38 +4,9 @@
 // toggling the class swaps the whole palette with no component changes.
 const KEY = "otc_theme";
 
-// Dispatched on every theme/skin change so JS-colored visuals (chart
+// Dispatched on every theme change so JS-colored visuals (chart
 // telemetry via src/lib/chartTheme.js) re-read their CSS tokens live.
 export const THEME_CHANGE_EVENT = "otc-theme-change";
-
-// Skin: RETRO (classic green terminal) by default, MODERN ("Iridescent
-// Terminal" HUD) opt-in via the icon-only header toggle. Persisted per
-// visitor alongside the dark/light theme.
-const SKIN_KEY = "otc_skin";
-
-export function getStoredSkin() {
-  try {
-    return window.localStorage.getItem(SKIN_KEY) === "modern" ? "modern" : "retro";
-  } catch {
-    return "retro";
-  }
-}
-
-export function toggleSkin() {
-  const next = getStoredSkin() === "modern" ? "retro" : "modern";
-  applySkin(next);
-  try {
-    window.localStorage.setItem(SKIN_KEY, next);
-  } catch {
-    /* storage unavailable — skin lasts for this session only */
-  }
-  return next;
-}
-
-export function applySkin(skin) {
-  document.documentElement.classList.toggle("skin-modern", skin === "modern");
-  window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
-}
 
 export function getStoredTheme() {
   try {
@@ -50,10 +21,9 @@ export function applyTheme(theme) {
   window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
 }
 
-// Run once at startup (main.jsx) so the classes exist before first paint.
+// Run once at startup (main.jsx) so the class exists before first paint.
 export function initTheme() {
   applyTheme(getStoredTheme());
-  applySkin(getStoredSkin());
 }
 
 export function toggleTheme() {

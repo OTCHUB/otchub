@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { THEME_CHANGE_EVENT } from "@/lib/theme";
 
 // Chart telemetry tokens: single source for every JS-colored chart value.
-// The CSS variables live in index.css (:root = RETRO values replicating the
-// previous hardcoded chart hexes; html.skin-modern = Iridescent Terminal
-// values), so every skin restyles all charts by swapping tokens — no chart
+// The CSS variables live in index.css (:root dark / html.light values), so
+// the dark/light theme restyles all charts by swapping tokens — no chart
 // code changes.
 const TOKENS = {
   grid: "--chart-grid",
@@ -37,7 +36,7 @@ function readChartTheme() {
   return t;
 }
 
-// Reads the live chart tokens and re-reads them whenever the theme or skin
+// Reads the live chart tokens and re-reads them whenever the theme
 // changes (theme.js dispatches THEME_CHANGE_EVENT on every toggle).
 export function useChartTheme() {
   const [theme, setTheme] = useState(readChartTheme);
