@@ -27,12 +27,39 @@ jobs:
       # Vite loads .env.production.local automatically for `vite build`.
       # This file is gitignored (*.local), so CI writes it from repo secrets
       # right before building — mirrors the local production-build setup.
+      #
+      # Program IDs are stored as Solscan/Solana.fm explorer URLs (with a
+      # `?ref=...&cluster=...` query string), not raw pubkeys — strip the
+      # query string here so the app gets a plain base58 address.
       - name: Write production env
         run: |
+          MAINNET_PROGRAM_ID="${{ secrets.VITE_HUB_MAINNET_PROGRAM_ID }}"
+          MAINNET_PROGRAM_ID="${MAINNET_PROGRAM_ID%%\?*}"
+          DEVNET_PROGRAM_ID="${{ secrets.VITE_HUB_DEVNET_PROGRAM_ID }}"
+          DEVNET_PROGRAM_ID="${DEVNET_PROGRAM_ID%%\?*}"
           cat <<EOF > .env.production.local
-          VITE_HUB_RPC_URL=${{ secrets.VITE_HUB_RPC_URL }}
-          VITE_HUB_CLUSTER=${{ secrets.VITE_HUB_CLUSTER }}
-          VITE_HUB_PROGRAM_ID=${{ secrets.VITE_HUB_PROGRAM_ID }}
+          # Main mount (/hub) — mainnet-beta config.
+          # NOTE: VITE_HUB_MAINNET_PROGRAM_ID currently resolves to the same
+          # address as devnet (7c5oPs9G...7b7i) — the $HUB program has not
+          # been deployed to mainnet-beta yet (see src/hub/lib/deployments.ts,
+          # HUB_MAINNET = null). VITE_HUB_ENABLED=false keeps /hub hidden
+          # until this secret is updated with the real mainnet deploy address.
+          VITE_HUB_RPC_URL=${{ secrets.VITE_HUB_MAINNET_RPC_URL }}
+          VITE_HUB_CLUSTER=${{ secrets.VITE_HUB_MAINNET_CLUSTER }}
+          VITE_HUB_PROGRAM_ID=$MAINNET_PROGRAM_ID
+
+          # Sandbox mount (/devnet) — QA only, always devnet.
+          VITE_HUB_DEVNET_RPC_URL=${{ secrets.VITE_HUB_DEVNET_RPC_URL }}
+          VITE_HUB_DEVNET_PROGRAM_ID=$DEVNET_PROGRAM_ID
+
+          # Launch control — flip to true only once the real mainnet program
+          # (and VITE_HUB_MINT below) are live. Requires a PR to change.
+          VITE_HUB_ENABLED=false
+
+          # $HUB token mint — set once minted via the OTC launcher.
+          # Empty keeps every mint-gated UI element hidden (see src/lib/hubMint.js).
+          VITE_HUB_MINT=
+
           VITE_BASE44_APP_ID=${{ secrets.VITE_BASE44_APP_ID }}
           EOF
 
