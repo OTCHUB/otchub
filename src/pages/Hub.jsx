@@ -16,9 +16,11 @@ import {
   useHub,
 } from "@/hub";
 
-// $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/" so the
-// hub module's relative routes resolve to /treasury, /deployments, /desk/:asset.
-// Signing reuses the wallet connected on /otc (walletSigner); swaps go through
+// $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/hub/*"
+// (and, as a forced-devnet sandbox, "/devnet/*") so the hub module's relative
+// routes resolve under whichever base path it's mounted at; header nav links
+// below are relative (no leading slash) so they work from either mount.
+// Signing reuses the wallet connected on "/" (walletSigner); swaps go through
 // the jupiterSwapRelay backend function like the OTC swap panel.
 const hubSwapTransport = {
   quote: ({ inputMint, outputMint, amount, slippageBps }) =>
@@ -33,6 +35,15 @@ export const HUB_CONFIG = {
   // Defaults to the address baked into the vendored IDL (devnet deploy).
   programId: import.meta.env.VITE_HUB_PROGRAM_ID || undefined,
   cluster: CLUSTERS.includes(envCluster) ? envCluster : "devnet",
+};
+// "/devnet" sandbox — always devnet regardless of VITE_HUB_CLUSTER, so it
+// keeps working as a risk-free QA environment even after HUB_CONFIG above
+// flips to mainnet-beta at launch. Separate RPC/program-id env vars so the
+// two mounts never share config once mainnet is live.
+export const HUB_DEVNET_CONFIG = {
+  rpcUrl: import.meta.env.VITE_HUB_DEVNET_RPC_URL ?? "https://api.devnet.solana.com",
+  programId: import.meta.env.VITE_HUB_DEVNET_PROGRAM_ID || undefined,
+  cluster: "devnet",
 };
 
 // Shared with pages/Home.jsx: the address persisted by WalletConnect.
@@ -66,23 +77,24 @@ function HubHeader() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <NavLink to="/" end className={navCls}>
+          {/* Relative (no leading slash) — resolves under /hub or /devnet alike. */}
+          <NavLink to="" end className={navCls}>
             [DASHBOARD]
           </NavLink>
-          <NavLink to="/treasury" className={navCls}>
+          <NavLink to="treasury" className={navCls}>
             [TREASURY]
           </NavLink>
-          <NavLink to="/tokenomics" className={navCls}>
+          <NavLink to="tokenomics" className={navCls}>
             [TOKENOMICS]
           </NavLink>
-          <NavLink to="/mechanics" className={navCls}>
+          <NavLink to="mechanics" className={navCls}>
             [MECHANICS]
           </NavLink>
-          <NavLink to="/deployments" className={navCls}>
+          <NavLink to="deployments" className={navCls}>
             [DEPLOYMENTS]
           </NavLink>
           <Link
-            to="/otc"
+            to="/"
             className="inline-flex items-center whitespace-nowrap border border-emerald-500/70 px-2 py-1 text-[12px] font-bold text-emerald-400 hover:bg-emerald-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
             title="OTC_DESK analytics: $OTC price, desk arbitrage, pot revenue, claims"
           >
@@ -121,8 +133,11 @@ function HubShell({ wallet }) {
   );
 }
 
-export default function Hub() {
-  // Follow the wallet connected on /otc (same tab or another) without a second connect UI.
+// devnet: force the "/devnet" sandbox config regardless of VITE_HUB_CLUSTER
+// (see HUB_DEVNET_CONFIG above) — same component tree, mounted a second time
+// at a different route in App.jsx.
+export default function Hub({ devnet = false }) {
+  // Follow the wallet connected on "/" (same tab or another) without a second connect UI.
   const [wallet, setWallet] = useState(() => {
     try {
       return window.localStorage.getItem(WALLET_STORAGE_KEY) || undefined;
@@ -138,11 +153,13 @@ export default function Hub() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  const config = devnet ? HUB_DEVNET_CONFIG : HUB_CONFIG;
+
   return (
     <HubProvider
-      rpcUrl={HUB_CONFIG.rpcUrl}
-      programId={HUB_CONFIG.programId}
-      cluster={HUB_CONFIG.cluster}
+      rpcUrl={config.rpcUrl}
+      programId={config.programId}
+      cluster={config.cluster}
       queryClient={queryClientInstance}
       resolveSigner={getSignerForAddress}
       swapTransport={hubSwapTransport}

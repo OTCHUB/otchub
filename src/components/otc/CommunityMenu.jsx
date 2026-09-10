@@ -6,7 +6,21 @@
 // contexts anywhere) can never clip or cover it.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ExternalLink, Eye, Globe, Menu, MessagesSquare, Send, Users, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ExternalLink, Eye, Globe, Menu, MessagesSquare, Send, Sparkles, Users, Zap } from "lucide-react";
+import { HUB_ENABLED } from "@/lib/hubFlag";
+
+// $HUB protocol dashboard lives at otchub.dev/hub — an in-SPA route, so it
+// navigates via react-router (spa: true) instead of a full page load. Stays
+// dark in the menu until launch, same gate as the route itself in App.jsx.
+const HUB_LINK = {
+  id: "hub",
+  label: "$HUB Protocol Dashboard",
+  hint: "treasury · yield tracker · tokenomics",
+  href: "/hub",
+  icon: Sparkles,
+  spa: true,
+};
 
 const LINKS = [
   {
@@ -20,8 +34,13 @@ const LINKS = [
     id: "ru-fomo-web",
     label: "RU_FOMO alpha terminal",
     hint: "live FOMO tape + safety gate",
-    href: "https://fomo.otchub.dev",
+    // Same origin now (otchub.dev/fomo, Workers Route — see rufomo/wrangler.toml),
+    // so the connected wallet (otc_wallet_address) carries over automatically.
+    // Still a full navigation (separate Worker/bundle, not an SPA route) but
+    // stays in the same tab since it never leaves the domain.
+    href: "/fomo",
     icon: Zap,
+    samesite: true,
   },
   {
     id: "x-chat",
@@ -135,28 +154,47 @@ export default function CommunityMenu() {
           <div className="border-b border-green-500/20 px-3 py-1.5 text-[11px] uppercase tracking-widest text-green-500/50">
             Navigation
           </div>
-          {LINKS.map((l) => (
-            <a
-              key={l.id}
-              role="menuitem"
-              href={l.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 border-b border-green-500/10 px-3 py-2 text-[13px] text-green-400 last:border-b-0 hover:bg-green-500/10"
-            >
-              <l.icon className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1">
-                {l.label} ↗
-                <span className="block text-[11px] text-green-500/50">{l.hint}</span>
-              </span>
-              {l.badge && (
-                <span className="border border-green-500/60 px-1 py-px text-[11px] font-bold uppercase tracking-widest text-green-300 animate-pulse">
-                  {l.badge}
+          {(HUB_ENABLED ? [HUB_LINK, ...LINKS] : LINKS).map((l) => {
+            const itemCls =
+              "flex items-center gap-2 border-b border-green-500/10 px-3 py-2 text-[13px] text-green-400 last:border-b-0 hover:bg-green-500/10";
+            const content = (
+              <>
+                <l.icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="flex-1">
+                  {l.label} {!l.spa && !l.samesite && "↗"}
+                  <span className="block text-[11px] text-green-500/50">{l.hint}</span>
                 </span>
-              )}
-            </a>
-          ))}
+                {l.badge && (
+                  <span className="border border-green-500/60 px-1 py-px text-[11px] font-bold uppercase tracking-widest text-green-300 animate-pulse">
+                    {l.badge}
+                  </span>
+                )}
+              </>
+            );
+            // /hub is an in-SPA route (react-router Link, no reload); /fomo is
+            // same-origin but a different app/Worker (full nav, same tab);
+            // everything else is a genuine external site (new tab).
+            if (l.spa) {
+              return (
+                <Link key={l.id} role="menuitem" to={l.href} onClick={() => setOpen(false)} className={itemCls}>
+                  {content}
+                </Link>
+              );
+            }
+            return (
+              <a
+                key={l.id}
+                role="menuitem"
+                href={l.href}
+                target={l.samesite ? undefined : "_blank"}
+                rel={l.samesite ? undefined : "noopener noreferrer"}
+                onClick={() => setOpen(false)}
+                className={itemCls}
+              >
+                {content}
+              </a>
+            );
+          })}
         </div>,
         document.body
       )}

@@ -15,7 +15,7 @@ export default function QuickNavBar({ onWallet }) {
     // Snipe: crosshair → arbitrage panel, which lists the live-vault
     // NEAR_FLOOR desks ranked by net cost with direct Magic Eden buy links.
     { id: "otc-arbitrage", label: "Snipe", icon: Crosshair },
-    { href: "https://fomo.otchub.dev", label: "RU_FOMO", icon: RuFomoIcon, external: true },
+    { href: "/fomo", label: "RU_FOMO", icon: RuFomoIcon, external: true },
   ];
 
   return (

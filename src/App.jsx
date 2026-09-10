@@ -2,7 +2,7 @@ import React from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -15,14 +15,11 @@ import { HUB_ENABLED } from './lib/hubFlag';
 
 // $HUB dashboard stays dark until the token launches on mainnet. Lazy import so
 // the module (and @anchor-lang/core) is not bundled into the main chunk while off.
+// Mounted at both /hub (live config) and /devnet (forced devnet sandbox — see
+// HUB_DEVNET_CONFIG in pages/Hub.jsx); otchub.dev/fomo is a separate app
+// entirely (Cloudflare Workers Route on the shared zone, see rufomo/wrangler.toml)
+// and never reaches this router.
 const Hub = HUB_ENABLED ? React.lazy(() => import('./pages/Hub')) : null;
-
-// app.otchub.dev (standalone $HUB shell) served the module under /hub/*; the
-// merged app serves it at the root, so strip the prefix and keep the rest.
-const HubLegacyRedirect = () => {
-  const { pathname, search, hash } = useLocation();
-  return <Navigate to={{ pathname: pathname.replace(/^\/hub/, '') || '/', search, hash }} replace />;
-};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -47,7 +44,10 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Render the main app
+  // Render the main app. Home is always the root — otchub.dev/hub and
+  // otchub.dev/devnet are the $HUB protocol dashboard (live config vs. a
+  // forced-devnet sandbox); /otc is kept as a legacy alias since it was
+  // Home's path during the (never-shipped) period when Hub sat at "/".
   if (!HUB_ENABLED) {
     return (
       <Routes>
@@ -64,13 +64,17 @@ const AuthenticatedApp = () => {
   return (
     <React.Suspense fallback={null}>
       <Routes>
-        <Route path="/otc" element={<Home />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/otc" element={<Navigate to="/" replace />} />
         <Route path="/about" element={<About />} />
         <Route path="/connect" element={<Connect />} />
-        <Route path="/hub/*" element={<HubLegacyRedirect />} />
-        {/* $HUB protocol metrics are the landing page: "/", /treasury, /deployments,
-            /desk/:asset. HubRoutes redirects any other unknown path back to "/". */}
-        <Route path="/*" element={<Hub />} />
+        {/* $HUB protocol metrics: "", /treasury, /tokenomics, /mechanics,
+            /deployments, /desk/:asset — relative, so they resolve under
+            either mount. HubRoutes redirects any other unknown sub-path
+            back to its own root. */}
+        <Route path="/hub/*" element={<Hub />} />
+        <Route path="/devnet/*" element={<Hub devnet />} />
+        <Route path="*" element={<PageNotFound />} />
       </Routes>
     </React.Suspense>
   );

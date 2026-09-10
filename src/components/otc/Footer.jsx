@@ -6,8 +6,9 @@ import React from "react";
 const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 
 // Byte-identical with the $HUB standalone shell's footer (hubconnect/web/src/Footer.tsx) — same
-// copy, order, and link styling — so the $HUB page reads the same on otchub.dev, app.otchub.dev,
-// and devnet.otchub.dev.
+// copy, order, and link styling — so the $HUB page reads the same everywhere $HUB is mounted
+// (otchub.dev/hub, otchub.dev/devnet). RU_FOMO is same-origin now too (otchub.dev/fomo, a
+// Cloudflare Workers Route — see rufomo/wrangler.toml), so it stays in the same tab.
 export default function Footer() {
   return (
     <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
@@ -23,13 +24,8 @@ export default function Footer() {
           otchub.dev ↗
         </a>
         {" · "}
-        <a
-          href="https://fomo.otchub.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-green-400"
-        >
-          fomo.otchub.dev ↗
+        <a href="/fomo" className="underline hover:text-green-400">
+          otchub.dev/fomo
         </a>
         {" · "}
         <a
