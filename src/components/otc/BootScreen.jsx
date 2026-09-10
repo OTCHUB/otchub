@@ -40,6 +40,43 @@ const BANNER = [
   "+---------------------------------------------+",
 ].join("\n");
 
+// ASCII art fitter: the block-letter glyphs (█ ▄ ▀) are NOT guaranteed to be
+// exactly one cell wide in every monospace font, so the wordmark/banner can
+// measure wider than expected and get clipped off the panel edge. This
+// wrapper measures the natural width (scrollWidth ignores transforms) and
+// scales the art down to always fit — desktop stays at 1:1.
+function FitAscii({ children, className }) {
+  const wrapRef = useRef(null);
+  const innerRef = useRef(null);
+  const [fit, setFit] = useState({ transform: "none" });
+
+  useEffect(() => {
+    const wrap = wrapRef.current, inner = innerRef.current;
+    if (!wrap || !inner) return;
+    const measure = () => {
+      const natural = inner.scrollWidth;
+      const avail = wrap.clientWidth;
+      if (!natural || !avail) return;
+      const scale = Math.min(1, avail / natural);
+      setFit({ transform: `scale(${scale})`, height: `${Math.ceil(inner.offsetHeight * scale)}px` });
+    };
+    measure();
+    if ("ResizeObserver" in window) {
+      const ro = new ResizeObserver(measure);
+      ro.observe(wrap);
+      return () => ro.disconnect();
+    }
+  }, [children]);
+
+  return (
+    <div ref={wrapRef} className="w-full overflow-hidden" style={{ height: fit.height }}>
+      <div ref={innerRef} className="origin-left" style={{ transform: fit.transform }}>
+        <div className={className}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function BootScreen({ onComplete, ready = true }) {
   const [lines, setLines] = useState([]);
   const [done, setDone] = useState(false);
@@ -91,15 +128,20 @@ export default function BootScreen({ onComplete, ready = true }) {
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(to_bottom,transparent,transparent_2px,rgba(0,255,80,0.025)_3px)]" />
       <div className="boot-crt pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.75))]" />
 
-      {/* Scrollable terminal body: stays inside the viewport on every screen */}
-      <div className="relative z-20 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
-        <div className="w-full max-w-3xl xl:max-w-4xl">
+      {/* Scrollable terminal body: auto margins (not align/justify-center)
+          center the block when it fits and collapse to 0 when it overflows,
+          so a tall stack scrolls from the very top instead of being clipped
+          off-screen. */}
+      <div className="relative z-20 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
+        <div className="mx-auto my-auto w-full max-w-3xl xl:max-w-4xl">
           {/* Strictly text/ASCII/typography — no images, pure CRT boot look. */}
-          <div className="whitespace-pre text-[9px] leading-tight text-green-300 sm:text-[11px]">
+          <FitAscii className="whitespace-pre text-[9px] leading-tight text-green-300 sm:text-[11px]">
             {WORDMARK}
-          </div>
-          <div className="mt-2 whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
-            {BANNER}
+          </FitAscii>
+          <div className="mt-2">
+            <FitAscii className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
+              {BANNER}
+            </FitAscii>
           </div>
           <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
             {lines.map((l, idx) => (
