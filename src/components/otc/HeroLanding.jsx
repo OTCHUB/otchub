@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { ArrowDown, Check, Coins, Copy, Flame, Gem, HandCoins, LineChart } from "lucide-react";
+import MascotLogo from "@/components/otc/MascotLogo";
 import { fmtNum, fmtSol } from "@/lib/format";
 
 const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 const DEX_URL = `https://dexscreener.com/solana/${OTC_MINT}`;
-const MASCOT_URL = "/otc-mascot.png";
 const DESK_CAP = 5000;
 
 // Headline + feature stats read live from the latest snapshot; every value
@@ -109,12 +109,7 @@ export default function HeroLanding({ latest }) {
           {/* Ring via box-shadow (not a border class) so the glass-zone rule
               keeps its circle in the MODERN skin. */}
           <div className="rounded-full p-1.5 shadow-[0_0_0_2px_rgb(74_222_128/0.5),0_0_60px_-6px_rgb(74_222_128/0.45)]">
-            <img
-              src={MASCOT_URL}
-              alt="OTC desk terminal mascot"
-              className="h-40 w-40 object-contain sm:h-48 sm:w-48"
-              draggable="false"
-            />
+            <MascotLogo className="h-40 w-40 object-contain sm:h-48 sm:w-48" />
           </div>
           <div className="w-full">
             <div className="flex items-center justify-between text-[10px] tracking-widest text-green-500/60">
