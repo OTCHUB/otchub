@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
-import MascotLogo from "@/components/otc/MascotLogo";
 
 // Session-scoped flag: the boot sequence plays ONCE per browser session —
 // reloads and same-session navigation skip straight to the dashboard with a
@@ -26,6 +25,22 @@ const LINES = [
   "Starting dashboard render services........ OK",
   "OTC_HUB ready. Loading interface...",
 ];
+
+// Block-letter ASCII wordmark (OTC_HUB), 5 rows — pure text, no images.
+const WORDMARK = [
+  " ####   ######  ####       #    # #    # ##### ",
+  "#    #   ##    #           #    # #    # #    #",
+  "#    #   ##    #           ###### #    # ##### ",
+  "#    #   ##    #           #    # #    # #    #",
+  " ####    ##    ####  ______ #    #  ####  ##### ",
+].join("\n");
+// Box-drawing banner — same for every screen size, mono-spaced.
+const BANNER = [
+  "+---------------------------------------------+",
+  "|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |",
+  "|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |",
+  "+---------------------------------------------+",
+].join("\n");
 
 export default function BootScreen({ onComplete, ready = true }) {
   const [lines, setLines] = useState([]);
@@ -81,26 +96,12 @@ export default function BootScreen({ onComplete, ready = true }) {
       {/* Scrollable terminal body: stays inside the viewport on every screen */}
       <div className="relative z-20 flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-3 sm:px-8 sm:py-5">
         <div className="w-full max-w-3xl xl:max-w-4xl">
-          {/* Brand header — the same identity as the dashboard header/hero:
-              mascot logo, OTC_HUB wordmark + blinking cursor, badge chips. */}
-          <div className="flex items-center gap-3">
-            <MascotLogo className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16" />
-            <div className="min-w-0">
-              <div className="text-lg font-bold uppercase tracking-widest text-green-300 sm:text-xl">
-                OTC_HUB <span className="animate-pulse text-green-500">▋</span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <span className="border border-green-500/60 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-400">
-                  SOLANA OTC DESKS
-                </span>
-                <span className="border border-amber-400/60 px-2 py-0.5 text-[9px] font-bold tracking-widest text-amber-400">
-                  LIVE ON-CHAIN DATA
-                </span>
-              </div>
-            </div>
+          {/* Strictly text/ASCII/typography — no images, pure CRT boot look. */}
+          <div className="whitespace-pre text-[9px] leading-tight text-green-300 sm:text-[11px]">
+            {WORDMARK}
           </div>
-          <div className="mt-3 text-[10px] leading-snug text-green-500/70 sm:text-[11px]">
-            OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL · CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL
+          <div className="mt-2 whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
+            {BANNER}
           </div>
           <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
             {lines.map((l, idx) => (
