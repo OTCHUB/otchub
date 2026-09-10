@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { ArrowLeftRight, Check, Copy, Globe, Send } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Globe, LineChart, Send } from "lucide-react";
 import XIcon from "@/components/otc/XIcon";
 import RowPayout from "@/components/otc/RowPayout";
 import { base44 } from "@/api/base44Client";
@@ -219,7 +219,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const tape = ranked.map(withDexQuote);
   // Payout icons on the tape: resolve the visible page's reward mints (basket
   // members included) to logos/symbols once, cached for the session.
-  const payoutMints = [...new Set(tape.slice(0, 30).flatMap((t) => {
+  const payoutMints = [...new Set(tape.flatMap((t) => {
     const p = t.payoutInfo;
     if (!p) return [];
     return p.rewardBasket?.length > 1 ? p.rewardBasket : p.rewardMint ? [p.rewardMint] : [];
@@ -344,9 +344,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-[60dvh] lg:max-h-none">
         {tape.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
-            className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-1.5 py-1 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
-            {/* identity: rank, logo, symbol, badges, status chip */}
-            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-1.5 py-1 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            {/* identity: rank, logo, symbol, badges, payout icons, status chip */}
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
               <span className="shrink-0 text-[10px] text-green-500/40">#{(page - 1) * (feed?.pageSize ?? pageSize) + i + 1}</span>
               <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
                 aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
@@ -371,8 +371,24 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 {STATUS_SHORT[statusOf(t)]?.[0] ?? "UNK"}
               </span>
             </span>
-            {/* market metrics: momentum, mcap, volume, age */}
-            <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-green-500/70">
+            {/* per-entry actions: dexscreener + swap — right column, never pushed off-screen */}
+            <span className="flex shrink-0 items-center gap-1">
+              <a href={`https://dexscreener.com/solana/${t.mint}`} target="_blank" rel="noopener noreferrer"
+                title={`$${t.symbol || "?"} on DexScreener ↗`} aria-label={`Open ${t.symbol || t.mint} on DexScreener`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center justify-center border border-green-500/30 p-0.5 text-green-500/70 hover:border-emerald-400 hover:text-emerald-300">
+                <LineChart className="h-3 w-3" aria-hidden="true" />
+              </a>
+              {onTrade && (
+                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled}
+                  title={`Swap $${t.symbol || "?"} in-app`} aria-label={`Swap ${t.symbol || t.mint} in-app`}
+                  className="inline-flex items-center gap-1 border border-green-500/30 px-1 py-0.5 font-bold text-green-300 hover:border-emerald-400 hover:text-emerald-300 disabled:opacity-40">
+                  <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />swap
+                </button>
+              )}
+            </span>
+            {/* market metrics + curve progress: full-width line that wraps — no side scroll */}
+            <span className="col-span-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[11px] text-green-500/70">
               {Number.isFinite(t.change24h) && (
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>{momentum(t.change24h)}</span>
               )}
@@ -381,13 +397,8 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               <span>vol {fmtUsdCompact(t.vol24)}</span>
               <span>liq {fmtUsdCompact(t.liquidity)}</span>
               <span className="text-green-500/50">{fmtAge(t.ageH)}</span>
-              {onTrade && (
-                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled}
-                  title={`Swap $${t.symbol || "?"} in-app`} aria-label={`Swap ${t.symbol || t.mint} in-app`}
-                  className="inline-flex items-center gap-1 border border-green-500/30 px-1 py-0.5 font-bold text-green-300 hover:border-emerald-400 hover:text-emerald-300 disabled:opacity-40">
-                  <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />swap
-                </button>
-              )}
+              {/* bonding (non-graduated) tokens show live curve progress; graduated ones hide it */}
+              {statusOf(t) !== "GRADUATED" && <CurveProgress token={t} />}
             </span>
           </div>
         ))}
