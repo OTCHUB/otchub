@@ -4,7 +4,7 @@ import React from "react";
 // the same top status bar and bottom disclaimer persist across the boot → app
 // transition, so the whole session reads as one continuous terminal.
 // Labels are typed sentence case; the .uppercase transform renders them as
-// terminal caps in RETRO while MODERN shows the clean sentence-case text.
+// terminal caps in the default (terminal) theme.
 export function TerminalTopBar({
   label = "OTC hub terminal",
   statusText = "Mainnet link active",

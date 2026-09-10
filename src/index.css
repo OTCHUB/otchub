@@ -262,7 +262,7 @@ body {
 html.light {
   color-scheme: light;
   background-color: rgb(236 243 236);
-  /* RETRO light-mode ("phosphor paper") DOS palette — kept byte-identical
+  /* Default-theme light-mode ("phosphor paper") DOS palette — kept byte-identical
      with hubconnect/web/src/index.css so the vendored $HUB module (Panel,
      Icons, ProgressBar, ThemeSwitch, ThemeProvider) renders the same ink-on-
      paper look in both apps. Do not hand-tune these independently of
@@ -358,6 +358,6 @@ html.light .boot-crt {
   display: none;
 }
 
-/* The modern "Iridescent Terminal" skin was fully removed — the RETRO
-   terminal is the one and only skin (solid branding). Any stale stored
+/* The extra "Iridescent Terminal" skin was fully removed — the terminal
+   theme above is the DEFAULT (and currently only) styling. Any stale stored
    "otc_skin" preference is simply ignored. */
