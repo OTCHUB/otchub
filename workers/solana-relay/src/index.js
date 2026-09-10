@@ -41,10 +41,15 @@ function json(obj, status, headers) {
 }
 
 async function heliusRpc(env, method, params) {
+  // Hard upstream deadline: a stalled Helius response must fail fast so the
+  // client's relay timeout (30s) surfaces a clear error and the read-mode
+  // retry kicks in — otherwise a hung RPC blocks the whole claim/swap run
+  // (no wallet prompt ever appears) until the browser gives up.
   const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: "otc", method, params }),
+    signal: AbortSignal.timeout(25_000),
   });
   if (!res.ok) throw new Error(`Helius RPC ${method} failed: ${res.status}`);
   const out = await res.json();
