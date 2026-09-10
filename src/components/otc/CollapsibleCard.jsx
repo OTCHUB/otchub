@@ -22,7 +22,7 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, m
       <div
         onClick={toggle}
         title={locked ? "Keep this panel open until the swap finishes" : undefined}
-        className={`flex cursor-pointer select-none items-center justify-between bg-black px-3 py-2 ${
+        className={`flex cursor-pointer select-none items-center justify-between px-3 py-2 ${
           open ? "border border-green-500/30 border-b-0" : "border border-green-500/30"
         }`}
       >
