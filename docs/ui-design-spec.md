@@ -1,199 +1,166 @@
-# OTC_HUB UI Design Spec — RETRO / MODERN Dual-Skin System
+# OTC_HUB UI Design Spec — DEFAULT Terminal Theme
 
-Handover document for cross-repo consistency (otchub / otcgub and future frontends).
+Handover document for cross-repo consistency (otchub ecosystem and future frontends).
 Source of truth is this workspace; replicate the architecture, tokens and rules below.
 
-**Defaults (as of 2026-09-10):** every visitor starts in **MODERN skin + DARK theme**.
-RETRO and LIGHT are opt-in via the two header toggles; choices persist in `localStorage`.
+**Defaults (as of 2026-09-10):** there is **one design language** — the
+**DEFAULT terminal theme** (green-phosphor DOS/CRT aesthetic). It is NOT a skin:
+no skin toggle exists, no skin classes exist, and no second design language is
+ever rendered. If a new skin is added later it must slot in beside this one and
+this document stays the definition of "default".
+
+- Every visitor starts in **dark** (green-on-black). **Light** ("phosphor paper",
+  ink-green-on-pale-mint) is opt-in via the header toggle; both persist in
+  `localStorage` under `otc_theme`.
+- Both modes render the **same JSX**. The theme is a pure CSS-variable remap
+  (`light` class on `<html>`) — never separate components, never hex in JSX.
 
 ---
 
-## 1. Architecture — one component tree, two skins
+## 1. Architecture — one component tree, one theme, two palettes
 
-Both skins render the **same JSX**. The skin is a pure CSS-variable remap plus a
-few chrome rules — never separate components:
-
-- `light` class on `<html>` → theme (light/dark), orthogonal to skin.
-- `skin-modern` class on `<html>` → design language (RETRO terminal ↔ MODERN iridescent glass).
-- Combinations: `retro|dark`, `retro|light`, `skin-modern` (dark), `skin-modern light`.
-- Every toggle dispatches `THEME_CHANGE_EVENT` so JS-colored visuals (charts via
-  `useChartTheme`) re-read tokens live. No page reload ever.
-
-Cascade order in `src/index.css` (matters — later blocks win):
-1. `:root` — RETRO dark palette + chart tokens (defaults)
-2. `html.light` — RETRO light ("phosphor paper") overrides
-3. `html.skin-modern` — MODERN dark ("Iridescent Terminal") full remap
-4. `html.skin-modern.light` — MODERN light ("Pearlescent") overrides
+- `light` class on `<html>` switches dark ↔ light. Nothing else changes.
+- The toggle dispatches `THEME_CHANGE_EVENT` so JS-colored visuals (charts via
+  `src/lib/chartTheme.js`) re-read tokens live. No page reload ever.
+- A pre-paint script in `index.html` applies the stored theme before CSS/JS
+  loads so light users never get a dark flash.
 
 ### Exact file locations (this workspace)
 
 | Concern | File |
 | --- | --- |
-| All skin/theme CSS variables + chrome rules | `src/index.css` |
+| All theme CSS variables + chrome rules (dark `:root` + `html.light` overrides) | `src/index.css` |
 | CSS variable → Tailwind class mapping (`rgb(var(--c-green-500)/<alpha>)` etc.) | `tailwind.config.js` |
-| Theme/skin classes, persistence, defaults, `THEME_CHANGE_EVENT` | `src/lib/theme.js` |
-| Startup init (`initTheme()` + `initModernSkinChrome()`) | `src/main.jsx` (lines 7–15) |
-| MODERN chrome pass (strips `[LABEL]` brackets while modern skin active) | `src/lib/modernChrome.js` |
+| Theme class, persistence, default, `THEME_CHANGE_EVENT` | `src/lib/theme.js` |
+| Startup init (`initTheme()`) | `src/main.jsx` |
 | Chart telemetry tokens + `useChartTheme()` hook + shared recharts styles | `src/lib/chartTheme.js` |
 | Light/dark toggle (icon-only, Sun/Moon = mode it switches TO) | `src/components/otc/ThemeToggle.jsx` |
-| Retro/modern toggle | `src/components/otc/SkinToggle.jsx` |
-| Boot screen (skin-aware hero) | `src/components/otc/BootScreen.jsx` |
+| Boot screen (first-session BIOS sequence, CRT overlay) | `src/components/otc/BootScreen.jsx` |
 | Fixed top/bottom terminal bars | `src/components/otc/TerminalBars.jsx` |
-| Collapsible panel window (the ONE glass frame per panel) | `src/components/otc/CollapsibleCard.jsx` |
+| Collapsible panel window (the ONE frame per panel) | `src/components/otc/CollapsibleCard.jsx` |
 | Dashboard composition (header layout, panel stack) | `src/pages/Home.jsx` |
 | Portaled dropdown (pattern for all menus) | `src/components/otc/CommunityMenu.jsx` |
 | Pager (table pagination control styling) | `src/components/otc/Pager.jsx` |
 | Original design-token source specs (kept for reference) | `design/tokens.css`, `design/components.css`, `design/tailwind.theme.js`, `design/tokens.json` |
-| Fonts (IBM Plex Mono = RETRO, Inter Tight = MODERN, Press Start 2P = retro display) | loaded in `index.html` (Google Fonts, lines 17–19) |
 | Site logo (transparent PNG, header + favicon) | `https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/7166bbd89_hub_mt.png` |
 
 ### Token system
 
-Tailwind color utilities are **variable-driven** — component code uses classes like
-`bg-black`, `text-green-400`, `border-emerald-500/30`, and each skin remaps the
-underlying `--c-*` variables. Never hardcode hex in JSX; add new colors as
-`--c-<family>-<step>` pairs in `:root` + every skin block, and map once in
-`tailwind.config.js`.
+Tailwind color utilities are **variable-driven** — component code uses classes
+like `bg-black`, `text-green-400`, `border-emerald-500/30`, and `html.light`
+remaps the underlying `--c-*` variables. Never hardcode hex in JSX; add new
+colors as `--c-<family>-<step>` pairs in `:root` **and** the `html.light` block,
+then map once in `tailwind.config.js`.
 
-Chart colors are also tokens (`--chart-grid`, `--chart-primary`, `--chart-seg-a…d`,
-`--chart-tip-*`) read by `src/lib/chartTheme.js` — charts never hardcode colors.
-
----
-
-## 2. MODERN skin — "Iridescent Terminal" (default, dark)
-
-Voice: sci-fi instrument chassis. Void-black stage, frosted glass windows,
-iridescent cyan/violet/magenta spectrum, fully sans-serif.
-
-### Palette (dark — `html.skin-modern`)
-
-| Role | Value |
-| --- | --- |
-| Page stage / void | `#000000` (aurora glows: cyan, violet, magenta radial gradients at low alpha) |
-| Chassis panel (`--c-black`) | `rgb(18 22 28 / …)` — `#12161C` with alpha |
-| Primary text / silver | `#E8EEF4` (green-200), body silver `#C9D2DC`–`#DBE4EE` |
-| Iris cyan (primary accent, borders, focus) | `#5CE1FF` |
-| Status lime (LIVE/success) | `#7CFF6B` |
-| Aqua (secondary positive) | `#3DFFD2` |
-| Gold (warnings) | `#F0C14A` |
-| Magenta (danger — never generic red) | `#FF5CC8` |
-| Violet (secondary accent) | `#A78BFF` |
-| Pearlescent metal grays (slate scale) | `#9AA3AE` → `#1B2430` |
-
-shadcn tokens follow the chassis: `--background 240 6% 0%`, `--card/--popover 217 22% 9%`,
-`--border/--input 214 16% 20%`, `--primary/--ring 193 100% 68%`.
-
-### Typography
-
-- **Everything is Inter Tight** — `--font-heading/--font-body/--font-display/--font-mono`
-  all remap to `"Inter Tight", ui-sans-serif, system-ui` (400/500/600/700 from Google Fonts).
-  Zero monospace anywhere in MODERN, including HUD readouts and boot logs.
-- **Sentence case** for labels: `html.skin-modern .uppercase { text-transform: none; }` —
-  write labels sentence-cased in JSX; RETRO uppercases them via the class.
-- Relaxed tracking: `.tracking-widest` → `0.04em` (wide `0.08em+` display spacing stays).
-- HUD wordmarks: weight 700, letter-spacing `0.08em`.
-- Uppercase is reserved for hero readouts and 10px status chips only.
-
-### Geometry — "one chamfer per window"
-
-- Collapsible window root (`.term-window`): **18px** radius, `overflow: hidden`.
-- Every inline control (buttons, inputs, chips, badges, anchor-links, media frames): **8px**.
-- Floating roots (dialogs, menus, tooltips): **14px**.
-- **Never rounded-on-rounded**: inside a window, block containers lose their radius and
-  backgrounds (`html.skin-modern :is(.term-window,[role=dialog]) :is(div,section,…)…`
-  rules in `src/index.css`) so bordered sections read as hairline zones of ONE frosted
-  sheet. Accent tints (`bg-emerald-500/5`-style) survive as soft zone glows.
-
-### Glass surfaces
-
-`.term-window` = frosted chassis glass: `rgb(18 22 28 / 0.55)` + `backdrop-filter:
-blur(16px) saturate(1.5)` + iridescent ring shadow (`0 0 0 1px rgb(92 225 255/.22)`,
-`0 0 0 2px rgb(167 139 255/.1)`, cyan bloom + deep drop). Fixed bars (`.term-bar`)
-freeze into glass (`blur(14px) saturate(1.4)`).
-
-### Chrome rules
-
-- **No square brackets** on labels/chips — `src/lib/modernChrome.js` strips
-  bracket-only text nodes (`[ TRADE ]` → `Trade`) while the modern skin is active and
-  restores them for RETRO. Write new buttons sentence-cased without brackets.
-- Inputs: recessed wells; focus = iris ring + cyan bloom
-  (`border-color rgba(92,225,255,.6)`, `box-shadow 0 0 16px rgba(92,225,255,.35)`),
-  caret `#5CE1FF`, selection `rgba(92,225,255,.28)`.
-- Scrollbars: metal (`#2A313A` thumb on `#000` track, pill-shaped).
-- Fee-flow marching dashes (`.pot-flow-x/y`): iris cyan; broken routes dim magenta.
-- CRT scanlines/vignette (`.boot-crt`) are RETRO-only: `html.skin-modern .boot-crt { display: none; }`.
-
-### MODERN light — "Pearlescent" (`html.skin-modern.light`)
-
-Cool pale metal canvas `#E3E9EF` with soft iris glows; near-white frosted panels
-(`--c-black: 245 248 251`); dark slate text `#1E2632`; iris spectrum darkened one step
-for contrast: cyan `#0891B2`, aqua `#13 148 136` (`#0D9488`), gold `#B45309`, magenta
-`#C026D3`, violet `#7C3AED`. Ring/bloom shadows and flow-dash colors get matching
-darkened overrides (see the `html.skin-modern.light` block in `src/index.css`).
+Chart colors are also tokens (`--chart-grid`, `--chart-primary`, `--chart-secondary`,
+`--chart-tertiary`, `--chart-danger`, `--chart-pos`, `--chart-bar-fill/edge`,
+`--chart-seg-a…d`, `--chart-tip-*`) read by `src/lib/chartTheme.js` — charts
+never hardcode colors and re-read tokens on every theme change.
 
 ---
 
-## 3. RETRO skin — DOS terminal (opt-in, dark is default)
+## 2. DEFAULT theme — voice and rules
 
-Voice: green-phosphor CRT terminal. Mono type, square corners, ALL-CAPS, bracket chrome.
+Voice: **green-phosphor CRT terminal.** Mono type, square corners, ALL-CAPS
+labels, bracket chrome, flat black stage, green hairlines. Dense, instrument-
+like, mobile-first.
 
 ### Palette (dark — `:root`)
 
-- Black `#000000` stage; Tailwind **green** scale for text/borders
-  (`text-green-400` body, `text-green-300` strong, `text-green-500` accents);
-  emerald = status, cyan = info, amber = warning, red = danger, fuchsia = highlight;
-  slate = secondary grays. Exact channel values: `:root` in `src/index.css`.
+- Stage: pure black (`bg-black`, `--c-black: 0 0 0`). Panels are flat black with
+  green hairline borders — no shadows, no gradients, no glass.
+- Tailwind **green** scale for text/borders: `text-green-500/50`–`/70` muted,
+  `text-green-400` body, `text-green-300` strong, `text-green-200` headlines.
+- Semantic families: **emerald** = success/LIVE, **cyan** = info/active/progress,
+  **amber** = warning, **red** = danger/loss, **fuchsia** = special highlight
+  (official $HUB/★ marks), **slate** = secondary grays.
+- Exact channel values replicate Tailwind's default palette and live in `:root`
+  in `src/index.css`.
 
-### Typography & chrome
+### Palette (light — `html.light`, "phosphor paper")
 
-- **IBM Plex Mono** for UI/HUD (`--font-mono`), **Press Start 2P** for the pixel
-  display wordmark (`--font-display`); both loaded in `index.html`.
-- Labels typed in JSX are sentence case; RETRO shows them **ALL-CAPS**
-  (`.uppercase` transform is untouched here) with wide tracking.
-- Buttons/links carry literal **`[ LABEL ↗ ]`** bracket chrome (stripped automatically
-  in MODERN by `modernChrome.js` — keep writing them bracketed for retro).
-- Square corners everywhere (no chamfer); flat `bg-black` panels with green hairlines.
-- Boot screen: full-screen CRT treatment — repeating scanline overlay + vignette
-  (`.boot-crt` divs in `BootScreen.jsx`), ASCII banner header
-  (`+---…` box, `OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL / CREATED BY
-  HUB_YIELD_OPTIMIZER_PROTOCOL`).
+- Pale mint paper `rgb(236 243 236)` (`--c-black: 236 243 236`); ink-dark green
+  text — the green scale inverts (200–400 go dark, 700–900 stay dark/lightened
+  for contrast on paper).
+- Every accent family (emerald/cyan/amber/red/fuchsia/slate) is darkened one or
+  more steps for paper contrast; chart tokens switch to ink grid + deep accents
+  (`--chart-primary #16A34A`, tip bg `#FFFFFF`).
+- CRT overlays (`.boot-crt` scanlines/vignette) are dark-only: hidden in light.
+- The light block is kept byte-identical with hubconnect/web's `index.css` —
+  edit hubconnect first, then re-copy (comment in `src/index.css`).
 
-### RETRO light — "phosphor paper" (`html.light`)
+### Typography
 
-Pale mint paper `rgb(236 243 236)`; ink-dark green text (green scale inverted: 200–400
-go dark, 700–900 go light); emerald/cyan/amber/red/fuchsia each darkened for paper
-contrast; chart tokens switch to ink grid + deep accents (`--chart-primary #16A34A`,
-tip bg `#FFFFFF`). CRT overlays hidden (`html.light .boot-crt { display: none; }`).
+- **Monospace everywhere** (`font-mono`, `--font-mono`: system mono stack).
+  No external webfonts are loaded; never add a font link for the default theme.
+- Headlines (`font-display`) may use the pixel/display stack for hero wordmarks;
+  body, labels, tables and HUD readouts are all mono.
+- Mobile typography scale (below `sm`): every Tailwind text size steps down one
+  notch via the media-query overrides in `src/index.css` — write normal
+  Tailwind text classes; the scale handles small screens. 10–11px floors stay.
+- **Labels typed in JSX are ALL-CAPS with wide tracking**
+  (`uppercase tracking-widest`), typically `text-[10px]`–`text-[11px]` muted
+  (`text-green-500/50`–`/70`).
+
+### Geometry & chrome
+
+- **Square corners everywhere** — `border-radius: 0`. No chamfers, no pills
+  (exception: tiny status dots use `rounded-full`).
+- **Bracket chrome**: buttons/links carry literal `[ LABEL ↗ ]`-style brackets
+  and arrow glyphs (`↗`, `▴/▾`, `▸`). Section headers read `NAME · DETAIL`.
+- Borders are 1px hairlines: `border-green-500/20` (calm) → `/30` (normal) →
+  `/50` (strong) → `/60` (CTA). Accent tints like `bg-green-500/5`–`/10` mark
+  hover/active zones; selected chips swap to their accent family
+  (e.g. `border-cyan-400 text-cyan-300 bg-cyan-500/10`).
+- Inputs: flat black wells (`bg-black border-green-500/30`), mono text 11px,
+  green caret. Focus = border brightens; no glow shadows.
+- Status indicators: blinking pulse dot (`animate-pulse rounded-full
+  bg-emerald-400`) + ALL-CAPS text (`LIVE`, `CONNECTED · xxxx…xxxx`).
+- Boot screen (first visit per session): full-screen CRT treatment — scanline
+  overlay + vignette (`.boot-crt` divs in `BootScreen.jsx`), one printed line
+  = one progress step.
+- Fee-flow marching dashes (`.pot-flow-x/y`) are green when live, dim red
+  (`.pot-flow-broken`) when a route is down.
+
+### Component idioms (copy these patterns)
+
+| Element | Pattern |
+| --- | --- |
+| Panel | `CollapsibleCard` — `[−]/[+]` header, ALL-CAPS title, `openSignal` counter to force-open from other panels, `locked` while a flow is busy |
+| Page frame | Fixed `TerminalTopBar` + `TerminalBottomBar` bars, `max-w-7xl` center column, `px-3 py-4 sm:px-4 sm:py-6`, panels stacked with `mt-3`, `lg:grid-cols-*` splits |
+| Header | Transparent logo image + ALL-CAPS wordmark + blinking `▋` cursor; single square action row (menu, X icon link `p-1.5 sm:p-2`, theme toggle, refresh) — all frames the same compact square size |
+| Hero | Terminal window with badge chips, ALL-CAPS headline, full-length CA copy bar, bordered CTA buttons, live stat cards that click-through to their panel |
+| Buttons | `border px-… py-1 text-[10px]–[12px] font-bold uppercase` + family color; primary CTAs get `bg-<accent>/10`–`/15` |
+| Filter chips | Compact `border px-1.5 py-0.5 text-[10px] font-bold uppercase` toggles; selected = cyan border + tint, ranking = green |
+| Data rows | Single-line dense rows, mono `text-[11px]–[12px]`, hairline dividers (`border-green-500/10`), wrap full-width metric lines instead of side-scrolling |
+| Dialogs | `bg-black border-green-500/40`, mono, ALL-CAPS header + sentence body, max-w constrained, `90dvh` scroll |
+| Numbers | Compact K/M/B suffixes, 2 decimals; SOL to 2–3 decimals; $OTC price 4 decimals; full CAs shown, never truncated (mobile uses `break-all`) |
+| Dropdowns | Portaled to `<body>`, positioned from the button's live rect (`CommunityMenu.jsx`) — panels clip inline overflow |
+| Disclaimers | "community tooling · not affiliated with otcdesks.cash" pattern on every page |
 
 ---
 
-## 4. Shared layout & interaction rules (both skins)
+## 3. Responsive & motion rules
 
-- **Responsive:** mobile-first; every panel must stay inside the viewport
-  (`html,body { overflow-x: hidden; max-width: 100vw }`). Below `sm`, a typography
-  scale steps every size down one notch (10–11px floors stay), and inputs are forced to
-  `16px` (except `.compact-input` = 11px) to stop mobile auto-zoom — `src/index.css`.
-- **Dropdowns are portaled to `<body>`** and positioned from the button's live rect
-  (see `CommunityMenu.jsx`) — glass windows have `overflow: hidden` and will clip
-  anything rendered inline.
-- **Panels** are `CollapsibleCard` (`[−]/[+]` header, all open by default, `openSignal`
-  counter to force-open from other panels, `locked` while a flow is busy).
-- Header: transparent logo image + `OTC hub · OTC desk tools` title, blinking cursor,
-  stackable action row (community menu, external links, theme toggle, skin toggle,
-  refresh). Theme toggle is **icon-only**; community button reads `COMMUNITY ▾`.
-- Boot screen tracks progress one printed line = one step; MODERN shows the sans hero
-  (`OTC_HUB` + "OTC ecosystem tooling · created by Hub Yield Optimizer Protocol"),
-  RETRO shows the ASCII banner.
-- Wallet panel is collapsed by default with a single status line
-  (`CONNECTED · xxxx…xxxx` / `NOT CONNECTED`); wallet address lookups use 11px.
-- Disclaimers everywhere: "community tooling · not affiliated with otcdesks.cash".
+- Mobile-first; every panel must stay inside the viewport
+  (`html, body { overflow-x: hidden; max-width: 100vw }`).
+- Below `sm`: text scale steps down (see Typography); inputs are forced to
+  `16px` (except `.compact-input` = 11px) to stop mobile auto-zoom.
+- Motion is minimal and functional only: `animate-pulse` live dots, one-shot
+  launcher flip/slide flashes (`.launcher-flip-up/down`), marching-dash flow
+  routes, blink cursor. No entrance animations, no parallax, no transitions
+  beyond short `hover:` color changes.
 
-## 5. New-repo checklist
+## 4. New-repo / new-page checklist
 
-1. Copy `src/index.css` (tokens + all four palette blocks) and `tailwind.config.js` verbatim.
-2. Port `src/lib/theme.js` (defaults: **dark** theme, **modern** skin),
-   `src/lib/modernChrome.js`, `src/lib/chartTheme.js`; call `initTheme()` +
-   `initModernSkinChrome()` at entry (see `src/main.jsx`).
-3. Load the three Google Fonts in `index.html` (IBM Plex Mono, Inter Tight, Press Start 2P).
-4. Use variable-driven Tailwind classes only; add tokens, never hex literals.
-5. Keep one chamfer per window in MODERN; brackets + ALL-CAPS in RETRO.
+1. Copy `src/index.css` (tokens + both palette blocks) and `tailwind.config.js`
+   verbatim; port `src/lib/theme.js` and `src/lib/chartTheme.js`; call
+   `initTheme()` at entry (see `src/main.jsx`) and add the pre-paint theme
+   script to `index.html`.
+2. Use variable-driven Tailwind classes only; add tokens, never hex literals.
+3. No webfonts — system mono stack; ALL-CAPS wide-tracked labels; square
+   corners; flat black panels with green hairlines; brackets on button chrome.
+4. Reuse the component idioms table above; panels are `CollapsibleCard`s in a
+   single center column with `lg:` grid splits.
+5. Both dark and light must always read correctly — check every new screen in
+   light mode before shipping.
