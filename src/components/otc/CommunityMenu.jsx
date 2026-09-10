@@ -7,15 +7,15 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ExternalLink, Eye, Globe, Menu, MessagesSquare, Send, Sparkles, Users, Zap } from "lucide-react";
+import { ExternalLink, Eye, FlaskConical, Globe, Menu, MessagesSquare, Send, Sparkles, Users, Zap } from "lucide-react";
 import { HUB_ENABLED } from "@/lib/hubFlag";
 
 // $HUB protocol dashboard lives at otchub.dev/hub — an in-SPA route, so it
 // navigates via react-router (spa: true) instead of a full page load. The
 // mainnet entry stays dark in the menu until launch, same gate as the route
 // itself in App.jsx (hubGated: true below). The devnet sandbox at
-// otchub.dev/devnet is ungated in App.jsx for direct-URL QA, but is
-// intentionally left out of this menu until its program logic is verified.
+// otchub.dev/devnet is ungated in App.jsx AND in this menu — it is a
+// risk-free QA sandbox that never depends on the mainnet program.
 //
 // Grouped into three sections, ordered so the two ecosystems stay visually
 // separate as each grows independently, with social/chat kept apart from
@@ -39,6 +39,15 @@ const LINKS = [
     icon: Sparkles,
     spa: true,
     hubGated: true,
+  },
+  {
+    id: "hub-devnet",
+    group: "otc-hub",
+    label: "$HUB Devnet Sandbox",
+    hint: "QA sandbox · test cluster · always on",
+    href: "/devnet",
+    icon: FlaskConical,
+    spa: true,
   },
   {
     id: "ru-fomo-web",
