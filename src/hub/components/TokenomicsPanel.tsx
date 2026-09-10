@@ -58,7 +58,7 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
 
   return (
     <div className="space-y-2">
-      <Panel title="TOKENOMICS" right={source}>
+      <Panel title="TOKENOMICS" right={source} id="hub-tokenomics">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
           <Stat
             label="max supply"
@@ -113,7 +113,7 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
         </div>
       </Panel>
 
-      <Panel title="AIRDROP">
+      <Panel title="AIRDROP" id="hub-airdrop">
         <Row
           k="mechanism"
           v="Merkle claim · one claim per desk asset · paid to the desk's current owner"

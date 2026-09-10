@@ -22,7 +22,9 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
           <>
             <MetricsStrip state={state} />
             <EpochTracker state={state} />
-            <YieldTable state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+            <div id="hub-yield">
+              <YieldTable state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+            </div>
             <div className="flex justify-between text-[10px] text-green-700">
               <span>last read {new Date(fetchedAt).toLocaleTimeString()}</span>
               <span className="flex gap-3">
@@ -40,7 +42,7 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
           </>
         )}
       </ProtocolGate>
-      <Panel title="DESK LOOKUP">
+      <Panel title="DESK LOOKUP" id="hub-desk-lookup">
         <DeskLookup />
       </Panel>
       <Disclaimer />

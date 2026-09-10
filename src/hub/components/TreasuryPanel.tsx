@@ -49,7 +49,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
 
   return (
     <div className="space-y-2">
-      <Panel title="TREASURY">
+      <Panel title="TREASURY" id="hub-treasury">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
           <Stat
             label="desks owned"
@@ -83,6 +83,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
       <Panel
         title="$OTC YIELD VAULT"
         right="§A5 90% leg — desks claim_yield pays out of this vault"
+        id="hub-vault"
       >
         {!otcPot ? (
           <div className="text-xs text-amber-400">
@@ -127,6 +128,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
       <Panel
         title="CREATOR FEE FLYWHEEL"
         right="§A6.3 treasury's launcher holder-leg claim (2% $HUB supply) — re-split every clear"
+        id="hub-flywheel"
       >
         {!creatorFee ? (
           <div className="text-xs text-amber-400">
@@ -201,7 +203,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
         </div>
       </Panel>
 
-      <Panel title="$HUB SUPPLY" right={`max ${fmtHub(supply.maxUnits, d, 0)}`}>
+      <Panel title="$HUB SUPPLY" right={`max ${fmtHub(supply.maxUnits, d, 0)}`} id="hub-supply">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
           <Stat
             label="burn % of circulating"

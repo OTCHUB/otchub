@@ -42,7 +42,7 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
   const { config } = state;
   return (
     <div className="space-y-2">
-      <Panel title="HOW $HUB WORKS">
+      <Panel title="HOW $HUB WORKS" id="hub-mech-overview">
         <p className={p}>
           $HUB turns every OTC desk NFT into a yield-earning position. Activate a desk and it starts
           collecting a share of Protocol Revenue every reward round — funded entirely by protocol
@@ -58,7 +58,7 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
         <MermaidBlock source={CYCLE_DIAGRAM} title="the $HUB cycle: buy → activate → earn → burn" />
       </Panel>
 
-      <CollapsibleCard title="1. ACTIVATE YOUR DESK" defaultOpen>
+      <CollapsibleCard title="1. ACTIVATE YOUR DESK" defaultOpen id="hub-mech-activate">
         <ul className="space-y-1">
           <li className={li}>
             <span className="text-green-300">Initial buy</span> comes first and is separate from
@@ -127,7 +127,7 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
         <MermaidBlock source={ACTIVATION_DIAGRAM} title="activation flow (technical detail)" />
       </CollapsibleCard>
 
-      <CollapsibleCard title="2. HOW DAILY REWARDS ARE PAID">
+      <CollapsibleCard title="2. HOW DAILY REWARDS ARE PAID" id="hub-mech-rewards">
         <ul className="space-y-1">
           <li className={li}>
             Protocol Revenue comes from six sources: desk activation fees, earnings from the
@@ -154,7 +154,7 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
         <MermaidBlock source={FEE_FLOW_DIAGRAM} title="revenue distribution (technical detail)" />
       </CollapsibleCard>
 
-      <CollapsibleCard title="3. TREASURY-BOOSTED YIELD">
+      <CollapsibleCard title="3. TREASURY-BOOSTED YIELD" id="hub-mech-treasury">
         <ul className="space-y-1">
           <li className={li}>
             The protocol treasury buys desks on the open market whenever that's cheaper than minting
@@ -182,7 +182,7 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
         <MermaidBlock source={TREASURY_DIAGRAM} title="treasury yield boost (technical detail)" />
       </CollapsibleCard>
 
-      <CollapsibleCard title="4. BUYBACK, BURN & LIQUIDITY">
+      <CollapsibleCard title="4. BUYBACK, BURN & LIQUIDITY" id="hub-mech-burn">
         <ul className="space-y-1">
           <li className={li}>
             Every reward round automatically earmarks {fmtBp(config.burnPctBp, 0)} of its revenue

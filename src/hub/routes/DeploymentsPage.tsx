@@ -142,7 +142,7 @@ export function DeploymentsPage() {
   return (
     <div className="space-y-2 font-mono">
       <BackLink />
-      <Panel title="DEPLOYMENTS :: $HUB PROGRAM REGISTRY" right={toggle}>
+      <Panel title="DEPLOYMENTS :: $HUB PROGRAM REGISTRY" right={toggle} id="hub-registry">
         <div className="mb-2 text-[10px] text-green-700">
           Links open solscan.io on <span className="text-green-400">{cluster}</span>. Dashboard is
           reading <span className="text-green-400">{active}</span>.
@@ -160,7 +160,7 @@ export function DeploymentsPage() {
         </div>
       </Panel>
 
-      <Panel title="PROGRAM ACCOUNTS (LIVE)">
+      <Panel title="PROGRAM ACCOUNTS (LIVE)" id="hub-accounts">
         {!programDeployed ? (
           <div className="text-xs text-amber-300">
             $HUB is not deployed on {cluster} — no PDAs to derive.
@@ -192,7 +192,7 @@ export function DeploymentsPage() {
         )}
       </Panel>
 
-      <Panel title="DEPENDENCIES">
+      <Panel title="DEPENDENCIES" id="hub-deps">
         <div className="space-y-2">
           {DEPLOYMENTS.filter((d) => d.group === "deps").map((d) => {
             // Cross-check the static registry's mainnet collection mint against the live
