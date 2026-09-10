@@ -1,6 +1,10 @@
 import React from "react";
 import { HandCoins, Rocket } from "lucide-react";
-import { fmtSol, fmtUsd } from "@/lib/format";
+
+// Lifetime reward totals are large enough that the sub-1 SOL / cent decimals
+// are pure noise — the hero shows whole numbers only.
+const fmtWholeSol = (v) => (v == null || !Number.isFinite(v) ? "—" : `${Math.round(v).toLocaleString()} SOL`);
+const fmtWholeUsd = (v) => (v == null || !Number.isFinite(v) ? "—" : `$${Math.round(v).toLocaleString()}`);
 
 // Hero lifetime reward totals, both derived from the live snapshot:
 // - DESK NFT HOLDERS: the desk-only distribution channel — the sum of the
@@ -24,10 +28,10 @@ export default function HeroRewardStats({ latest }) {
           Total rewards → OTC Desks NFT holders
         </div>
         <div className="mt-1.5 font-display text-xl font-bold leading-tight text-green-200">
-          {fmtSol(deskSol)}
+          {fmtWholeSol(deskSol)}
           {solUsd ? (
             <span className="ml-2 text-[11px] font-normal text-green-500/60">
-              {fmtUsd(deskSol * solUsd)}
+              {fmtWholeUsd(deskSol * solUsd)}
             </span>
           ) : null}
         </div>
@@ -41,10 +45,10 @@ export default function HeroRewardStats({ latest }) {
           Total rewards → OTC launch holders
         </div>
         <div className="mt-1.5 font-display text-xl font-bold leading-tight text-amber-200">
-          {fmtSol(launchSol)}
+          {fmtWholeSol(launchSol)}
           {solUsd && launchSol != null ? (
             <span className="ml-2 text-[11px] font-normal text-amber-500/60">
-              {fmtUsd(launchSol * solUsd)}
+              {fmtWholeUsd(launchSol * solUsd)}
             </span>
           ) : null}
         </div>

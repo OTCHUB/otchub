@@ -317,45 +317,43 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         ))}
       </div>
 
+      {/* Filter flow — one pipeline: status scope first, then the time /
+          payout / ranking groups on a single compact line, then search. */}
       <div role="tablist" aria-label="Launcher status" className="mt-2 flex flex-wrap gap-1">
         {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-          onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-1 text-[11px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-0.5 text-[10px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
           {s} ({counts[s] ?? 0})
         </button>)}
       </div>
-      <div role="tablist" aria-label="Launch timeframe" className="mt-1 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Since</span>
-        {TIMEFRAMES.map(([tf]) => <button key={tf} type="button" role="tab" aria-selected={timeframe === tf}
+      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span className="text-[10px] uppercase tracking-widest text-green-500/50">Since</span>
+        {TIMEFRAMES.map(([tf]) => <button key={tf} type="button" role="tab" aria-label={`Launches since ${tf}`} aria-selected={timeframe === tf}
           onClick={() => { setTimeframe(tf); setPage(1); }}
-          className={`border px-1.5 py-1 text-[11px] ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+          className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${timeframe === tf ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
           {tf}
         </button>)}
-      </div>
-      <div role="tablist" aria-label="Reward payout filter" className="mt-1 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Payout</span>
+        <span className="text-green-500/30">·</span>
+        <span className="text-[10px] uppercase tracking-widest text-green-500/50">Payout</span>
         {PAYOUTS.map((p) => (
           <button key={p} type="button" role="tab" aria-selected={payout === p}
             onClick={() => { setPayout(p); setPage(1); }}
-            className={`border px-1.5 py-1 text-[11px] ${payout === p ? "border-amber-400 text-amber-300" : "border-green-500/30 text-green-500/70"}`}
+            className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${payout === p ? "border-amber-400 text-amber-300" : "border-green-500/30 text-green-500/70"}`}
             title={p === "BASKET" ? "Rotating multi-token MemeStock reward baskets" : p === "SINGLE" ? "Single source-reported reward token" : "No payout filter"}>
             {p}
           </button>
         ))}
-      </div>
-      <input aria-label="Search launcher tokens" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        placeholder="Symbol, name or mint · searches the full tape"
-        className="mt-2 w-full border border-green-500/30 bg-black px-2 py-1 text-[12px] text-green-300" />
-
-      {/* KPI ranking */}
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Rank by</span>
+        <span className="text-green-500/30">·</span>
+        <span className="text-[10px] uppercase tracking-widest text-green-500/50">Rank by</span>
         {KPIS.map((k) => (
           <button key={k.key} type="button" onClick={() => { setKpi(k.key); setPage(1); }}
-            className={`border px-1.5 py-0.5 text-[11px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
-            [ {k.label} ]
+            className={`border px-1.5 py-0.5 text-[10px] ${kpi === k.key ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/60"}`}>
+            {k.label}
           </button>
         ))}
       </div>
+      <input aria-label="Search launcher tokens" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        placeholder="Search symbol, name or mint"
+        className="mt-1 w-full border border-green-500/30 bg-black px-2 py-1 text-[11px] text-green-300 placeholder:text-green-500/40" />
 
       {/* launch feed */}
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-[60dvh] lg:max-h-none">
