@@ -160,8 +160,9 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     payout !== "ALL" ? `${payout.toLowerCase()} payout` : null,
   ].filter(Boolean);
   const [page, setPage] = useState(1);
-  // Dense tape: fit many more launches per screen on mobile and desktop.
-  const [pageSize] = useState(() => (window.innerWidth >= 1024 ? 50 : 30));
+  // Bounded page: max 25 launches per page keeps the tape short on mobile
+  // and desktop alike; the pager walks the rest of the roster.
+  const [pageSize] = useState(25);
   const maxAgeHours = TIMEFRAMES.find(([tf]) => tf === timeframe)?.[1] ?? null;
   // The FULL tape (every launch, historical included) is filtered, sorted and
   // paged server-side; the poller re-fetches whenever the view changes.
@@ -403,11 +404,18 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
 
       {/* launch feed */}
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto border border-green-500/20 max-h-[60dvh] lg:max-h-none">
+        {/* Desktop column header — aligned to the lg row grid. */}
+        <div aria-hidden="true" className="hidden border-b border-green-500/20 px-3 py-1 text-[10px] uppercase tracking-widest text-green-500/40 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center lg:gap-x-5">
+          <span>Rank · token · payout</span>
+          <span>Market</span>
+          <span className="justify-self-end">Actions</span>
+        </div>
         {tape.map((t, i) => (
           <div key={t.mint} data-selected={selectedMint === t.mint}
-            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-1.5 py-1 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
+            onClick={(e) => { if (window.matchMedia("(min-width: 1024px)").matches) { detailTrigger.current = e.currentTarget; setDetailMint(t.mint); } }}
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 border-b border-green-500/10 px-1.5 py-1 text-[12px] transition-colors duration-75 last:border-0 hover:bg-green-500/10 lg:cursor-pointer lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:gap-x-5 lg:px-3 lg:py-1.5 ${selectedMint === t.mint ? "bg-cyan-500/10" : ""} ${flash[t.mint] === "up" ? "launcher-flip-up" : flash[t.mint] === "down" ? "launcher-flip-down" : ""}`}>
             {/* identity: rank, logo, symbol, badges, payout icons, status chip */}
-            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5 lg:order-1 lg:gap-2">
               <span className="shrink-0 text-[10px] text-green-500/40">#{(page - 1) * (feed?.pageSize ?? pageSize) + i + 1}</span>
               <button type="button" aria-label={`View details for ${t.name || t.symbol || t.mint}`} aria-haspopup="dialog"
                 aria-controls={detailMint === t.mint ? detailId : undefined} aria-expanded={detailMint === t.mint}
@@ -421,6 +429,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 title={`${t.name || t.symbol} — open profile`}>
                 ${t.symbol || t.mint.slice(0, 6)}
               </button>
+              {t.name && <span className="hidden max-w-[22ch] truncate text-[11px] text-green-500/50 lg:inline" title={t.name}>{t.name}</span>}
               {isOfficialHubMint(t.mint) && (
                 <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold text-fuchsia-300"
                   title="Official OTC_HUB token — mint verified against the official CA">★</span>
@@ -433,23 +442,24 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               </span>
             </span>
             {/* per-entry actions: dexscreener + swap — right column, never pushed off-screen */}
-            <span className="flex shrink-0 items-center gap-1">
+            <span className="flex shrink-0 items-center gap-1 lg:order-3 lg:gap-2">
               <a href={`https://dexscreener.com/solana/${t.mint}`} target="_blank" rel="noopener noreferrer"
                 title={`$${t.symbol || "?"} on DexScreener ↗`} aria-label={`Open ${t.symbol || t.mint} on DexScreener`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center justify-center border border-green-500/30 p-0.5 text-green-500/70 hover:border-emerald-400 hover:text-emerald-300">
-                <LineChart className="h-3 w-3" aria-hidden="true" />
+                className="inline-flex items-center justify-center gap-1 border border-green-500/30 p-1 text-[11px] font-bold text-green-500/70 hover:border-emerald-400 hover:bg-green-500/10 hover:text-emerald-300 lg:px-2.5 lg:py-1.5 lg:text-[12px]">
+                <LineChart className="h-3.5 w-3.5 lg:h-4 lg:w-4" aria-hidden="true" />
+                <span className="hidden lg:inline">chart</span>
               </a>
               {onTrade && (
-                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled}
+                <button type="button" onClick={(e) => { e.stopPropagation(); onTrade?.(t); }} disabled={tradingDisabled}
                   title={`Swap $${t.symbol || "?"} in-app`} aria-label={`Swap ${t.symbol || t.mint} in-app`}
-                  className="inline-flex items-center gap-1 border border-green-500/30 px-1 py-0.5 font-bold text-green-300 hover:border-emerald-400 hover:text-emerald-300 disabled:opacity-40">
-                  <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />swap
+                  className="inline-flex items-center gap-1 border border-green-500/30 bg-green-500/5 px-1.5 py-1 font-bold text-green-300 hover:border-emerald-400 hover:bg-green-500/15 hover:text-emerald-300 disabled:opacity-40 lg:px-3 lg:py-1.5 lg:text-[12px]">
+                  <ArrowLeftRight className="h-3.5 w-3.5 lg:h-4 lg:w-4" aria-hidden="true" />swap
                 </button>
               )}
             </span>
             {/* market metrics + curve progress: full-width line that wraps — no side scroll */}
-            <span className="col-span-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[11px] text-green-500/70">
+            <span className="col-span-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[11px] text-green-500/70 lg:order-2 lg:col-span-1 lg:flex-nowrap lg:gap-x-4 lg:text-[12px]">
               {Number.isFinite(t.change24h) && (
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>{momentum(t.change24h)}</span>
               )}
