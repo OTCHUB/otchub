@@ -66,6 +66,11 @@ jobs:
           # On Base44 preview the platform reverse-proxies /api/* for you; on
           # Cloudflare Pages there is no proxy, so the SDK must call Base44 directly.
           VITE_BASE44_APP_BASE_URL=https://base44.app
+
+          # Solana RPC relay Worker — routes blockhash/simulate/send through
+          # Helius server-side so the browser never hits the public RPC directly.
+          # Set this secret after deploying workers/solana-relay via wrangler.
+          VITE_SOLANA_RELAY_URL=${{ secrets.VITE_SOLANA_RELAY_URL }}
           EOF
 
       - name: Build
