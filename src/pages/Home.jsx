@@ -299,10 +299,14 @@ export default function Home() {
 
         {/* Wallet */}
         <div className="mt-3">
+          {/* Auto-expand while a wallet is connected: the signal carries +1 for
+              a connected wallet, so a persisted wallet opens the panel on
+              mount and a fresh connect opens it immediately; disconnect
+              returns to 0 and leaves the card as the user left it. */}
           <CollapsibleCard
             title="Wallet"
             id="otc-wallet"
-            openSignal={walletOpenSignal}
+            openSignal={walletOpenSignal + (wallet ? 1 : 0)}
             defaultOpen={false}
             right={
               <span

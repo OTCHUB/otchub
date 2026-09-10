@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Fixed bottom banner shown while a transaction flow (claim / swap / crank) is
 // running. It names the current phase, explains what is happening, and shows a
 // live spinner + elapsed-seconds counter so the app never looks frozen during
 // long broadcast/confirmation waits.
+// PORTED to <body>: the frosted .term-window panels use backdrop-filter and a
+// reveal transform, which make them the containing block for fixed-position
+// descendants — rendered inline, this banner anchored to the CARD (clipped by
+// its overflow, floating over the tx log) instead of the viewport.
 const PHASES = {
   prep: {
     label: "PREPARING",
@@ -71,7 +76,7 @@ export default function TxStatusOverlay({ phase, detail = null, onCancel = null 
   if (!phase) return null;
   const p = PHASES[phase] || PHASES.prep;
 
-  return (
+  return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-[60px] z-[60] flex justify-center px-3">
       <div className={`w-full max-w-lg border bg-black/95 px-3 py-2 ${p.cls} ${onCancel ? "pointer-events-auto" : ""}`}>
         <div className="flex items-center gap-2.5">
@@ -104,6 +109,7 @@ export default function TxStatusOverlay({ phase, detail = null, onCancel = null 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
