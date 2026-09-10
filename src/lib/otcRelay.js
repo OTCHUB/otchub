@@ -28,7 +28,8 @@ const RELAY_TIMEOUT_MS = 30_000;
 // sendBatch broadcast bytes and must never be blind-retried here.
 const RELAY_RETRY_MODES = /^(blockhash|simulate|simulateBatch|accounts|fee|confirm|balance)$/;
 
-async function relayOnce(mode, payload) {
+// Call the Cloudflare Worker relay with a hard AbortController deadline.
+async function workerOnce(mode, payload) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), RELAY_TIMEOUT_MS);
   try {
@@ -46,15 +47,40 @@ async function relayOnce(mode, payload) {
   }
 }
 
-export async function relay(mode, payload = {}) {
-  if (!RELAY_URL) {
-    const res = await base44.functions.invoke("solanaRelay", { mode, ...payload });
+// Call the Base44 solanaRelay function with the same hard deadline.
+// base44.functions.invoke() does not accept an AbortSignal, so we race it
+// against a manual timeout promise — same 30s budget, same AbortError name
+// so the caller's retry logic works identically for both transports.
+async function base44Once(mode, payload) {
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const e = new Error(`relay ${mode} timed out after ${RELAY_TIMEOUT_MS / 1000}s`);
+      e.name = "AbortError";
+      reject(e);
+    }, RELAY_TIMEOUT_MS);
+  });
+  try {
+    const res = await Promise.race([
+      base44.functions.invoke("solanaRelay", { mode, ...payload }),
+      deadline,
+    ]);
     const data = res?.data || {};
     if (data.error) throw new Error(data.error);
     return data;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+export async function relay(mode, payload = {}) {
+  // Pick the transport: dedicated CF Worker when configured, Base44 function
+  // otherwise. Both paths share the same timeout + retry behaviour below.
+  const attempt = () =>
+    RELAY_URL ? workerOnce(mode, payload) : base44Once(mode, payload);
+
   try {
-    return await relayOnce(mode, payload);
+    return await attempt();
   } catch (e) {
     const timedOut = e?.name === "AbortError";
     if (!timedOut || !RELAY_RETRY_MODES.test(mode)) {
@@ -65,6 +91,6 @@ export async function relay(mode, payload = {}) {
           : e.message
       );
     }
-    return await relayOnce(mode, payload); // one retry for a stalled read
+    return await attempt(); // one retry for a stalled read-only call
   }
 }
