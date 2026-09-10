@@ -12,6 +12,13 @@
 // Catches every path under /api/* (Pages' [[path]] catch-all segment) and
 // forwards it verbatim — method, headers, query string, and body — to the
 // Base44 app's own hosted origin, then streams the response back unchanged.
+//
+// NOTE: this file must live at the repository-root `functions/` directory —
+// Cloudflare Pages/Wrangler only auto-detects Pages Functions there. A prior
+// automated commit (base44-builder[bot], 42fb472) moved this same file to
+// base44/functions/api/[[path]]/entry.ts, which silently dropped the /api
+// proxy from the Pages deploy. This root-level copy restores it; the
+// base44/functions/ tree is left in place for Base44's own backend bundling.
 const BASE44_ORIGIN = 'https://otchubdev.base44.app';
 
 export async function onRequest(context) {
