@@ -455,16 +455,18 @@ body::after {
    .reveal-pending for .reveal-in; without JS support panels stay visible. */
 .term-window.reveal-pending {
   opacity: 0;
-  transform: translateY(22px) scale(0.99);
+  transform: translate3d(0, 24px, 0);
+  will-change: transform, opacity;
 }
 
 .term-window.reveal-in {
-  animation: reveal-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: reveal-rise 0.55s cubic-bezier(0.25, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 @keyframes reveal-rise {
-  from { opacity: 0; transform: translateY(22px) scale(0.99); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(0, 24px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -25,12 +25,14 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, m
       return;
     }
     const io = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        el.classList.remove("reveal-pending");
-        el.classList.add("reveal-in");
-        io.disconnect();
-      }
-    }, { rootMargin: "0px 0px -6% 0px", threshold: 0.08 });
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      io.disconnect();
+      el.classList.remove("reveal-pending");
+      el.classList.add("reveal-in");
+      // Release the compositing hint once the entrance finishes so the
+      // page doesn't hold dozens of will-change layers open.
+      el.addEventListener("animationend", () => el.classList.remove("reveal-in"), { once: true });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
