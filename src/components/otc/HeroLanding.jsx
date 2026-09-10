@@ -37,7 +37,7 @@ const FEATURES = [
     icon: Flame,
     label: "SUPPLY BURNT",
     value: (s) => (s?.token_burnt != null ? `${(s.token_burnt / 1e6).toFixed(2)}M` : "—"),
-    desc: (s) => (s?.token_total_supply ? `${((s.token_burnt / s.token_total_supply) * 100).toFixed(1)}% of supply burnt` : "—"),
+    desc: (s) => (s?.token_burnt != null ? `${((s.token_burnt / (s?.token_tge_supply || 1e9)) * 100).toFixed(1)}% of TGE max burnt` : "—"),
     href: "otc-protocol",
   },
   { icon: Gem, label: "DESK SUPPLY", value: (s) => fmtNum(s?.nft_total_supply), desc: () => "OTC Desks NFT live supply", href: "otc-nft-trade" },
