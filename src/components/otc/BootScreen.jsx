@@ -27,7 +27,7 @@ const LINES = [
   "OTC_HUB ready. Loading interface...",
 ];
 
-export default function BootScreen({ onComplete }) {
+export default function BootScreen({ onComplete, ready = true }) {
   const [lines, setLines] = useState([]);
   const [done, setDone] = useState(false);
   // Boot-time skin: the modern skin renders a sans hero instead of the
@@ -50,11 +50,19 @@ export default function BootScreen({ onComplete }) {
         } catch {
           /* storage unavailable — boot replays next visit */
         }
-        setTimeout(() => onCompleteRef.current?.(), 150);
       }
     }, 25);
     return () => clearInterval(id);
   }, []);
+
+  // Reveal only when the boot script is done AND the caller's data is ready:
+  // the dashboard mounts behind the boot screen, so it appears instantly
+  // instead of swapping to a blank spinner while the fetch finishes.
+  useEffect(() => {
+    if (!done || !ready) return;
+    const t = setTimeout(() => onCompleteRef.current?.(), 150);
+    return () => clearTimeout(t);
+  }, [done, ready]);
 
   // The bar tracks EXACTLY how many of the milestone lines have printed —
   // one line = one step of the sequence, 100% only when the last line is up.
@@ -100,8 +108,8 @@ export default function BootScreen({ onComplete }) {
             {!done && <span className="animate-pulse text-green-400">▋</span>}
           </div>
           {done && (
-            <div className="mt-2 text-emerald-400">
-              <span className="animate-pulse">▋</span> BOOT_COMPLETE
+            <div className={`mt-2 ${ready ? "text-emerald-400" : "text-cyan-400"}`}>
+              <span className="animate-pulse">▋</span> {ready ? "BOOT_COMPLETE" : "SYNCING_MARKET_DATA"}
             </div>
           )}
         </div>

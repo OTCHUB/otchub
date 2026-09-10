@@ -26,7 +26,17 @@ import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
-import BootScreen, { hasSeenBoot } from "@/components/otc/BootScreen";
+// First-session boot screen, lazy-loaded: it never weighs down the initial
+// bundle for returning (already-booted) visitors. The session-marker check
+// is inlined so the BootScreen module stays fully lazy.
+const BootScreen = React.lazy(() => import("@/components/otc/BootScreen"));
+const hasSeenBoot = () => {
+  try {
+    return window.sessionStorage.getItem("otc_boot_seen") === "1";
+  } catch {
+    return false;
+  }
+};
 import { TerminalTopBar } from "@/components/otc/TerminalBars";
 import QuickNavBar from "@/components/otc/QuickNavBar";
 import KeeperPanel from "@/components/otc/KeeperPanel";
@@ -216,14 +226,21 @@ export default function Home() {
   if (loading || !bootDone) {
     // Session already booted: a quiet spinner while data loads, never a
     // boot replay.
-    if (loading && bootDone) {
+    if (bootDone) {
       return (
         <div className="skin-stage fixed inset-0 flex items-center justify-center bg-black">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500/20 border-t-green-400" />
         </div>
       );
     }
-    return <BootScreen onComplete={() => setBootDone(true)} />;
+    // First visit this session: the boot sequence IS the loading screen —
+    // it plays while the dashboard fetch runs in parallel and holds at
+    // SYNCING_MARKET_DATA until the data lands, then reveals instantly.
+    return (
+      <React.Suspense fallback={null}>
+        <BootScreen ready={!loading} onComplete={() => setBootDone(true)} />
+      </React.Suspense>
+    );
   }
 
   return (
