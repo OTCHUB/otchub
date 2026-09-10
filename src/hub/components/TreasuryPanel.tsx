@@ -40,7 +40,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
     vault: vaultPda(programId)[0].toBase58(),
   };
   const stepFeeSplit = `${fmtBp(BPS - config.opsPctBp, 0)} pot / ${fmtBp(config.opsPctBp, 0)} ops`;
-  const roundSplit = `${fmtBp(config.burnPctBp, 0)} burn / ${fmtBp(config.lpPctBp, 0)} LP / ${fmtBp(BPS - config.burnPctBp - config.lpPctBp, 0)} $OTC yield`;
+  const roundSplit = `${fmtBp(config.burnPctBp, 0)} burn / ${fmtBp(config.lpPctBp, 0)} LP / ${fmtBp(config.treasuryFloatPctBp, 0)} treasury / ${fmtBp(BPS - config.burnPctBp - config.lpPctBp - config.treasuryFloatPctBp, 0)} $OTC yield`;
   const potVsLiability = `${fmtSol(potLamports)} / ${fmtSol(config.potLiabilityLamports)}`;
   const otcAvgRate =
     otcPot && otcPot.totalLamportsSpent > 0
@@ -50,13 +50,12 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
   return (
     <div className="space-y-2">
       <Panel title="TREASURY" id="hub-treasury">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
           <Stat
             label="desks owned"
             value={fmtNum(treasury.desksOwned)}
             sub={`bought via sweeps · ${treasuryDeskProgressPct(treasury.desksOwned)}% of ${fmtNum(TREASURY_DESK_TARGET)} target`}
           />
-          <Stat label="desks consigned" value={fmtNum(treasury.desksConsigned)} sub="in vault" />
           <Stat label="sweeps" value={fmtNum(treasury.totalSweeps)} sub="floor buys executed" />
           <Stat label="exits" value={fmtNum(treasury.totalExits)} sub="desks sold back" />
           <Stat
@@ -64,16 +63,14 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
             value={fmtHub(supply.burnedUnits, d)}
             sub={`ledger ${fmtNum(burn.totalHubBurned)} units${supply.ledgerDrift ? " · drift" : ""}`}
           />
-          <Stat label="burn pending" value={fmtSol(burn.burnPendingLamports)} sub="awaiting swap" />
           <Stat
             label="LP-build pending"
-            value={fmtSol(treasury.lpPendingLamports)}
-            sub="§A5 5% leg · phase-2 $HUB/$OTC LP"
+            value={fmtHub(treasury.lpPendingHubUnits, d)}
+            sub="§A5 2.5% leg · phase-2 $HUB/$OTC LP"
           />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Flag on={!config.paused} label="LIVE" />
-          <Flag on={config.consignmentEnabled} label="CONSIGNMENT" />
           <Flag on={config.lpEnabled} label="LP" />
           <Flag on={otcAvgRate !== null} label="$OTC YIELD FUNDED" />
           <Flag on={creatorFee !== null} label="CREATOR FEE FLYWHEEL" />
@@ -184,16 +181,11 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
       </Panel>
 
       <Panel title="TREASURY LOCKS" right="what the treasury's holdings are earmarked for">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Stat
             label="LP provisioning"
             value={config.lpEnabled ? "ACTIVE" : "PENDING"}
             sub="liquidity for the $HUB / $OTC pair — seeded from treasury OTC + $HUB once price holds ≥14 days"
-          />
-          <Stat
-            label="buyback reserve"
-            value={fmtSol(burn.burnPendingLamports)}
-            sub="SOL earmarked each round, awaiting the buyback-burn keeper — automated floor support"
           />
           <Stat
             label="yield buffer"
@@ -259,7 +251,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Row k="OTC pot state" v={<AddressLink address={pdas.otcPot} />} />
           <Row k="creator fee state" v={<AddressLink address={pdas.creatorFee} />} />
           <Row k="treasury state" v={<AddressLink address={pdas.treasury} />} />
-          <Row k="vault (consigned custody)" v={<AddressLink address={pdas.vault} />} />
+          <Row k="vault (LP custody)" v={<AddressLink address={pdas.vault} />} />
           <Row k="treasury multisig" v={<AddressLink address={config.treasury} />} />
           <Row k="ops wallet" v={<AddressLink address={config.opsWallet} />} />
           <Row k="authority" v={<AddressLink address={config.authority} />} />
@@ -273,7 +265,6 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Row k="tier weights" v={config.tierWeightsBp.map((w) => `${w / 100}%`).join(" · ")} />
           <Row k="round threshold" v={fmtSol(config.minPotThresholdLamports, 2)} />
           <Row k="genesis" v={fmtUtc(config.genesisTs)} />
-          <Row k="consignor share" v={fmtBp(config.consignorShareBp, 0)} />
           <Row k="pot balance / liability" v={potVsLiability} />
         </CollapsibleCard>
       </div>

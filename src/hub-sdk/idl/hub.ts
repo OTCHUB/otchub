@@ -5,12 +5,12 @@
  * IDL can be found at `target/idl/hub.json`.
  */
 export type Hub = {
-  "address": "5tCDEazUAkRjrkasup1uWcYo3t1C2ht76LmQva5rewQv",
+  "address": "7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i",
   "metadata": {
     "name": "hub",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "spec": "0.1.0",
-    "description": "$HUB protocol — stake-to-earn layer for OTC desk NFTs (community tooling)"
+    "description": "$HUB Yield Optimizer Protocol — Activate-to-earn Boosted Yield layer for OTC desk NFTs on Solana"
   },
   "instructions": [
     {
@@ -147,7 +147,9 @@ export type Hub = {
     {
       "name": "activateTierOtc",
       "docs": [
-        "§A4.1 #16 — `activate_tier` paid in $OTC at the 2× premium; proceeds → POL reserve."
+        "§A4.1 #16 — `activate_tier` paid in $OTC at the 2× premium: `otc_swap_amount` swapped",
+        "$OTC→$HUB via Jupiter (`min_out = hub_cost_delta`, burned in full) + an equal-scaled",
+        "amount injected into the $OTC yield vault (`OtcPotState`, no swap)."
       ],
       "discriminator": [
         23,
@@ -188,8 +190,50 @@ export type Hub = {
           }
         },
         {
-          "name": "otcPay",
+          "name": "epoch",
           "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.currentEpoch",
+                "account": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "opsWallet",
+          "writable": true
+        },
+        {
+          "name": "otcPay",
           "pda": {
             "seeds": [
               {
@@ -212,10 +256,39 @@ export type Hub = {
         },
         {
           "name": "payerOtc",
+          "docs": [
+            "desk-pot leg transfer and the Jupiter swap-burn leg (as part of `remaining_accounts`)."
+          ],
           "writable": true
         },
         {
-          "name": "polAccount",
+          "name": "otcPot",
+          "docs": [
+            "§A5 yield-vault bookkeeping; the desk-pot leg's `total_otc_bought_units` is credited here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcVault",
+          "docs": [
+            "the desk-pot leg (no swap — already $OTC)."
+          ],
           "writable": true
         },
         {
@@ -224,10 +297,16 @@ export type Hub = {
         },
         {
           "name": "payerHub",
+          "docs": [
+            "destination; burned in full immediately after (this *is* the tier's $HUB cost burn)."
+          ],
           "writable": true
         },
         {
           "name": "tokenProgram"
+        },
+        {
+          "name": "jupiterProgram"
         },
         {
           "name": "deskTier",
@@ -259,6 +338,14 @@ export type Hub = {
         {
           "name": "targetTier",
           "type": "u8"
+        },
+        {
+          "name": "otcSwapAmount",
+          "type": "u64"
+        },
+        {
+          "name": "jupiterData",
+          "type": "bytes"
         }
       ]
     },
@@ -469,96 +556,6 @@ export type Hub = {
       ]
     },
     {
-      "name": "claimAccrual",
-      "docs": [
-        "Pays a wallet-level StakerAccrual (consignor share credits)."
-      ],
-      "discriminator": [
-        179,
-        84,
-        221,
-        93,
-        63,
-        114,
-        51,
-        191
-      ],
-      "accounts": [
-        {
-          "name": "wallet",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "accrual"
-          ]
-        },
-        {
-          "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "accrual",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  99,
-                  99,
-                  114,
-                  117,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "wallet"
-              }
-            ]
-          }
-        },
-        {
-          "name": "pot",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  116
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "claimAirdrop",
       "docs": [
         "§A7.1 #20 — a desk's current owner claims its snapshot allocation (one claim per asset)."
@@ -721,6 +718,255 @@ export type Hub = {
               ]
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "claimHubPotReward",
+      "docs": [
+        "§A5.1 #37 — a desk's current owner pulls its own tier-weighted share of all 4 open",
+        "`HubPotRound` buckets (\"M.I.M ETF\" — $OTC/CRCLx/OpenAI/Anthropic), self-signed; shares the",
+        "same `HubPotClaim` PDA as `distribute_hub_pot_reward` so a desk can only ever be paid once",
+        "per round regardless of which path is used (mirrors `claim_airdrop`/`distribute_airdrop`)."
+      ],
+      "discriminator": [
+        210,
+        240,
+        177,
+        9,
+        52,
+        69,
+        147,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "claimant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deskAsset"
+        },
+        {
+          "name": "deskTier",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcMint"
+        },
+        {
+          "name": "crclxMint"
+        },
+        {
+          "name": "openaiMint"
+        },
+        {
+          "name": "anthropicMint"
+        },
+        {
+          "name": "otcVault",
+          "writable": true
+        },
+        {
+          "name": "crclxVault",
+          "writable": true
+        },
+        {
+          "name": "openaiVault",
+          "writable": true
+        },
+        {
+          "name": "anthropicVault",
+          "writable": true
+        },
+        {
+          "name": "claimantOtc",
+          "writable": true
+        },
+        {
+          "name": "claimantCrclx",
+          "writable": true
+        },
+        {
+          "name": "claimantOpenai",
+          "writable": true
+        },
+        {
+          "name": "claimantAnthropic",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "claim",
+          "docs": [
+            "Same seeds as `DistributeHubPotReward::claim` — pull and push share one PDA per",
+            "(round, desk asset), so a desk can only ever be paid once regardless of which path is used."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "roundIndex",
+          "type": "u32"
         }
       ]
     },
@@ -962,35 +1208,31 @@ export type Hub = {
       "args": []
     },
     {
-      "name": "consignDesk",
+      "name": "devnetReset",
       "docs": [
-        "§B3 #11"
+        "Devnet-only: closes `config`/`burn`/`treasury_state`/`epoch(epoch_index)` so",
+        "`initialize_config` can re-`init` the same PDAs after a layout change. Compiled only",
+        "under the `mock-jupiter` feature — absent from every mainnet build."
       ],
       "discriminator": [
-        166,
-        87,
-        176,
-        166,
-        3,
-        58,
-        174,
-        123
+        52,
+        226,
+        240,
+        25,
+        105,
+        131,
+        41,
+        28
       ],
       "accounts": [
         {
-          "name": "owner",
+          "name": "authority",
           "writable": true,
           "signer": true
         },
         {
-          "name": "deskAsset",
-          "writable": true
-        },
-        {
-          "name": "deskCollection"
-        },
-        {
           "name": "config",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -1008,17 +1250,17 @@ export type Hub = {
           }
         },
         {
-          "name": "vault",
+          "name": "burn",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  118,
-                  97,
+                  98,
                   117,
-                  108,
-                  116
+                  114,
+                  110
                 ]
               }
             ]
@@ -1046,8 +1288,63 @@ export type Hub = {
           }
         },
         {
-          "name": "consignedDesk",
+          "name": "epoch",
           "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "epochIndex"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "epochIndex",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "distributeAirdrop",
+      "docs": [
+        "§A7.1 #20b — authority pushes a snapshot allocation straight to the desk's current owner",
+        "(genesis \"1-time 1-address\" distribution); shares the same `AirdropClaim` PDA guard as",
+        "`claim_airdrop`, so a desk can only ever be paid once regardless of the path used."
+      ],
+      "discriminator": [
+        208,
+        4,
+        12,
+        36,
+        180,
+        28,
+        118,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
           "pda": {
             "seeds": [
               {
@@ -1056,10 +1353,117 @@ export type Hub = {
                   99,
                   111,
                   110,
-                  115,
+                  102,
                   105,
-                  103,
-                  110
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deskAsset",
+          "docs": [
+            "them, this is a push. Whoever holds the desk right now receives the payout, matching the",
+            "genesis policy of paying \"the OTC desk NFT owner at distribution time.\""
+          ]
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubMint"
+        },
+        {
+          "name": "airdropVault",
+          "writable": true
+        },
+        {
+          "name": "ownerHub",
+          "docs": [
+            "actual on-chain owner in the handler, not against a signer."
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "claim",
+          "docs": [
+            "Same seeds as `ClaimAirdrop::claim` — `init` makes a second payout for the same desk fail",
+            "regardless of whether the first one went through `claim_airdrop` or `distribute_airdrop`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  105,
+                  114,
+                  100,
+                  114,
+                  111,
+                  112
                 ]
               },
               {
@@ -1070,14 +1474,507 @@ export type Hub = {
           }
         },
         {
-          "name": "mplCoreProgram"
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amountUnits",
+          "type": "u64"
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "distributeHubPotReward",
+      "docs": [
+        "§A5.1 #36 — authority pushes one active desk's tier-weighted share of all 4 open",
+        "`HubPotRound` buckets straight to its current owner in a single transaction (4",
+        "`transfer_checked` CPIs); each bucket independently capped so it can never pay out more",
+        "than that bucket's snapshotted amount."
+      ],
+      "discriminator": [
+        45,
+        241,
+        217,
+        255,
+        166,
+        70,
+        119,
+        55
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deskAsset",
+          "docs": [
+            "`distribute_treasury_reward`'s \"pay whoever holds the desk right now\" policy."
+          ]
+        },
+        {
+          "name": "deskTier",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcMint"
+        },
+        {
+          "name": "crclxMint"
+        },
+        {
+          "name": "openaiMint"
+        },
+        {
+          "name": "anthropicMint"
+        },
+        {
+          "name": "otcVault",
+          "writable": true
+        },
+        {
+          "name": "crclxVault",
+          "writable": true
+        },
+        {
+          "name": "openaiVault",
+          "writable": true
+        },
+        {
+          "name": "anthropicVault",
+          "writable": true
+        },
+        {
+          "name": "ownerOtc",
+          "docs": [
+            "on-chain owner in the handler, not against a signer."
+          ],
+          "writable": true
+        },
+        {
+          "name": "ownerCrclx",
+          "writable": true
+        },
+        {
+          "name": "ownerOpenai",
+          "writable": true
+        },
+        {
+          "name": "ownerAnthropic",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "claim",
+          "docs": [
+            "One payout per desk asset per round."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
         },
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "roundIndex",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "distributeTreasuryReward",
+      "docs": [
+        "#32 — authority pushes one active desk's tier-weighted share of an open `RewardRound`",
+        "straight to its current owner; capped so a round can never pay out more than it holds."
+      ],
+      "discriminator": [
+        152,
+        54,
+        132,
+        121,
+        78,
+        212,
+        250,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deskAsset",
+          "docs": [
+            "`distribute_airdrop`'s \"pay whoever holds the desk right now\" policy."
+          ]
+        },
+        {
+          "name": "deskTier",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubMint"
+        },
+        {
+          "name": "treasuryLockVault",
+          "writable": true
+        },
+        {
+          "name": "ownerHub",
+          "docs": [
+            "actual on-chain owner in the handler, not against a signer."
+          ],
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "claim",
+          "docs": [
+            "One payout per desk asset per round."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundIndex"
+              },
+              {
+                "kind": "account",
+                "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "roundIndex",
+          "type": "u32"
+        }
+      ]
     },
     {
       "name": "drawCreatorFeeLeg",
@@ -1190,7 +2087,11 @@ export type Hub = {
     {
       "name": "finalizeEpoch",
       "docs": [
-        "§B3 #4"
+        "§B3 #4 / §A5 4-way split — 90% distributed to desks (unchanged mechanic); the other 10%",
+        "(5% burn / 2.5% LP / 2.5% treasury float) is swapped SOL→$HUB via a synchronous Jupiter",
+        "CPI executed inside this instruction. `jupiter_data`/`ctx.remaining_accounts` are the",
+        "caller-assembled Jupiter route (see `jupiter_swap::swap_exact_in`); `min_hub_out` floors",
+        "the swap's received $HUB."
       ],
       "discriminator": [
         159,
@@ -1207,7 +2108,7 @@ export type Hub = {
           "name": "keeper",
           "docs": [
             "Permissionless: the math is deterministic, so anyone may close a round once the",
-            "threshold is met (they pay the next Epoch account's rent)."
+            "threshold is met (they pay the next Epoch account's rent and assemble the Jupiter route)."
           ],
           "writable": true,
           "signer": true
@@ -1332,6 +2233,48 @@ export type Hub = {
           }
         },
         {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubMint",
+          "writable": true
+        },
+        {
+          "name": "vaultWsol",
+          "writable": true
+        },
+        {
+          "name": "vaultHub",
+          "docs": [
+            "`lp_pending_hub_units`'s physical custody."
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasuryFloatVault",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "jupiterProgram"
+        },
+        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
@@ -1339,6 +2282,234 @@ export type Hub = {
       "args": [
         {
           "name": "epochIndex",
+          "type": "u64"
+        },
+        {
+          "name": "minHubOut",
+          "type": "u64"
+        },
+        {
+          "name": "jupiterData",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "fundHubPot",
+      "docs": [
+        "§A5.1 #34 — treasury deposits the 4 already-converted basket amounts (swapped off-chain",
+        "from source-B's 13-stock treasury-desk claim) in one instruction — four enforced",
+        "`TransferChecked` deposits, not merely attested."
+      ],
+      "discriminator": [
+        180,
+        102,
+        46,
+        137,
+        225,
+        48,
+        88,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcMint"
+        },
+        {
+          "name": "crclxMint"
+        },
+        {
+          "name": "openaiMint"
+        },
+        {
+          "name": "anthropicMint"
+        },
+        {
+          "name": "treasuryOtc",
+          "writable": true
+        },
+        {
+          "name": "treasuryCrclx",
+          "writable": true
+        },
+        {
+          "name": "treasuryOpenai",
+          "writable": true
+        },
+        {
+          "name": "treasuryAnthropic",
+          "writable": true
+        },
+        {
+          "name": "otcVault",
+          "writable": true
+        },
+        {
+          "name": "crclxVault",
+          "writable": true
+        },
+        {
+          "name": "openaiVault",
+          "writable": true
+        },
+        {
+          "name": "anthropicVault",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "otcAmount",
+          "type": "u64"
+        },
+        {
+          "name": "crclxAmount",
+          "type": "u64"
+        },
+        {
+          "name": "openaiAmount",
+          "type": "u64"
+        },
+        {
+          "name": "anthropicAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "fundTreasuryReward",
+      "docs": [
+        "§A6.3/§A7.1 bridge #30 — treasury deposits $HUB (swapped off-chain from the OTC launcher's",
+        "holders-in-stock reward leg) into `treasury_lock_vault` (enforced deposit), earmarked for",
+        "the next `open_reward_round`."
+      ],
+      "discriminator": [
+        97,
+        112,
+        5,
+        61,
+        115,
+        152,
+        136,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubMint"
+        },
+        {
+          "name": "treasuryHub",
+          "writable": true
+        },
+        {
+          "name": "treasuryLockVault",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "hubAmount",
           "type": "u64"
         }
       ]
@@ -1425,6 +2596,143 @@ export type Hub = {
         {
           "name": "clearThresholdUnits",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initHubPot",
+      "docs": [
+        "§A5.1 #33 — authority creates the HUB Pot MemeStock basket bookkeeping (one-time,",
+        "post-init); records the 4 basket mints (resolved at call time, never hardcoded) + their",
+        "vault-owned token accounts."
+      ],
+      "discriminator": [
+        32,
+        247,
+        252,
+        50,
+        58,
+        40,
+        189,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcVault"
+        },
+        {
+          "name": "crclxVault"
+        },
+        {
+          "name": "openaiVault"
+        },
+        {
+          "name": "anthropicVault"
+        },
+        {
+          "name": "hubPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "otcMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "crclxMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "openaiMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "anthropicMint",
+          "type": "pubkey"
         }
       ]
     },
@@ -1697,6 +3005,12 @@ export type Hub = {
           "name": "airdropVault"
         },
         {
+          "name": "treasuryLockVault",
+          "docs": [
+            "holds the immutable 2% genesis floor; no instruction in this program ever debits it."
+          ]
+        },
+        {
           "name": "tokenomics",
           "writable": true,
           "pda": {
@@ -1722,6 +3036,99 @@ export type Hub = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initTreasuryFloat",
+      "docs": [
+        "§A6.3/§A7.1 bridge — authority records the vault-owned WSOL scratch, $HUB scratch, and",
+        "$HUB buy-and-hold float ATAs `finalize_epoch`'s synchronous Jupiter legs need (one-time,",
+        "post-init, mirrors `init_otc_pot`)."
+      ],
+      "discriminator": [
+        81,
+        231,
+        116,
+        124,
+        179,
+        180,
+        125,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultWsol"
+        },
+        {
+          "name": "vaultHub"
+        },
+        {
+          "name": "treasuryFloatVault"
         }
       ],
       "args": []
@@ -1888,6 +3295,210 @@ export type Hub = {
       ]
     },
     {
+      "name": "openHubPotRound",
+      "docs": [
+        "§A5.1 #35 — permissionless: snapshots all 4 pending bucket balances across the live Σw",
+        "of active desks into a new `HubPotRound`."
+      ],
+      "discriminator": [
+        65,
+        162,
+        128,
+        220,
+        209,
+        242,
+        112,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Permissionless: deterministic snapshot, like `open_reward_round`."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "hubPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98,
+                  95,
+                  112,
+                  111,
+                  116,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hubPot.roundCount",
+                "account": "hubPotConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "openRewardRound",
+      "docs": [
+        "#31 — permissionless: snapshots the pending reward deposit across the live Σw of active",
+        "desks into a new `RewardRound`."
+      ],
+      "discriminator": [
+        162,
+        249,
+        119,
+        227,
+        253,
+        100,
+        177,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Permissionless: deterministic snapshot, like `clear_creator_fees` / `finalize_epoch`."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenomics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  111,
+                  109,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "tokenomics.rewardRoundCount",
+                "account": "tokenomicsConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "pause",
       "docs": [
         "§B3 #10"
@@ -1931,107 +3542,6 @@ export type Hub = {
         }
       ],
       "args": []
-    },
-    {
-      "name": "recordBurn",
-      "docs": [
-        "§B3 #7"
-      ],
-      "discriminator": [
-        254,
-        128,
-        98,
-        33,
-        0,
-        74,
-        165,
-        252
-      ],
-      "accounts": [
-        {
-          "name": "keeper",
-          "docs": [
-            "Must be `burn.authority`: fronts SOL for the market buy, reimbursed here on proof of burn."
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "burn",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  117,
-                  114,
-                  110
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "pot",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  116
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "hubBurned",
-          "type": "u64"
-        },
-        {
-          "name": "lamportsSpent",
-          "type": "u64"
-        },
-        {
-          "name": "burnTx",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
-        }
-      ]
     },
     {
       "name": "recordCreatorFee",
@@ -2471,149 +3981,6 @@ export type Hub = {
       ]
     },
     {
-      "name": "registerConsignedInflow",
-      "docs": [
-        "§B3 #6, source E — consignor-share split (§A6.1)."
-      ],
-      "discriminator": [
-        157,
-        175,
-        147,
-        30,
-        57,
-        195,
-        251,
-        106
-      ],
-      "accounts": [
-        {
-          "name": "treasury",
-          "writable": true,
-          "signer": true,
-          "relations": [
-            "config"
-          ]
-        },
-        {
-          "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "epoch",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  111,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "config.currentEpoch",
-                "account": "config"
-              }
-            ]
-          }
-        },
-        {
-          "name": "pot",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  116
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "consignedDesk",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  115,
-                  105,
-                  103,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "consignedDesk.assetId",
-                "account": "consignedDesk"
-              }
-            ]
-          }
-        },
-        {
-          "name": "consignorAccrual",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  99,
-                  99,
-                  114,
-                  117,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "consignedDesk.consignor",
-                "account": "consignedDesk"
-              }
-            ]
-          }
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "lamports",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "registerTreasuryInflow",
       "docs": [
         "§B3 #6"
@@ -2822,19 +4189,20 @@ export type Hub = {
       ]
     },
     {
-      "name": "setOtcRate",
+      "name": "setOtcPaymentsEnabled",
       "docs": [
-        "§A4.1 #15 — authority refreshes the $OTC/SOL reference rate and the enable switch."
+        "§A4.1 #15 — authority toggles the $OTC payment path on/off. Pricing is a live Jupiter",
+        "quote supplied per-call (`otc_swap_amount`), not a stored rate."
       ],
       "discriminator": [
-        97,
-        190,
-        198,
-        119,
-        23,
-        18,
-        202,
-        143
+        208,
+        123,
+        148,
+        250,
+        195,
+        94,
+        48,
+        214
       ],
       "accounts": [
         {
@@ -2885,45 +4253,35 @@ export type Hub = {
       ],
       "args": [
         {
-          "name": "otcPerSol",
-          "type": "u64"
-        },
-        {
           "name": "enabled",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "unconsignDesk",
+      "name": "setTreasuryFloatCapBp",
       "docs": [
-        "§B3 #12"
+        "§A6.3/§A7.1 bridge — treasury multisig retunes the experimental treasury-float cap",
+        "(bp of $HUB max supply). Excess over the live cap at deposit time is burned, never",
+        "rejected."
       ],
       "discriminator": [
-        133,
-        87,
-        235,
-        90,
-        130,
-        163,
+        97,
+        179,
+        121,
+        199,
+        122,
         82,
-        160
+        185,
+        165
       ],
       "accounts": [
         {
-          "name": "consignor",
-          "writable": true,
+          "name": "treasury",
           "signer": true,
           "relations": [
-            "consignedDesk"
+            "config"
           ]
-        },
-        {
-          "name": "deskAsset",
-          "writable": true
-        },
-        {
-          "name": "deskCollection"
         },
         {
           "name": "config",
@@ -2938,48 +4296,6 @@ export type Hub = {
                   102,
                   105,
                   103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "consignEpoch",
-          "docs": [
-            "The consignment epoch must be closed so no round is double-counted (§A6.1)."
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  112,
-                  111,
-                  99,
-                  104
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "consignedDesk.consignedEpoch",
-                "account": "consignedDesk"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
                 ]
               }
             ]
@@ -3005,40 +4321,14 @@ export type Hub = {
               }
             ]
           }
-        },
-        {
-          "name": "consignedDesk",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  115,
-                  105,
-                  103,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "deskAsset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "mplCoreProgram"
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "hubFloatCapBp",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "unpause",
@@ -3281,7 +4571,7 @@ export type Hub = {
     {
       "name": "upgradeTierOtc",
       "docs": [
-        "§A4.1 #17 — `upgrade_tier` paid in $OTC at the 2× premium; proceeds → POL reserve."
+        "§A4.1 #17 — `upgrade_tier` paid in $OTC at the 2× premium (see `activate_tier_otc`)."
       ],
       "discriminator": [
         6,
@@ -3322,8 +4612,50 @@ export type Hub = {
           }
         },
         {
-          "name": "otcPay",
+          "name": "epoch",
           "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.currentEpoch",
+                "account": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "opsWallet",
+          "writable": true
+        },
+        {
+          "name": "otcPay",
           "pda": {
             "seeds": [
               {
@@ -3346,10 +4678,39 @@ export type Hub = {
         },
         {
           "name": "payerOtc",
+          "docs": [
+            "desk-pot leg transfer and the Jupiter swap-burn leg (as part of `remaining_accounts`)."
+          ],
           "writable": true
         },
         {
-          "name": "polAccount",
+          "name": "otcPot",
+          "docs": [
+            "§A5 yield-vault bookkeeping; the desk-pot leg's `total_otc_bought_units` is credited here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcVault",
+          "docs": [
+            "the desk-pot leg (no swap — already $OTC)."
+          ],
           "writable": true
         },
         {
@@ -3358,10 +4719,16 @@ export type Hub = {
         },
         {
           "name": "payerHub",
+          "docs": [
+            "destination; burned in full immediately after (this *is* the tier's $HUB cost burn)."
+          ],
           "writable": true
         },
         {
           "name": "tokenProgram"
+        },
+        {
+          "name": "jupiterProgram"
         },
         {
           "name": "deskTier",
@@ -3383,12 +4750,24 @@ export type Hub = {
               }
             ]
           }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "targetTier",
           "type": "u8"
+        },
+        {
+          "name": "otcSwapAmount",
+          "type": "u64"
+        },
+        {
+          "name": "jupiterData",
+          "type": "bytes"
         }
       ]
     }
@@ -3434,19 +4813,6 @@ export type Hub = {
       ]
     },
     {
-      "name": "consignedDesk",
-      "discriminator": [
-        246,
-        189,
-        11,
-        19,
-        219,
-        54,
-        90,
-        0
-      ]
-    },
-    {
       "name": "creatorFeeState",
       "discriminator": [
         165,
@@ -3486,6 +4852,45 @@ export type Hub = {
       ]
     },
     {
+      "name": "hubPotClaim",
+      "discriminator": [
+        135,
+        227,
+        41,
+        78,
+        222,
+        214,
+        96,
+        221
+      ]
+    },
+    {
+      "name": "hubPotConfig",
+      "discriminator": [
+        88,
+        211,
+        114,
+        180,
+        153,
+        101,
+        120,
+        25
+      ]
+    },
+    {
+      "name": "hubPotRound",
+      "discriminator": [
+        242,
+        7,
+        76,
+        135,
+        86,
+        165,
+        160,
+        106
+      ]
+    },
+    {
       "name": "otcPayConfig",
       "discriminator": [
         255,
@@ -3512,16 +4917,29 @@ export type Hub = {
       ]
     },
     {
-      "name": "stakerAccrual",
+      "name": "rewardClaim",
       "discriminator": [
-        213,
-        19,
-        206,
-        218,
-        211,
-        157,
-        148,
-        110
+        194,
+        80,
+        130,
+        80,
+        113,
+        62,
+        2,
+        91
+      ]
+    },
+    {
+      "name": "rewardRound",
+      "discriminator": [
+        175,
+        204,
+        6,
+        220,
+        209,
+        208,
+        47,
+        98
       ]
     },
     {
@@ -3553,19 +4971,6 @@ export type Hub = {
   ],
   "events": [
     {
-      "name": "accrualClaimed",
-      "discriminator": [
-        86,
-        99,
-        51,
-        211,
-        226,
-        48,
-        235,
-        238
-      ]
-    },
-    {
       "name": "airdropClaimed",
       "discriminator": [
         125,
@@ -3579,6 +4984,19 @@ export type Hub = {
       ]
     },
     {
+      "name": "airdropDistributed",
+      "discriminator": [
+        150,
+        40,
+        93,
+        36,
+        137,
+        4,
+        173,
+        131
+      ]
+    },
+    {
       "name": "airdropRootSet",
       "discriminator": [
         200,
@@ -3589,19 +5007,6 @@ export type Hub = {
         232,
         157,
         123
-      ]
-    },
-    {
-      "name": "burnRecorded",
-      "discriminator": [
-        217,
-        168,
-        29,
-        198,
-        28,
-        67,
-        77,
-        142
       ]
     },
     {
@@ -3683,32 +5088,6 @@ export type Hub = {
       ]
     },
     {
-      "name": "deskConsigned",
-      "discriminator": [
-        169,
-        15,
-        200,
-        51,
-        212,
-        46,
-        86,
-        179
-      ]
-    },
-    {
-      "name": "deskUnconsigned",
-      "discriminator": [
-        26,
-        252,
-        178,
-        11,
-        128,
-        237,
-        38,
-        46
-      ]
-    },
-    {
       "name": "epochFinalized",
       "discriminator": [
         109,
@@ -3719,6 +5098,71 @@ export type Hub = {
         249,
         145,
         107
+      ]
+    },
+    {
+      "name": "epochSolSwapped",
+      "discriminator": [
+        186,
+        193,
+        241,
+        194,
+        62,
+        168,
+        162,
+        138
+      ]
+    },
+    {
+      "name": "hubPotFunded",
+      "discriminator": [
+        245,
+        123,
+        128,
+        44,
+        207,
+        139,
+        160,
+        0
+      ]
+    },
+    {
+      "name": "hubPotRewardClaimed",
+      "discriminator": [
+        213,
+        201,
+        142,
+        136,
+        203,
+        178,
+        127,
+        157
+      ]
+    },
+    {
+      "name": "hubPotRewardDistributed",
+      "discriminator": [
+        76,
+        84,
+        9,
+        31,
+        125,
+        174,
+        104,
+        41
+      ]
+    },
+    {
+      "name": "hubPotRoundOpened",
+      "discriminator": [
+        86,
+        161,
+        117,
+        46,
+        8,
+        53,
+        16,
+        4
       ]
     },
     {
@@ -3774,16 +5218,16 @@ export type Hub = {
       ]
     },
     {
-      "name": "otcRateSet",
+      "name": "otcPaymentsEnabledSet",
       "discriminator": [
-        74,
+        4,
+        195,
+        142,
+        124,
+        133,
         104,
-        139,
-        74,
-        54,
-        196,
-        74,
-        213
+        88,
+        53
       ]
     },
     {
@@ -3836,6 +5280,71 @@ export type Hub = {
         61,
         5,
         126
+      ]
+    },
+    {
+      "name": "treasuryFloatCapUpdated",
+      "discriminator": [
+        131,
+        125,
+        229,
+        40,
+        254,
+        160,
+        217,
+        102
+      ]
+    },
+    {
+      "name": "treasuryFloatInitialized",
+      "discriminator": [
+        245,
+        252,
+        92,
+        138,
+        195,
+        23,
+        168,
+        210
+      ]
+    },
+    {
+      "name": "treasuryRewardDistributed",
+      "discriminator": [
+        214,
+        41,
+        72,
+        131,
+        134,
+        162,
+        230,
+        112
+      ]
+    },
+    {
+      "name": "treasuryRewardFunded",
+      "discriminator": [
+        252,
+        249,
+        49,
+        39,
+        173,
+        87,
+        137,
+        249
+      ]
+    },
+    {
+      "name": "treasuryRewardRoundOpened",
+      "discriminator": [
+        215,
+        125,
+        97,
+        30,
+        220,
+        41,
+        77,
+        87
       ]
     },
     {
@@ -3925,212 +5434,206 @@ export type Hub = {
     },
     {
       "code": 6014,
-      "name": "alreadyConsigned",
-      "msg": "Desk is already consigned"
-    },
-    {
-      "code": 6015,
-      "name": "burnExceedsPending",
-      "msg": "Burn spend exceeds burn-pending"
-    },
-    {
-      "code": 6016,
-      "name": "accrualEmpty",
-      "msg": "Accrual has nothing owed"
-    },
-    {
-      "code": 6017,
       "name": "lpPositionExists",
       "msg": "LP position for this pair already exists (one per pair)"
     },
     {
-      "code": 6018,
-      "name": "consignedNotExitable",
-      "msg": "Consigned desks are not eligible for treasury exits"
-    },
-    {
-      "code": 6019,
+      "code": 6015,
       "name": "tierVoided",
       "msg": "Tier has been voided by an ownership change; re-activate"
     },
     {
-      "code": 6020,
+      "code": 6016,
       "name": "notDeskOwner",
       "msg": "Caller does not own the desk asset"
     },
     {
-      "code": 6021,
+      "code": 6017,
       "name": "wrongCollection",
       "msg": "Desk asset does not belong to the configured collection"
     },
     {
-      "code": 6022,
+      "code": 6018,
       "name": "potBelowThreshold",
       "msg": "Open epoch inflow is below min_pot_threshold_lamports"
     },
     {
-      "code": 6023,
+      "code": 6019,
       "name": "epochAlreadyFinalized",
       "msg": "Epoch already finalized"
     },
     {
-      "code": 6024,
+      "code": 6020,
       "name": "epochNotFinalized",
       "msg": "Epoch is not finalized"
     },
     {
-      "code": 6025,
+      "code": 6021,
       "name": "nothingToClaim",
       "msg": "Nothing to claim"
     },
     {
-      "code": 6026,
+      "code": 6022,
       "name": "potBelowLiability",
       "msg": "Pot lamports below liability"
     },
     {
-      "code": 6027,
+      "code": 6023,
       "name": "invariantViolated",
       "msg": "Inflow accounting invariant violated"
     },
     {
-      "code": 6028,
-      "name": "consignmentDisabled",
-      "msg": "Consignment is disabled"
-    },
-    {
-      "code": 6029,
-      "name": "deskConsigned",
-      "msg": "Desk is consigned and cannot be sold or transferred by treasury"
-    },
-    {
-      "code": 6030,
-      "name": "consignmentInactive",
-      "msg": "Consignment is not active"
-    },
-    {
-      "code": 6031,
-      "name": "unconsignBeforeFinalize",
-      "msg": "Cannot unconsign until the current epoch is finalized"
-    },
-    {
-      "code": 6032,
+      "code": 6024,
       "name": "lpDisabled",
       "msg": "LP building is disabled"
     },
     {
-      "code": 6033,
+      "code": 6025,
       "name": "lpPhase2Gated",
       "msg": "HUB/OTC LP is gated until phase-2 conditions hold"
     },
     {
-      "code": 6034,
+      "code": 6026,
       "name": "floorStale",
       "msg": "Floor moved more than the staleness guard since tx build"
     },
     {
-      "code": 6035,
+      "code": 6027,
       "name": "treasurySelfDeal",
       "msg": "Treasury may not buy its own exit"
     },
     {
-      "code": 6036,
+      "code": 6028,
       "name": "burnPendingUnderflow",
       "msg": "Burn-pending underflow"
     },
     {
-      "code": 6037,
+      "code": 6029,
       "name": "mathOverflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6038,
+      "code": 6030,
       "name": "otcPaymentsDisabled",
       "msg": "$OTC payments are disabled"
     },
     {
-      "code": 6039,
+      "code": 6031,
       "name": "otcRateStale",
       "msg": "$OTC reference rate is stale; authority must refresh it"
     },
     {
-      "code": 6040,
+      "code": 6032,
       "name": "invalidTokenAccount",
       "msg": "Account is not an SPL token account for the expected mint/owner"
     },
     {
-      "code": 6041,
+      "code": 6033,
       "name": "wrongTokenProgram",
       "msg": "Token program does not match the configured mint"
     },
     {
-      "code": 6042,
+      "code": 6034,
       "name": "allocationExceedsSupply",
       "msg": "Airdrop + treasury lock + team allocations exceed the max supply"
     },
     {
-      "code": 6043,
+      "code": 6035,
       "name": "airdropClosed",
       "msg": "Airdrop claims are not open"
     },
     {
-      "code": 6044,
+      "code": 6036,
       "name": "airdropInvalidProof",
       "msg": "Merkle proof does not match the published airdrop root"
     },
     {
-      "code": 6045,
+      "code": 6037,
       "name": "airdropLocked",
       "msg": "Airdrop root cannot change once claims have been paid"
     },
     {
-      "code": 6046,
+      "code": 6038,
       "name": "notImplemented",
       "msg": "Not implemented in this milestone"
     },
     {
-      "code": 6047,
+      "code": 6039,
       "name": "otcBuyExceedsPending",
       "msg": "OTC buy spend exceeds otc_pending_lamports"
     },
     {
-      "code": 6048,
+      "code": 6040,
       "name": "noOtcPurchased",
       "msg": "No $OTC has been purchased yet; nothing claimable"
     },
     {
-      "code": 6049,
+      "code": 6041,
       "name": "creatorFeeBelowThreshold",
       "msg": "Creator-fee pending balance is below the clearing threshold"
     },
     {
-      "code": 6050,
+      "code": 6042,
       "name": "creatorFeeLegExceedsPending",
       "msg": "Creator-fee leg draw exceeds that leg's pending balance"
     },
     {
-      "code": 6051,
+      "code": 6043,
       "name": "lpAccountsMissing",
       "msg": "build_lp requires AMM CPI accounts in remaining_accounts"
+    },
+    {
+      "code": 6044,
+      "name": "airdropCapExceeded",
+      "msg": "Airdrop snapshot desk count exceeds the 2,500-desk cap"
+    },
+    {
+      "code": 6045,
+      "name": "noRewardPending",
+      "msg": "No treasury reward pending; call fund_treasury_reward first"
+    },
+    {
+      "code": 6046,
+      "name": "rewardRoundExceeded",
+      "msg": "Reward round payout would exceed the round's snapshotted amount"
+    },
+    {
+      "code": 6047,
+      "name": "deskNotActive",
+      "msg": "Desk is not an active tier holder"
+    },
+    {
+      "code": 6048,
+      "name": "noHubPotPending",
+      "msg": "No HUB Pot bucket has a pending balance; call fund_hub_pot first"
+    },
+    {
+      "code": 6049,
+      "name": "hubPotRoundExceeded",
+      "msg": "HUB Pot round payout would exceed a bucket's snapshotted amount"
+    },
+    {
+      "code": 6050,
+      "name": "slippageExceeded",
+      "msg": "Jupiter swap returned less than the required minimum output"
+    },
+    {
+      "code": 6051,
+      "name": "wrongJupiterProgram",
+      "msg": "CPI target does not match the configured Jupiter program id"
+    },
+    {
+      "code": 6052,
+      "name": "swapAccountsMissing",
+      "msg": "Jupiter route requires accounts in remaining_accounts"
+    },
+    {
+      "code": 6053,
+      "name": "treasuryFloatNotInitialized",
+      "msg": "Treasury float vault has not been initialized"
     }
   ],
   "types": [
-    {
-      "name": "accrualClaimed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "wallet",
-            "type": "pubkey"
-          },
-          {
-            "name": "lamports",
-            "type": "u64"
-          }
-        ]
-      }
-    },
     {
       "name": "airdropClaim",
       "docs": [
@@ -4164,6 +5667,9 @@ export type Hub = {
     },
     {
       "name": "airdropClaimed",
+      "docs": [
+        "User-initiated pull via `claim_airdrop`."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -4191,9 +5697,42 @@ export type Hub = {
       }
     },
     {
+      "name": "airdropDistributed",
+      "docs": [
+        "Authority-initiated push via `distribute_airdrop` — same `AirdropClaim` PDA guard as",
+        "`AirdropClaimed`, so a desk can only ever appear in one of the two events, never both."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountUnits",
+            "type": "u64"
+          },
+          {
+            "name": "totalClaimedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "airdropRootSet",
       "docs": [
-        "§A7.1 — snapshot published (or re-published before any claim) / claims toggled."
+        "§A7.1 — snapshot published (round 1) or extended (round ≥2 — desk_count grew to onboard",
+        "newly-minted desks) / claims toggled."
       ],
       "type": {
         "kind": "struct",
@@ -4209,6 +5748,10 @@ export type Hub = {
           },
           {
             "name": "deskCount",
+            "type": "u32"
+          },
+          {
+            "name": "round",
             "type": "u32"
           },
           {
@@ -4235,26 +5778,6 @@ export type Hub = {
       }
     },
     {
-      "name": "burnRecorded",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "hubBurned",
-            "type": "u64"
-          },
-          {
-            "name": "lamportsSpent",
-            "type": "u64"
-          },
-          {
-            "name": "burnPendingAfter",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "burnState",
       "docs": [
         "`Pot` is a system-owned PDA (`[\"pot\"]`); balance = account lamports. It has",
@@ -4269,10 +5792,6 @@ export type Hub = {
           },
           {
             "name": "totalHubBurned",
-            "type": "u64"
-          },
-          {
-            "name": "burnPendingLamports",
             "type": "u64"
           },
           {
@@ -4374,21 +5893,22 @@ export type Hub = {
           {
             "name": "lpPctBp",
             "docs": [
-              "§A5 5%: earmarked at finalize into `TreasuryState.lp_pending_lamports` for the",
-              "$HUB/$OTC LP (phase-2 `build_lp`). Remainder after burn + lp is the 90% $OTC leg."
+              "§A5 2.5%: swapped SOL→$HUB at finalize and earmarked into",
+              "`TreasuryState.lp_pending_hub_units` for the $HUB/$OTC LP (phase-2 `build_lp_otc_locked`)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "treasuryFloatPctBp",
+            "docs": [
+              "§A5 2.5%: swapped SOL→$HUB at finalize and deposited into",
+              "`TreasuryState.treasury_float_vault` (buy-and-hold, capped). Remainder after",
+              "burn + lp + treasury_float is the 90% $OTC leg."
             ],
             "type": "u16"
           },
           {
             "name": "opsPctBp",
-            "type": "u16"
-          },
-          {
-            "name": "consignmentEnabled",
-            "type": "bool"
-          },
-          {
-            "name": "consignorShareBp",
             "type": "u16"
           },
           {
@@ -4496,13 +6016,10 @@ export type Hub = {
             "name": "lpPctBp"
           },
           {
+            "name": "treasuryFloatPctBp"
+          },
+          {
             "name": "opsPctBp"
-          },
-          {
-            "name": "consignmentEnabled"
-          },
-          {
-            "name": "consignorShareBp"
           },
           {
             "name": "lpEnabled"
@@ -4559,34 +6076,6 @@ export type Hub = {
             "fields": [
               "i64"
             ]
-          }
-        ]
-      }
-    },
-    {
-      "name": "consignedDesk",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "assetId",
-            "type": "pubkey"
-          },
-          {
-            "name": "consignor",
-            "type": "pubkey"
-          },
-          {
-            "name": "consignedEpoch",
-            "type": "u64"
-          },
-          {
-            "name": "active",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }
@@ -4861,7 +6350,7 @@ export type Hub = {
           {
             "name": "lastBurnResultTx",
             "docs": [
-              "Replay guard for `record_creator_fee_burn_result` (trust-attested like `record_burn`)."
+              "Replay guard for `record_creator_fee_burn_result` (trust-attested)."
             ],
             "type": {
               "array": [
@@ -4885,26 +6374,6 @@ export type Hub = {
           {
             "name": "bump",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "deskConsigned",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "asset",
-            "type": "pubkey"
-          },
-          {
-            "name": "consignor",
-            "type": "pubkey"
-          },
-          {
-            "name": "epoch",
-            "type": "u64"
           }
         ]
       }
@@ -4959,26 +6428,6 @@ export type Hub = {
       }
     },
     {
-      "name": "deskUnconsigned",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "asset",
-            "type": "pubkey"
-          },
-          {
-            "name": "consignor",
-            "type": "pubkey"
-          },
-          {
-            "name": "epoch",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "epoch",
       "docs": [
         "One round of the pot. Opens at the previous finalize, closes when inflow ≥ threshold."
@@ -5016,12 +6465,25 @@ export type Hub = {
           },
           {
             "name": "burnPendingLamports",
+            "docs": [
+              "§A5 5% — SOL input to this epoch's burn leg, swapped $HUB→burned synchronously inside",
+              "`finalize_epoch` (no longer a keeper-drawn pending balance)."
+            ],
             "type": "u64"
           },
           {
             "name": "lpPendingLamports",
             "docs": [
-              "§A5 5% — this round's LP-build earmark, added to `TreasuryState.lp_pending_lamports`."
+              "§A5 2.5% — SOL input to this epoch's LP-build leg, swapped to $HUB and added to",
+              "`TreasuryState.lp_pending_hub_units`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "treasuryFloatLamports",
+            "docs": [
+              "§A5 2.5% — SOL input to this epoch's treasury-float leg, swapped to $HUB and deposited",
+              "into `TreasuryState.treasury_float_vault` (capped; excess folded into the burn leg)."
             ],
             "type": "u64"
           },
@@ -5080,10 +6542,23 @@ export type Hub = {
           },
           {
             "name": "burnPendingLamports",
+            "docs": [
+              "SOL input to this epoch's burn leg — swapped and burned synchronously, not left pending."
+            ],
             "type": "u64"
           },
           {
             "name": "lpPendingLamports",
+            "docs": [
+              "SOL input to this epoch's LP-build leg — swapped to $HUB and earmarked, not left pending."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "treasuryFloatLamports",
+            "docs": [
+              "SOL input to this epoch's treasury-float leg — swapped to $HUB and deposited/burned."
+            ],
             "type": "u64"
           },
           {
@@ -5106,6 +6581,429 @@ export type Hub = {
       }
     },
     {
+      "name": "epochSolSwapped",
+      "docs": [
+        "The synchronous Jupiter SOL→$HUB CPI executed inside `finalize_epoch` for the combined",
+        "burn/LP/treasury-float legs (10% of inflow). `hub_received` splits 50/25/25 into",
+        "`hub_burned`/`hub_lp_earmarked`/`hub_float_requested`; `hub_float_deposited` may be less than",
+        "`hub_float_requested` if the cap was hit, with the remainder folded into `hub_burned`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "solSwappedLamports",
+            "type": "u64"
+          },
+          {
+            "name": "hubReceived",
+            "type": "u64"
+          },
+          {
+            "name": "hubBurned",
+            "type": "u64"
+          },
+          {
+            "name": "hubLpEarmarked",
+            "type": "u64"
+          },
+          {
+            "name": "hubFloatRequested",
+            "type": "u64"
+          },
+          {
+            "name": "hubFloatDeposited",
+            "type": "u64"
+          },
+          {
+            "name": "treasuryFloatUnitsAfter",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotClaim",
+      "docs": [
+        "`[\"hub_pot_claim\", round_index, asset]` — one payout per desk asset per HUB Pot round;",
+        "existence is the double-payout guard (mirrors `RewardClaim`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "otcUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claimedTs",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotConfig",
+      "docs": [
+        "§A5.1 `[\"hub_pot\"]` — MemeStock basket ($OTC, CRCLx, OpenAI, Anthropic) bookkeeping.",
+        "Created once via `init_hub_pot`. Funded by the treasury's converted source-B (13-stock",
+        "treasury-desk) yield via `fund_hub_pot`; independent of `TokenomicsConfig`'s single-asset",
+        "$HUB reward path (§A6.3/§A7.1 bridge) — different funding source, different vaults."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "otcMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "crclxMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "openaiMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "anthropicMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "otcVault",
+            "docs": [
+              "Vault-owned (`[\"vault\"]` PDA) token accounts, one per bucket mint above."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "crclxVault",
+            "type": "pubkey"
+          },
+          {
+            "name": "openaiVault",
+            "type": "pubkey"
+          },
+          {
+            "name": "anthropicVault",
+            "type": "pubkey"
+          },
+          {
+            "name": "otcPendingUnits",
+            "docs": [
+              "Earmarked since the last `open_hub_pot_round`, awaiting the next snapshot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "crclxPendingUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiPendingUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicPendingUnits",
+            "type": "u64"
+          },
+          {
+            "name": "otcDepositedUnits",
+            "docs": [
+              "Lifetime totals, for dashboard display — never decreases."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "crclxDepositedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiDepositedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicDepositedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "roundCount",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotFunded",
+      "docs": [
+        "§A5.1 — treasury deposits converted source-B (13-stock) yield into the 4 HUB Pot buckets."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "otcAmount",
+            "type": "u64"
+          },
+          {
+            "name": "crclxAmount",
+            "type": "u64"
+          },
+          {
+            "name": "openaiAmount",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicAmount",
+            "type": "u64"
+          },
+          {
+            "name": "otcPendingAfter",
+            "type": "u64"
+          },
+          {
+            "name": "crclxPendingAfter",
+            "type": "u64"
+          },
+          {
+            "name": "openaiPendingAfter",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicPendingAfter",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotRewardClaimed",
+      "docs": [
+        "User-initiated pull via `claim_hub_pot_reward` — same `HubPotClaim` PDA guard as",
+        "`HubPotRewardDistributed`, so a desk can only ever appear in one of the two events per round."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "claimant",
+            "type": "pubkey"
+          },
+          {
+            "name": "otcUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotRewardDistributed",
+      "docs": [
+        "Authority-pushed payout of one active desk's tier-weighted share of all 4 HUB Pot buckets."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "otcUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotRound",
+      "docs": [
+        "`[\"hub_pot_round\", index]` — one `fund_hub_pot` snapshot: all 4 bucket pending balances",
+        "split across the active desks' Σw (`Config.total_weight_bp`) at the moment",
+        "`open_hub_pot_round` was called. Mirrors `RewardRound`, ×4 mints."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "otcUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicUnits",
+            "type": "u64"
+          },
+          {
+            "name": "totalWeightBp",
+            "type": "u64"
+          },
+          {
+            "name": "otcDistributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxDistributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiDistributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicDistributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          },
+          {
+            "name": "openedTs",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hubPotRoundOpened",
+      "docs": [
+        "Permissionless snapshot: each bucket's pending balance split across the active desks' Σw."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "otcUnits",
+            "type": "u64"
+          },
+          {
+            "name": "crclxUnits",
+            "type": "u64"
+          },
+          {
+            "name": "openaiUnits",
+            "type": "u64"
+          },
+          {
+            "name": "anthropicUnits",
+            "type": "u64"
+          },
+          {
+            "name": "totalWeightBp",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "inflowRegistered",
       "type": {
         "kind": "struct",
@@ -5121,10 +7019,6 @@ export type Hub = {
           {
             "name": "lamports",
             "type": "u64"
-          },
-          {
-            "name": "consignorShare",
-            "type": "u64"
           }
         ]
       }
@@ -5132,7 +7026,7 @@ export type Hub = {
     {
       "name": "inflowSource",
       "docs": [
-        "§A5 inflow sources. `E` (consigned desk yield) uses `register_consigned_inflow`."
+        "§A5 inflow sources."
       ],
       "type": {
         "kind": "enum",
@@ -5145,9 +7039,6 @@ export type Hub = {
           },
           {
             "name": "d"
-          },
-          {
-            "name": "e"
           },
           {
             "name": "f"
@@ -5260,8 +7151,8 @@ export type Hub = {
     {
       "name": "otcBuyRecorded",
       "docs": [
-        "Keeper-attested $OTC buy, reimbursed from the pot up to `otc_pending_lamports` (mirrors",
-        "`BurnRecorded`). `otc_bought` is deposited into `otc_vault` in the same tx."
+        "Keeper-attested $OTC buy, reimbursed from the pot up to `otc_pending_lamports`.",
+        "`otc_bought` is deposited into `otc_vault` in the same tx."
       ],
       "type": {
         "kind": "struct",
@@ -5293,7 +7184,10 @@ export type Hub = {
       "name": "otcPayConfig",
       "docs": [
         "§A4.1 `[\"otc_pay\"]` — $OTC as an alternative step-fee currency. Created by the authority",
-        "after `initialize_config` (no `Config` migration); absent ⇒ the path does not exist."
+        "after `initialize_config` (no `Config` migration); absent ⇒ the path does not exist. Pricing",
+        "is no longer a static authority-refreshed rate — the 2× premium is now a real synchronous",
+        "on-chain Jupiter OTC→$HUB swap (dynamic, priced at the live market rate), so this config only",
+        "holds the on/off switch and the dead-reserve pointer."
       ],
       "type": {
         "kind": "struct",
@@ -5301,24 +7195,6 @@ export type Hub = {
           {
             "name": "enabled",
             "type": "bool"
-          },
-          {
-            "name": "otcPerSol",
-            "docs": [
-              "Reference rate: $OTC base units per 1 SOL, refreshed by the authority (`set_otc_rate`)."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "rateTs",
-            "type": "i64"
-          },
-          {
-            "name": "premiumBp",
-            "docs": [
-              "Premium over the SOL step-fee value (bp). Written from `OTC_PREMIUM_BP`, never updated."
-            ],
-            "type": "u16"
           },
           {
             "name": "polAccount",
@@ -5335,6 +7211,21 @@ export type Hub = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "otcPaymentsEnabledSet",
+      "docs": [
+        "Authority toggles the $OTC payment path on/off (`init_otc_payments` starts it disabled)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
           }
         ]
       }
@@ -5402,46 +7293,76 @@ export type Hub = {
       }
     },
     {
-      "name": "otcRateSet",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "otcPerSol",
-            "type": "u64"
-          },
-          {
-            "name": "enabled",
-            "type": "bool"
-          },
-          {
-            "name": "ts",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "stakerAccrual",
+      "name": "rewardClaim",
       "docs": [
-        "Per-wallet consignor ledger (`[\"accrual\", wallet]`): consignor-share credits still owed,",
-        "plus the lifetime total paid out by `claim_accrual`. Created by the treasury on the first",
-        "consigned inflow for that wallet."
+        "`[\"reward_claim\", round_index, asset]` — one payout per desk asset per reward round;",
+        "existence is the double-payout guard (mirrors `AirdropClaim`)."
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "wallet",
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "asset",
             "type": "pubkey"
           },
           {
-            "name": "owedLamports",
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountUnits",
             "type": "u64"
           },
           {
-            "name": "totalClaimedLamports",
+            "name": "claimedTs",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "rewardRound",
+      "docs": [
+        "`[\"reward_round\", index]` — one `fund_treasury_reward` snapshot: `amount_units` split across",
+        "the active desks' Σw (`Config.total_weight_bp`) at the moment `open_reward_round` was called.",
+        "Each active desk may be paid its `amount_units × weight_bp(tier) / total_weight_bp` share",
+        "exactly once per round (see `RewardClaim`); `distributed_units` is capped at `amount_units`",
+        "on-chain, so the vault can never be over-drawn even if Σw drifts upward mid-round."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "amountUnits",
             "type": "u64"
+          },
+          {
+            "name": "totalWeightBp",
+            "type": "u64"
+          },
+          {
+            "name": "distributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          },
+          {
+            "name": "openedTs",
+            "type": "i64"
           },
           {
             "name": "bump",
@@ -5496,9 +7417,12 @@ export type Hub = {
     {
       "name": "tierPaidOtc",
       "docs": [
-        "§A4.1 — step(s) paid in $OTC at the 2× premium; nothing enters the pot, the $OTC lands in the",
-        "POL reserve. `from_tier == 0` is a fresh activation. `hub_burned_units` is paid separately —",
-        "the $HUB tier cost is always burned, on both the SOL and $OTC fee paths."
+        "§A4.1 (revised) — step(s) paid in $OTC: the flat 0.5 SOL activation fee (90% pot / 10% ops,",
+        "same as the SOL path — `fee_lamports`/`to_pot`/`to_ops`) plus the $OTC 2× premium, split into",
+        "a swap-burn leg (real on-chain Jupiter OTC→$HUB, burned in full — this *is* the tier's $HUB",
+        "cost burn, no separate direct debit from the payer's own $HUB wallet) and an equal-sized",
+        "desk-pot leg (raises `OtcPotState`'s lifetime average buy rate). `from_tier == 0` is a fresh",
+        "activation."
       ],
       "type": {
         "kind": "struct",
@@ -5524,23 +7448,43 @@ export type Hub = {
             "type": "u64"
           },
           {
-            "name": "solEquivalentLamports",
+            "name": "feeLamports",
             "type": "u64"
           },
           {
-            "name": "otcPaid",
+            "name": "toPot",
             "type": "u64"
           },
           {
-            "name": "otcPerSol",
+            "name": "toOps",
             "type": "u64"
           },
           {
-            "name": "premiumBp",
-            "type": "u16"
+            "name": "otcSwapAmount",
+            "docs": [
+              "$OTC input to the Jupiter swap-burn leg."
+            ],
+            "type": "u64"
           },
           {
             "name": "hubBurnedUnits",
+            "docs": [
+              "$HUB received from the swap and burned (≥ `hub_cost_delta`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "toOtcPot",
+            "docs": [
+              "Equal to `otc_swap_amount`, injected into `OtcPotState.otc_vault` (no swap)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "otcPaidTotal",
+            "docs": [
+              "Total $OTC charged (`otc_swap_amount + to_otc_pot`), i.e. the \"2× premium\"."
+            ],
             "type": "u64"
           }
         ]
@@ -5642,13 +7586,23 @@ export type Hub = {
           {
             "name": "snapshotDeskCount",
             "docs": [
-              "Desk assets counted at the airdrop snapshot (0 until `set_airdrop_root`)."
+              "Cumulative desk assets covered by the snapshot across every round so far (0 until the",
+              "first `set_airdrop_root`; never decreases once claims have started — see `snapshot_round`)."
             ],
             "type": "u32"
           },
           {
             "name": "snapshotTs",
             "type": "i64"
+          },
+          {
+            "name": "snapshotRound",
+            "docs": [
+              "Number of times `set_airdrop_root` has published a changed root/desk_count. 0 = no",
+              "snapshot yet; 1 = the genesis round; ≥2 = later rounds onboarding desks minted since —",
+              "e.g. \"distribute the first 1,800 desks now, run round 2 once the remaining ~700 mint.\""
+            ],
+            "type": "u32"
           },
           {
             "name": "airdropUnits",
@@ -5708,8 +7662,187 @@ export type Hub = {
             "type": "bool"
           },
           {
+            "name": "treasuryLockVault",
+            "docs": [
+              "Vault-owned $HUB token account holding the genesis 2% (`YIELD_RESERVE_BP`) floor. No",
+              "instruction in this program ever debits it — recorded here for on-chain provenance /",
+              "dashboard display, not as a spendable balance. The treasury multisig's own float ATA is",
+              "the separate, ordinary account that accumulates additional $HUB on top over time",
+              "(source C claims, capped by `TREASURY_HUB_FLOAT_CAP_BP`) — this vault only ever holds the",
+              "fixed initial floor."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryLockUnits",
+            "docs": [
+              "`HUB_MAX_SUPPLY_UNITS × YIELD_RESERVE_BP / BPS_DENOMINATOR`, recorded once at",
+              "`init_tokenomics` for auditability (compare against `treasury_lock_vault`'s live balance)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rewardDepositedUnits",
+            "docs": [
+              "Lifetime $HUB deposited into `treasury_lock_vault` by `fund_treasury_reward`, on top of",
+              "the immutable `treasury_lock_units` floor — provenance only. `treasury_lock_vault`'s live",
+              "balance always equals `treasury_lock_units + (reward_deposited_units -",
+              "reward_distributed_units)`, since both the deposit (`TransferChecked` in) and every payout",
+              "(`TransferChecked` out, capped per-round at `RewardRound.amount_units`) are enforced."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rewardDistributedUnits",
+            "docs": [
+              "Lifetime $HUB paid out of `treasury_lock_vault` to active desk holders via",
+              "`distribute_treasury_reward`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rewardPendingUnits",
+            "docs": [
+              "Deposited via `fund_treasury_reward` but not yet snapshotted into a `RewardRound`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rewardRoundCount",
+            "docs": [
+              "Number of `RewardRound`s opened so far (next round's PDA index)."
+            ],
+            "type": "u32"
+          },
+          {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryFloatCapUpdated",
+      "docs": [
+        "Treasury multisig retunes the experimental float cap."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hubFloatCapBp",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryFloatInitialized",
+      "docs": [
+        "Authority/treasury records the vault-owned $HUB scratch, WSOL scratch, and treasury-float",
+        "ATAs used by the synchronous Jupiter legs (one-time, post-init — mirrors `init_otc_pot`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vaultWsol",
+            "type": "pubkey"
+          },
+          {
+            "name": "vaultHub",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryFloatVault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryRewardDistributed",
+      "docs": [
+        "Authority-pushed payout of one active desk's tier-weighted share of an open reward round."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amountUnits",
+            "type": "u64"
+          },
+          {
+            "name": "roundDistributedUnits",
+            "type": "u64"
+          },
+          {
+            "name": "claims",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryRewardFunded",
+      "docs": [
+        "§A6.3 bridge — treasury deposits $HUB (swapped off-chain from the OTC launcher's",
+        "holders-in-stock reward leg) into `treasury_lock_vault`, earmarked for the next",
+        "`open_reward_round`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hubAmount",
+            "type": "u64"
+          },
+          {
+            "name": "pendingAfter",
+            "type": "u64"
+          },
+          {
+            "name": "totalDeposited",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryRewardRoundOpened",
+      "docs": [
+        "Permissionless snapshot: `amount_units` split across the active desks' Σw at this moment."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round",
+            "type": "u32"
+          },
+          {
+            "name": "amountUnits",
+            "type": "u64"
+          },
+          {
+            "name": "totalWeightBp",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
           }
         ]
       }
@@ -5726,16 +7859,12 @@ export type Hub = {
           {
             "name": "vault",
             "docs": [
-              "Program-signed custody PDA (`[\"vault\"]`) that owns consigned desks."
+              "Program-signed custody PDA (`[\"vault\"]`) for treasury-side token positions (LP, §A6.2)."
             ],
             "type": "pubkey"
           },
           {
             "name": "desksOwned",
-            "type": "u32"
-          },
-          {
-            "name": "desksConsigned",
             "type": "u32"
           },
           {
@@ -5771,10 +7900,49 @@ export type Hub = {
             "type": "u32"
           },
           {
-            "name": "lpPendingLamports",
+            "name": "lpPendingHubUnits",
             "docs": [
-              "§A5 5% leg, earmarked at every `finalize_epoch`; drawn down once the phase-2 LP adapter",
-              "lands (mirrors `BurnState.burn_pending_lamports`'s keeper-draw pattern)."
+              "§A5 2.5% leg — lifetime $HUB swapped-in and earmarked for the $HUB/$OTC LP at every",
+              "`finalize_epoch`; audit/informational running total (mirrors the pre-swap",
+              "`lp_pending_lamports` field it replaces), physically sitting in `vault_hub` until",
+              "`build_lp_otc_locked` draws it via CPI."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vaultHub",
+            "docs": [
+              "Vault-owned (`[\"vault\"]` PDA) $HUB scratch ATA: the Jupiter swap destination for both the",
+              "`finalize_epoch` round-split leg and the `otc_pay.rs` 2× premium swap-burn leg, and the",
+              "physical custody for `lp_pending_hub_units` until `build_lp_otc_locked` draws it. Set by",
+              "`init_treasury_float`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vaultWsol",
+            "docs": [
+              "Vault-owned (`[\"vault\"]` PDA) WSOL scratch ATA used only by `finalize_epoch`'s SOL→$HUB",
+              "leg (wrapped via System transfer + `SyncNative` immediately before the Jupiter CPI). Set",
+              "by `init_treasury_float`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryFloatVault",
+            "docs": [
+              "Vault-owned (`[\"vault\"]` PDA) $HUB buy-and-hold ATA (§A6.3/§A7.1 \"source C\" float,",
+              "distinct from `TokenomicsConfig.treasury_lock_vault`'s immutable genesis floor) — the",
+              "`finalize_epoch` treasury-float leg's destination, capped at `hub_float_cap_bp` of supply;",
+              "excess at deposit time is burned instead. Set by `init_treasury_float`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryFloatUnits",
+            "docs": [
+              "Lifetime $HUB deposited into `treasury_float_vault` — compared against",
+              "`HUB_MAX_SUPPLY_UNITS × hub_float_cap_bp / BPS_DENOMINATOR` at every deposit."
             ],
             "type": "u64"
           },
@@ -5854,7 +8022,7 @@ export type Hub = {
     {
       "name": "seedsDoc",
       "type": "string",
-      "value": "\"config|epoch+u64|tier+asset|consign+asset|accrual+wallet+u64|pot|burn|otc_pot|creator_fee|treasury|vault|otc_pay|tokenomics|airdrop+asset\""
+      "value": "\"config|epoch+u64|tier+asset|pot|burn|otc_pot|creator_fee|treasury|vault|otc_pay|tokenomics|airdrop+asset|reward_round+u32|reward_claim+u32+asset|hub_pot|hub_pot_round+u32|hub_pot_claim+u32+asset\""
     }
   ]
 };
