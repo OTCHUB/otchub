@@ -16,11 +16,16 @@ export default function RowPayout({ payout, symbols = {}, resolve }) {
     : `$${payout.rewardSymbol}`} · source-reported, unverified`;
   return (
     <span className="inline-flex shrink-0 items-center" title={title}>
-      {mints.length ? mints.map((mint, i) => (
-        <span key={mint} className={i ? "-ml-1.5" : ""}>
-          <PayoutIcon mint={mint} symbol={symOf(mint)} logo={logoOf(mint)} />
-        </span>
-      )) : payout?.rewardSymbol ? (
+      {mints.length ? <>
+        {mints.slice(0, 4).map((mint, i) => (
+          <span key={mint} className={i ? "-ml-1.5" : ""}>
+            <PayoutIcon mint={mint} symbol={symOf(mint)} logo={logoOf(mint)} />
+          </span>
+        ))}
+        {mints.length > 4 && (
+          <span className="ml-0.5 font-mono text-[10px] font-bold text-amber-300">+{mints.length - 4}</span>
+        )}
+      </> : payout?.rewardSymbol ? (
         <PayoutIcon mint={payout.rewardMint || payout.rewardSymbol} symbol={payout.rewardSymbol} />
       ) : null}
     </span>
