@@ -15,6 +15,8 @@ import {
   HubRoutes,
   rpcHost,
   useHub,
+  useWallet,
+  WalletProvider,
 } from "@/hub";
 
 // $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/hub/*"
@@ -94,6 +96,11 @@ function HubHeader() {
           <NavLink to="deployments" className={navCls}>
             [DEPLOYMENTS]
           </NavLink>
+          {cluster === "devnet" && (
+            <NavLink to="drip" className={navCls}>
+              [FAUCET]
+            </NavLink>
+          )}
           <Link
             to="/"
             className="inline-flex items-center whitespace-nowrap border border-emerald-500/70 px-2 py-1 text-[12px] font-bold text-emerald-400 hover:bg-emerald-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
@@ -116,8 +123,18 @@ function HubHeader() {
 
 // otchub's fixed top/bottom terminal bars + page footer — reads `cluster` from HubProvider, so
 // it must render inside the provider (mirrors hubconnect/web's standalone shell AppShell).
+// Also mirrors the host-connected `wallet` (otc_wallet_address, from "/") into the hub module's
+// own WalletProvider context, so panels that read useWallet() directly (faucet, airdrop checker,
+// mock-desk mint) stay in sync with whatever the rest of otchub treats as "your" wallet, exactly
+// like every panel that still takes the walletAddress prop.
 function HubShell({ wallet }) {
   const { cluster } = useHub();
+  const hubWallet = useWallet();
+  useEffect(() => {
+    if (wallet && wallet !== hubWallet.address) hubWallet.connect(wallet);
+    else if (!wallet && hubWallet.address) hubWallet.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync when the host wallet changes
+  }, [wallet]);
   const statusText = `${cluster.toUpperCase().replace(/-/g, "_")}_LINK_ACTIVE`;
   return (
     <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[52px] font-mono text-green-400">
@@ -165,7 +182,9 @@ export default function Hub({ devnet = false }) {
       resolveSigner={getSignerForAddress}
       swapTransport={hubSwapTransport}
     >
-      <HubShell wallet={wallet} />
+      <WalletProvider>
+        <HubShell wallet={wallet} />
+      </WalletProvider>
     </HubProvider>
   );
 }

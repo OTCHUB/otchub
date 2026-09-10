@@ -12,7 +12,7 @@ function Box({ tone, children }: { tone: Tone; children: ReactNode }) {
     amber: "border-amber-500/40 text-amber-300",
     red: "border-red-500/40 text-red-300",
   }[tone];
-  return <div className={`term-window border bg-black p-4 font-mono text-xs ${cls}`}>{children}</div>;
+  return <div className={`border bg-black p-4 font-mono text-xs ${cls}`}>{children}</div>;
 }
 
 export function LoadingBox({ label = "READING CHAIN" }: { label?: string }) {

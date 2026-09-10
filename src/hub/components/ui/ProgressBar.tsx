@@ -19,7 +19,8 @@ type ProgressBarProps = {
 /**
  * The app's one progress-bar primitive — the ASCII block heat-gradient loader (red → yellow →
  * neon green climbing left→right, `flex-wrap` so it never overflows narrow viewports). Pulses
- * once `frac` clears `imminentAt` to signal the final stretch.
+ * once `frac` clears `imminentAt` to signal the final stretch. Shared by `EpochTracker`
+ * (round-close threshold) and the bonding curve panel (graduation progress).
  */
 export function ProgressBar({
   frac,

@@ -20,9 +20,8 @@ function RoundRow({ e, defaultOpen }: { e: EpochView; defaultOpen: boolean }) {
       <Row k="closed" v={fmtUtc(e.finalizedTs)} />
       <Row k="opened" v={fmtUtc(e.startTs)} />
       <Row k="inflow" v={fmtSol(e.inflowLamports)} />
-      <Row k="credited to stakers ($OTC)" v={fmtSol(e.distributedLamports)} />
+      <Row k="credited to stakers" v={fmtSol(e.distributedLamports)} />
       <Row k="burn pending" v={fmtSol(e.burnPendingLamports)} />
-      <Row k="LP-build pending" v={fmtSol(e.lpPendingLamports)} />
       <Row k="floor remainder" v={`${fmtNum(e.rolledForwardLamports)} lamports → next round`} />
       <Row k="Σw at close" v={`${fmtNum(e.totalWeightBp)} bp`} />
       <div className="mt-2 text-[10px] text-green-700">paid per desk: {perTier}</div>

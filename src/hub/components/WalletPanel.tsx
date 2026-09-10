@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ProtocolState } from "@hub-sdk";
 import { useWalletPortfolio } from "../hooks/useWalletPortfolio";
 import { shortKey } from "../lib/format";
-import { silentReconnect } from "../lib/wallets";
+import { useWallet } from "../WalletProvider";
 import { ActivatePanel } from "./ActivatePanel";
 import { ClaimPanel } from "./ClaimPanel";
-import { SwapPanel } from "./SwapPanel";
+import { HubPotPanel } from "./HubPotPanel";
+import { BoltIcon } from "./ui/Icons";
 import { Panel } from "./ui/Panel";
 import { WalletConnect } from "./WalletConnect";
 import { WalletPortfolio } from "./WalletPortfolio";
-
-const STORAGE_KEY = "hub:wallet";
 
 type Props = {
   state: ProtocolState;
@@ -18,119 +17,133 @@ type Props = {
   walletAddress?: string;
 };
 
-const readStored = () => {
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-};
-
-/** WALLET_CONNECT → collapses to a `[ CONNECTED ✓ ]` bar + portfolio once an address is known. */
+/** Wallet Connect :: HUB Portfolio — the app's one centralized wallet controller. Sits at the top
+ * of the dashboard (see routes/Dashboard.tsx) so it's the first thing every other panel below
+ * (portfolio, claim, activate, HUB pot) implicitly depends on. Reads/writes the app-wide
+ * `WalletProvider` context via `useWallet`, so connecting here (or from the header, or from the
+ * airdrop checker) shows up everywhere else too. Collapsed, the connect flow shrinks to a single
+ * `● Connected · 0x123…abcd` / `○ Disconnected` summary line so it doesn't dominate the page once
+ * a wallet is already hooked up. */
 export function WalletPanel({ state, walletAddress }: Props) {
-  const [address, setAddress] = useState<string | null>(() => walletAddress ?? readStored());
-  const [open, setOpen] = useState(false);
+  const wallet = useWallet();
+  const address = walletAddress ?? wallet.address;
+  const [switchOpen, setSwitchOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const activateRef = useRef<HTMLDivElement>(null);
   // Same query key as WalletPortfolio → one fetch, shared by portfolio + claim rows.
   const portfolio = useWalletPortfolio(address, state);
 
-  // From a PORTFOLIO desk card's [ACTIVATE →]/[UPGRADE →]: preselect it below and scroll to it.
+  // From a PORTFOLIO desk card's [HUB_ACTIVATE →]/[UPGRADE_TIER →]: preselect it below and scroll
+  // to it.
   const jumpToActivate = (asset: string) => {
     setSelectedAsset(asset);
     activateRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  useEffect(() => {
-    if (walletAddress) setAddress(walletAddress);
-  }, [walletAddress]);
-
-  // Prompt-free restore after reload; the stored address stays visible read-only either way.
-  useEffect(() => {
-    const stored = readStored();
-    if (!walletAddress && stored) void silentReconnect(stored);
-  }, [walletAddress]);
-
   const connect = (pk: string) => {
-    setAddress(pk);
-    setOpen(false);
-    try {
-      localStorage.setItem(STORAGE_KEY, pk);
-    } catch {
-      /* private mode */
-    }
-    window.dispatchEvent(new Event("hub:wallet-changed"));
+    wallet.connect(pk);
+    setSwitchOpen(false);
   };
   const clear = () => {
-    setAddress(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* private mode */
-    }
-    window.dispatchEvent(new Event("hub:wallet-changed"));
+    wallet.disconnect();
   };
 
-  if (!address) {
-    return (
-      <div className="space-y-2">
-        <Panel title="WALLET_CONNECT :: HUB_PORTFOLIO">
-          <WalletConnect onConnected={connect} />
-        </Panel>
-        <SwapPanel state={state} address={null} />
-      </div>
-    );
-  }
+  const statusLine = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={address ? "font-bold text-emerald-300" : "font-bold text-amber-400"}>
+        {address ? "● Connected" : "○ Disconnected"}
+      </span>
+      {address && <span className="text-green-500/70">{shortKey(address, 6)}</span>}
+    </div>
+  );
 
   return (
     <div className="space-y-2">
-      {!walletAddress && (
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between border border-green-500/30 bg-black px-3 py-2 text-left"
-          title="reopen wallet connect"
-        >
-          <span className="text-[10px] uppercase tracking-widest text-green-500/70">
-            WALLET_CONNECT
-          </span>
-          <span className="text-xs font-bold text-green-400">
-            [ CONNECTED ✓ {shortKey(address, 6)} ]
-          </span>
-          <span className="text-[10px] text-green-500/40">{open ? "▴" : "▾"}</span>
-        </button>
-      )}
-      {open && (
-        <Panel title="SWITCH_WALLET">
-          <WalletConnect onConnected={connect} />
-        </Panel>
-      )}
-      <Panel title="PORTFOLIO">
-        <WalletPortfolio
-          address={address}
-          state={state}
-          onClear={walletAddress ? undefined : clear}
-          onActivate={jumpToActivate}
-        />
+      <div className="border border-green-500/30 bg-black px-3 py-2.5 font-mono">
+        <div className="flex items-start gap-2">
+          <BoltIcon className="h-4 w-4 shrink-0 text-green-500" />
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-green-600">
+              [ WHAT IS HUB PROTOCOL? ]
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-green-400/90">
+              <span className="font-bold text-green-200">HUB Protocol</span> — the sovereign
+              liquidity layer for the new age of internet finance. Decentralized OTC desks,
+              automated treasury yields, and the home of{" "}
+              <span className="font-bold text-green-300">Magic Internet Money</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Panel
+        title="Wallet Connect"
+        collapsible
+        defaultCollapsed={!!address}
+        collapsedSummary={statusLine}
+      >
+        {!address ? (
+          <>
+            <p className="mb-2 text-xs text-green-700">
+              Tip: connecting once here works everywhere across the dashboard.
+            </p>
+            <WalletConnect onConnected={connect} />
+          </>
+        ) : (
+          <div className="space-y-2">
+            {statusLine}
+            {!walletAddress && (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSwitchOpen((o) => !o)}
+                  className="text-xs text-green-500 underline hover:text-green-300"
+                >
+                  {switchOpen ? "Cancel switch" : "Switch wallet"}
+                </button>
+                <button
+                  type="button"
+                  onClick={clear}
+                  className="text-xs text-amber-400 underline hover:text-amber-200"
+                >
+                  Disconnect
+                </button>
+              </div>
+            )}
+            {switchOpen && <WalletConnect onConnected={connect} />}
+          </div>
+        )}
       </Panel>
-      <div className="grid gap-2 lg:grid-cols-2">
-        <SwapPanel state={state} address={address} />
-        <ClaimPanel
-          address={address}
-          state={state}
-          desks={portfolio.data?.desks ?? []}
-          onClaimed={() => void portfolio.refetch()}
-        />
-      </div>
-      <div ref={activateRef}>
-        <ActivatePanel
-          address={address}
-          state={state}
-          desks={portfolio.data?.desks ?? []}
-          selectedAsset={selectedAsset}
-          onChanged={() => void portfolio.refetch()}
-        />
-      </div>
+
+      {!address && <HubPotPanel />}
+      {address && (
+        <>
+          <Panel title="PORTFOLIO" collapsible>
+            <WalletPortfolio
+              address={address}
+              state={state}
+              onClear={walletAddress ? undefined : clear}
+              onActivate={jumpToActivate}
+            />
+          </Panel>
+          <ClaimPanel
+            address={address}
+            state={state}
+            desks={portfolio.data?.desks ?? []}
+            onClaimed={() => void portfolio.refetch()}
+          />
+          <div ref={activateRef}>
+            <ActivatePanel
+              address={address}
+              state={state}
+              desks={portfolio.data?.desks ?? []}
+              selectedAsset={selectedAsset}
+              onChanged={() => void portfolio.refetch()}
+            />
+          </div>
+          <HubPotPanel desks={portfolio.data?.desks ?? []} address={address} />
+        </>
+      )}
     </div>
   );
 }

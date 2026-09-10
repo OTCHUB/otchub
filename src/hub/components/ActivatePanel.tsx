@@ -30,7 +30,6 @@ import {
 import { fmtSol, fmtUnits, shortKey } from "../lib/format";
 import type { TxLog } from "../lib/swap";
 import { Panel } from "./ui/Panel";
-import { TierBadge } from "./ui/TierProgress";
 import { TxLogView } from "./ui/TxLogView";
 
 /** Fixed by `OTC_PAY_SWAP_BURN_PCT_BP` (currently an even 50/50 swap/pot split) — not a live
@@ -42,7 +41,7 @@ type Props = {
   state: ProtocolState;
   desks: OwnedDesk[];
   onChanged?: () => void;
-  /** Preselect a desk (e.g. jumped here from a PORTFOLIO card's [ACTIVATE →]/[UPGRADE →]). */
+  /** Preselect a desk (e.g. jumped here from a PORTFOLIO card's [HUB_ACTIVATE →]/[UPGRADE_TIER →]). */
   selectedAsset?: string | null;
 };
 
@@ -85,7 +84,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
     if (toTier <= fromTier) setToTier(Math.min(fromTier + 1, MAX_TIER));
   }, [fromTier, toTier]);
 
-  // PORTFOLIO card's [ACTIVATE →]/[UPGRADE →] jumps here with a desk already picked.
+  // PORTFOLIO card's [HUB_ACTIVATE →]/[UPGRADE_TIER →] jumps here with a desk already picked.
   useEffect(() => {
     if (selectedAsset) setAsset(selectedAsset);
   }, [selectedAsset]);
@@ -114,7 +113,10 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       taker: new PublicKey(address),
       otcMint: new PublicKey(state.config.otcMint),
       hubMint: new PublicKey(state.config.hubMint),
-      destinationTokenAccount: ataPda(new PublicKey(address), new PublicKey(state.config.hubMint))[0],
+      destinationTokenAccount: ataPda(
+        new PublicKey(address),
+        new PublicKey(state.config.hubMint),
+      )[0],
       minHubOut: BigInt(quote.hubBurnUnits),
     })
       .then((route) => {
@@ -130,7 +132,15 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on primitives, not `desk`/`quote` identity
-  }, [method, desk?.asset, quote?.hubBurnUnits, otcAvailable, address, state.config.otcMint, state.config.hubMint]);
+  }, [
+    method,
+    desk?.asset,
+    quote?.hubBurnUnits,
+    otcAvailable,
+    address,
+    state.config.otcMint,
+    state.config.hubMint,
+  ]);
 
   const split = quote ? splitFee(quote.solLamports) : null;
   const otcBal = balances.data?.otcUnits ?? null;
@@ -197,7 +207,9 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
   return (
     <Panel
       title="ACTIVATE_DESK :: SOL | $OTC"
-      right={collected === null ? "SOL ONLY" : `$OTC collected for POL: ${collected} OTC`}
+      right={
+        collected === null ? "SOL ONLY" : `lifetime $OTC paid (2× swap-burn): ${collected} OTC`
+      }
     >
       {rows.length === 0 ? (
         <div className="text-xs text-green-700">
@@ -207,9 +219,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
         </div>
       ) : (
         <>
-          <div className="text-[10px] uppercase tracking-widest text-green-600">
-            step 1 · select desk
-          </div>
+          <div className="text-[10px] uppercase tracking-widest text-green-600">desk</div>
           <div className="mt-1 max-h-32 overflow-y-auto border border-green-500/20">
             {rows.map((d) => {
               const t = currentTier(d);
@@ -225,7 +235,9 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
                   }`}
                 >
                   <span className="text-green-300">{shortKey(d.asset, 6)}</span>
-                  <TierBadge tier={t} />
+                  <span className={t ? "text-cyan-300" : "text-green-700"}>
+                    {t ? `T${t} ${TIER_NAMES[t - 1]}` : "NOT ACTIVATED"}
+                  </span>
                 </button>
               );
             })}
@@ -235,12 +247,10 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
 
       {desk && (
         <>
-          <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-green-600">
-            <span>step 2 · target tier</span>
-            <TierBadge tier={fromTier} />
-            <span className="text-green-700">→</span>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">
+            target tier {fromTier ? `(current T${fromTier})` : "(fresh activation)"}
           </div>
-          <div className="mt-1 grid grid-cols-4 gap-1">
+          <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-4">
             {TIERS.map((t) => (
               <button
                 key={t}
@@ -263,9 +273,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
             ))}
           </div>
 
-          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">
-            step 3 · pay with
-          </div>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-green-600">pay with</div>
           <div className="mt-1 flex gap-1">
             {(["sol", "otc"] as PayMethod[]).map((m) => (
               <button
@@ -287,32 +295,17 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
           </div>
 
           {quote && split && (
-            <div className="mt-2 border border-emerald-500/30 bg-emerald-500/[0.03] p-2 text-[11px]">
-              <div className="mb-1.5 text-[10px] uppercase tracking-widest text-emerald-400/80">
-                step 4 · cost summary — {verb.toLowerCase()} T{toTier}
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <span
-                  className={
-                    method === "sol"
-                      ? "text-sm font-bold text-emerald-300"
-                      : "text-[11px] text-green-700"
-                  }
-                >
+            <div className="mt-2 border border-green-500/20 p-2 text-[11px]">
+              <div className="flex justify-between gap-2">
+                <span className={method === "sol" ? "text-emerald-300" : "text-green-300"}>
                   SOL: {fmtSol(quote.solLamports, 2)}
                 </span>
                 <span className="text-green-600">
                   {fmtSol(split.toPot, 2)} → pot, {fmtSol(split.toOps, 2)} → ops
                 </span>
               </div>
-              <div className="mt-1 flex items-baseline justify-between gap-2">
-                <span
-                  className={
-                    method === "otc"
-                      ? "text-sm font-bold text-amber-300"
-                      : `text-[11px] ${otcTone}`
-                  }
-                >
+              <div className="mt-1 flex justify-between gap-2">
+                <span className={method === "otc" ? "text-amber-300" : otcTone}>
                   $OTC:{" "}
                   {!otcAvailable
                     ? `unavailable — ${quote.otcUnavailableReason}`
@@ -326,12 +319,10 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
                   {OTC_TOTAL_PREMIUM}× total → half swapped to $HUB + burned, half → yield vault
                 </span>
               </div>
-              <div className="mt-1.5 border-t border-emerald-500/15 pt-1.5 flex items-baseline justify-between gap-2">
-                <span
-                  className={`text-sm font-bold ${hubShort ? "text-amber-400" : "text-cyan-300"}`}
-                >
-                  {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB burn
-                </span>
+              <div
+                className={`mt-1 flex justify-between gap-2 ${hubShort ? "text-amber-400" : "text-cyan-300"}`}
+              >
+                <span>$HUB burn: {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB</span>
                 <span className="text-green-700">
                   {fromTier ? "T" + fromTier + " → T" + toTier + " difference" : "full tier cost"}
                 </span>
@@ -342,7 +333,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
             </div>
           )}
 
-          <div className="mt-2 grid grid-cols-3 gap-1 text-[11px]">
+          <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] sm:grid-cols-3">
             <div className="flex justify-between border border-green-500/20 px-2 py-1">
               <span className="text-green-600">SOL_BAL</span>
               <span className={solShort ? "text-amber-400" : "text-emerald-300"}>

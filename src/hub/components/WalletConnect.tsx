@@ -4,10 +4,11 @@ import { connectWallet, detectWallets, subscribeWallets, type WalletEntry } from
 
 type Props = { onConnected: (address: string) => void };
 
-const btnCls =
+const RETRO_BTN =
   "border border-green-500/50 px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/10 disabled:opacity-40";
 
-/** Read-only connect (or paste an address) — same panel otchub's WALLET_CONNECT uses. */
+/** Read-only connect (or paste an address) — square DOS bordered list, dropped into
+ *  `WalletPanel`'s `Panel` (and the always-DOS header connect dropdown). */
 export function WalletConnect({ onConnected }: Props) {
   const [wallets, setWallets] = useState<WalletEntry[]>(() => detectWallets());
   const [busy, setBusy] = useState(false);
@@ -40,7 +41,7 @@ export function WalletConnect({ onConnected }: Props) {
       const msg = e instanceof Error ? e.message : `${w.name} connect failed`;
       setError(
         /reject|declin|denied|4001/i.test(msg)
-          ? `${w.name}: request rejected — approve the prompt in your wallet to continue.`
+          ? `${w.name}: request rejected — approve the prompt to continue.`
           : msg,
       );
     } finally {
@@ -55,7 +56,7 @@ export function WalletConnect({ onConnected }: Props) {
     setWallets(list);
     if (!list.length) {
       setError(
-        "No Solana wallet detected. Open this page in your wallet's browser or paste an address.",
+        "No wallet detected — open this page in your wallet's browser, or paste an address.",
       );
       return;
     }
@@ -65,13 +66,13 @@ export function WalletConnect({ onConnected }: Props) {
   const submitManual = (e: FormEvent) => {
     e.preventDefault();
     const key = parsePubkey(manual);
-    if (!key) return setError("not a valid base58 pubkey");
+    if (!key) return setError("Not a valid address.");
     setError(null);
     onConnected(key.toBase58());
   };
 
   const solflareDeepLink = `https://solflare.com/ul/v1/browse/${encodeURIComponent(
-    typeof window !== "undefined" ? window.location.href : "https://otchub.dev",
+    typeof window !== "undefined" ? window.location.href : "https://app.otchub.dev",
   )}`;
 
   return (
@@ -81,7 +82,7 @@ export function WalletConnect({ onConnected }: Props) {
           type="button"
           onClick={handleConnect}
           disabled={busy}
-          className={`${btnCls} font-bold`}
+          className={`${RETRO_BTN} font-bold`}
         >
           {busy ? "[CONNECTING...]" : "[CONNECT_WALLET]"}
         </button>
@@ -96,7 +97,7 @@ export function WalletConnect({ onConnected }: Props) {
       {wallets.length === 0 && (
         <div className="flex flex-wrap items-center gap-2 text-[10px] text-green-500/50">
           <span>MOBILE?</span>
-          <a href={solflareDeepLink} className={btnCls}>
+          <a href={solflareDeepLink} className={RETRO_BTN}>
             [OPEN_IN_SOLFLARE ↗]
           </a>
           <span className="text-green-500/40">opens this page in the Solflare in-app browser</span>
@@ -142,7 +143,7 @@ export function WalletConnect({ onConnected }: Props) {
           spellCheck={false}
           className="min-w-0 flex-1 border border-green-500/30 bg-black px-2 py-1.5 text-xs text-green-400 outline-none placeholder:text-green-500/30 focus:border-green-400"
         />
-        <button type="submit" className={btnCls}>
+        <button type="submit" className={RETRO_BTN}>
           [LOOKUP]
         </button>
       </form>

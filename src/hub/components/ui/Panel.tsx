@@ -1,12 +1,10 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 type PanelProps = {
   title: ReactNode;
   right?: ReactNode;
   children: ReactNode;
   className?: string;
-  /** Optional anchor id — lets the quick-nav jump straight to this panel. */
-  id?: string;
   /** Adds a collapse toggle to the header and lets the body collapse/expand. */
   collapsible?: boolean;
   /** Uncontrolled initial state when `collapsible` is set — ignored once `collapsed` is passed. */
@@ -15,23 +13,22 @@ type PanelProps = {
    *  state, seeded by `defaultCollapsed`). */
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
-  /** Shown in place of `children` while collapsed (e.g. a one-line status summary). Left
-   *  undefined, the body simply hides with nothing in its place. Only ever rendered when
-   *  `collapsible` is true. */
+  /** Shown in place of `children` while collapsed (e.g. a one-line status summary) — WalletPanel's
+   *  "Connected · 0x123…abcd" row. Left undefined, the body simply hides with nothing in its
+   *  place. Only ever rendered when `collapsible` is true. */
   collapsedSummary?: ReactNode;
 };
 
 /**
  * The app's one `Panel` primitive — the square DOS-terminal window (`[ TITLE ]` header, 1px
  * border, monospace, zero radius). Collapsible mechanics are CSS-only (grid-template-rows +
- * opacity transition). Mirrors hubconnect's `Panel` so both apps render identically.
+ * opacity transition). Mirrors otchub's vendored `Panel` so both apps render identically.
  */
 export function Panel({
   title,
   right,
   children,
   className = "",
-  id,
   collapsible = false,
   defaultCollapsed = false,
   collapsed: collapsedProp,
@@ -41,34 +38,6 @@ export function Panel({
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const isCollapsed = collapsible && (collapsedProp ?? internalCollapsed);
 
-  // Apple-style scroll reveal — the same rise-into-place entrance as the OTC
-  // dashboard's CollapsibleCard: panels sit one notch down and animate in as
-  // they enter the viewport (reveal-pending → reveal-in, defined in index.css).
-  const revealRef = useRef<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    const el = revealRef.current;
-    if (!el) return;
-    if (
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
-      !("IntersectionObserver" in window)
-    ) {
-      el.classList.remove("reveal-pending");
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        io.disconnect();
-        el.classList.remove("reveal-pending");
-        el.classList.add("reveal-in");
-        el.addEventListener("animationend", () => el.classList.remove("reveal-in"), { once: true });
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
   const toggle = () => {
     const next = !isCollapsed;
     if (collapsedProp === undefined) setInternalCollapsed(next);
@@ -77,9 +46,7 @@ export function Panel({
 
   return (
     <section
-      id={id}
-      ref={revealRef}
-      className={`term-window reveal-pending rounded-none border border-green-500/30 bg-black font-mono text-green-400 ${className}`}
+      className={`rounded-none border border-green-500/30 bg-black font-mono text-green-400 ${className}`}
     >
       <header className="flex items-center justify-between gap-2 border-b border-green-500/30 px-3 py-1.5 text-xs">
         <span className="tracking-widest text-green-300">[ {title} ]</span>
@@ -128,14 +95,12 @@ export function CollapsibleCard({
   right,
   children,
   className,
-  id,
 }: CollapsibleProps) {
   return (
     <Panel
       title={title}
       right={right}
       className={className}
-      id={id}
       collapsible
       defaultCollapsed={!defaultOpen}
     >

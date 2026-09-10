@@ -1,10 +1,11 @@
-import { Github } from "lucide-react";
 import { useState } from "react";
+import { TIER_NAMES } from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { Disclaimer } from "../components/Disclaimer";
 import { BackLink } from "../components/ui/BackLink";
-import { Panel } from "../components/ui/Panel";
+import { Flag, Panel, Row } from "../components/ui/Panel";
 import { useProtocolState } from "../hooks/useProtocolState";
+import { fmtBp, fmtNum, fmtSol, fmtUtc, fmtWeight } from "../lib/format";
 import {
   DEPLOYMENTS,
   liveDeployments,
@@ -12,10 +13,6 @@ import {
   type RegistryCluster,
 } from "../lib/deployments";
 import { solscanAddress } from "../lib/explorer";
-
-// Public repo backing the deployed $HUB program — same one scripts/verify-build.sh builds
-// from, so build verifiers / auditors can diff the deployed program against this source.
-const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 
 const STATUS: Record<DeploymentStatus, { label: string; cls: string }> = {
   live: { label: "LIVE", cls: "border-emerald-500 text-emerald-300" },
@@ -113,39 +110,38 @@ export function DeploymentsPage() {
   const hubProgramStatus: DeploymentStatus = liveOnViewedCluster ? "live" : hub.status[cluster];
 
   const toggle = (
-    <span className="flex items-center gap-2">
-      <a
-        href={HUB_GITHUB_URL}
-        target="_blank"
-        rel="noreferrer"
-        title="View program source on GitHub"
-        className="inline-flex items-center gap-1 text-[10px] text-green-500/70 underline decoration-green-700 hover:text-green-300"
-      >
-        <Github className="h-3 w-3" aria-hidden="true" />
-        source
-      </a>
-      <span className="flex gap-1">
-        {(["devnet", "mainnet-beta"] as RegistryCluster[]).map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setCluster(c)}
-            className={toggleCls(cluster === c)}
-          >
-            {c === "devnet" ? "DEVNET" : "MAINNET"}
-          </button>
-        ))}
-      </span>
+    <span className="flex gap-1">
+      {(["devnet", "mainnet-beta"] as RegistryCluster[]).map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => setCluster(c)}
+          className={toggleCls(cluster === c)}
+        >
+          {c === "devnet" ? "DEVNET" : "MAINNET"}
+        </button>
+      ))}
     </span>
   );
 
   return (
     <div className="space-y-2 font-mono">
       <BackLink />
-      <Panel title="DEPLOYMENTS :: $HUB PROGRAM REGISTRY" right={toggle} id="hub-registry">
-        <div className="mb-2 text-[10px] text-green-700">
-          Links open solscan.io on <span className="text-green-400">{cluster}</span>. Dashboard is
-          reading <span className="text-green-400">{active}</span>.
+      <Panel title="DEPLOYMENTS :: $HUB PROGRAM REGISTRY" right={toggle}>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-green-700">
+          <span>
+            Links open solscan.io on <span className="text-green-400">{cluster}</span>. Dashboard is
+            reading <span className="text-green-400">{active}</span>.
+          </span>
+          <a
+            href="https://github.com/OTCHUB/hubconnect"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[10px] tracking-widest text-green-400 hover:bg-green-500/10"
+            title="hubconnect source on GitHub"
+          >
+            [SOURCE ↗]
+          </a>
         </div>
         <div className="space-y-2">
           {DEPLOYMENTS.filter((d) => d.group === "hub").map((d) => (
@@ -160,7 +156,7 @@ export function DeploymentsPage() {
         </div>
       </Panel>
 
-      <Panel title="PROGRAM ACCOUNTS (LIVE)" id="hub-accounts">
+      <Panel title="PROGRAM ACCOUNTS (LIVE)">
         {!programDeployed ? (
           <div className="text-xs text-amber-300">
             $HUB is not deployed on {cluster} — no PDAs to derive.
@@ -192,7 +188,51 @@ export function DeploymentsPage() {
         )}
       </Panel>
 
-      <Panel title="DEPENDENCIES" id="hub-deps">
+      <Panel
+        title="CONFIG PARAMETERS (LIVE)"
+        right="raw Config values, straight off-chain — verify against the source"
+      >
+        {!showLive || !config ? (
+          <div className="text-xs text-green-700">
+            Parameters appear once the protocol state loads on {cluster}.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Flag on={!config.paused} label="LIVE" />
+              <Flag on={config.lpEnabled} label="LP" />
+            </div>
+            <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+              <Row k="burn split (round)" v={fmtBp(config.burnPctBp, 2)} />
+              <Row k="lp split (round)" v={fmtBp(config.lpPctBp, 2)} />
+              <Row k="ops split (step fee)" v={fmtBp(config.opsPctBp, 2)} />
+              <Row k="round-close threshold" v={fmtSol(config.minPotThresholdLamports)} />
+              <Row k="tier step fee" v={fmtSol(config.stepFeeLamports)} />
+              <Row k="lp target (phase-2)" v={fmtSol(config.lpTargetSolLamports)} />
+              <Row
+                k="lp phase-2 opens"
+                v={config.lpPhase2OpenTs > 0 ? fmtUtc(config.lpPhase2OpenTs) : "closed"}
+              />
+              <Row k="current epoch" v={fmtNum(config.currentEpoch)} />
+              <Row k="genesis" v={fmtUtc(config.genesisTs)} />
+              <Row k="Σ weight (active tiers)" v={fmtWeight(config.totalWeightBp)} />
+              <Row k="pot liability" v={fmtSol(config.potLiabilityLamports)} />
+            </div>
+            <div className="border-t border-green-500/10 pt-2">
+              <div className="mb-1 text-[10px] uppercase tracking-widest text-green-600">
+                tier weights
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-4">
+                {config.tierWeightsBp.map((w, i) => (
+                  <Row key={i} k={TIER_NAMES[i]} v={fmtWeight(w)} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="DEPENDENCIES">
         <div className="space-y-2">
           {DEPLOYMENTS.filter((d) => d.group === "deps").map((d) => {
             // Cross-check the static registry's mainnet collection mint against the live

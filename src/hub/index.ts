@@ -1,6 +1,8 @@
 // Public surface for hosts (otchub) and the standalone shell. Everything else is internal.
 export { HubProvider, useHub } from "./HubProvider";
 export type { HubProviderProps, HubContextValue } from "./HubProvider";
+export { WalletProvider, useWallet } from "./WalletProvider";
+export type { WalletContextValue } from "./WalletProvider";
 export { HubRoutes } from "./HubRoutes";
 export type { HubRoutesProps } from "./HubRoutes";
 export { useProtocolState } from "./hooks/useProtocolState";
@@ -13,6 +15,7 @@ export { useRpcCluster } from "./hooks/useRpcCluster";
 export type { RpcClusterStatus } from "./hooks/useRpcCluster";
 export { WalletPanel } from "./components/WalletPanel";
 export { SwapPanel } from "./components/SwapPanel";
+export { HubBondingDashboard } from "./components/HubBondingDashboard";
 export { ClaimPanel } from "./components/ClaimPanel";
 export { ActivatePanel } from "./components/ActivatePanel";
 export { useOtcPay } from "./hooks/useOtcPay";
@@ -39,6 +42,7 @@ export {
   dexscreenerTokenUrl,
   DEFAULT_COLLECTION_URL,
   MAGIC_EDEN_COLLECTION_SLUG,
+  OFFICIAL_MINT_URL,
 } from "./lib/marketplace";
 export {
   yieldBoostPctOverBase,
@@ -47,5 +51,9 @@ export {
   deskMilestoneProgressPct,
 } from "./lib/yield";
 export { DEPLOYMENTS, type Deployment } from "./lib/deployments";
-export type { Scenario } from "./lib/yield";
-export { ESTIMATE_LABEL } from "./components/YieldTable";
+export { ESTIMATE_LABEL } from "./components/EarningPreview";
+export { useHubHistory } from "./hooks/useHubHistory";
+export { fetchHubHistory, type HubHistoryPoint } from "./lib/supabaseHistory";
+export { HubEarningsChart } from "./components/HubEarningsChart";
+export { HubSupplyChart } from "./components/HubSupplyChart";
+export { LineChart, type LineSeries } from "./components/ui/LineChart";

@@ -2,13 +2,10 @@ import { useState } from "react";
 import { tokenomicsPda, type ProtocolState } from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { useTokenomics } from "../hooks/useTokenomics";
-import { fmtBpPct, fmtHub, fmtNum, fmtTokens, fmtUtc } from "../lib/format";
-import {
-  MAX_DESK_SUPPLY,
-  NEXT_DESK_SUPPLY_MILESTONE,
-  deskMilestoneProgressPct,
-} from "../lib/yield";
+import { fmtBpPct, fmtHub, fmtNum, fmtTokens, fmtUtc, unitsToTokens } from "../lib/format";
+import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
+import { HubSupplyChart } from "./HubSupplyChart";
 import { PieChart, type PieSlice } from "./ui/PieChart";
 import { CollapsibleCard, Flag, Panel, Row, Stat } from "./ui/Panel";
 
@@ -36,6 +33,15 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
     );
   }
   const { onChain, collection, deskCount, deskCountSource, plan, dexscreener } = q.data!;
+  // Live on-chain collection size — a separate thing from `deskCount`, which sizes the
+  // tokenomics split itself and is pinned to the fixed launch-policy target pre-snapshot (see
+  // useTokenomics.ts). The "treasury desk milestone" stat below tracks treasury-owned desks
+  // (state.treasury.desksOwned, target 20), not this collection-wide figure.
+  const liveDeskCount = collection?.currentSize ?? 0;
+  // Distinct from `liveDeskCount` above: `null` here means "collection unreadable" so the chart
+  // never plots a misleading 0, whereas `liveDeskCount` (UI copy) treats that case as 0 desks.
+  const chartLiveDeskCount = collection ? collection.currentSize : null;
+  const chartLiveCirculatingHub = unitsToTokens(state.supply.circulatingUnits, d);
   const slices: PieSlice[] = plan.slices.map((s) => ({
     id: s.id,
     label: s.label,
@@ -44,7 +50,9 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
     amount: fmtHub(s.units, d),
     share: fmtBpPct(s.bp),
   }));
-  const source = onChain ? "on-chain · TokenomicsConfig" : "preview · init_tokenomics not run";
+  const source = onChain
+    ? "on-chain · TokenomicsConfig"
+    : "target · launch policy (§A3/A7.1), pre-snapshot";
   const claimedPct =
     onChain && onChain.airdropUnits > 0n
       ? Number((onChain.airdropClaimedUnits * 10_000n) / onChain.airdropUnits)
@@ -58,7 +66,7 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
 
   return (
     <div className="space-y-2">
-      <Panel title="TOKENOMICS" right={source} id="hub-tokenomics">
+      <Panel title="TOKENOMICS" right={source} collapsible>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
           <Stat
             label="max supply"
@@ -66,20 +74,18 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
             sub="minted once · authority revoked"
           />
           <Stat
-            label="desks"
+            label="desks (plan basis)"
             value={fmtNum(deskCount)}
             sub={
               deskCountSource === "snapshot"
-                ? `snapshot ${onChain ? fmtUtc(onChain.snapshotTs) : ""}`
-                : deskCountSource === "live"
-                  ? `live · ${fmtNum(collection?.numMinted ?? 0)} minted lifetime`
-                  : "collection unreadable"
+                ? `round ${onChain?.snapshotRound ?? 1} · ${onChain ? fmtUtc(onChain.snapshotTs) : ""}`
+                : `target · launch policy cap (live: ${fmtNum(liveDeskCount)} today)`
             }
           />
           <Stat
-            label="supply milestone"
-            value={`${deskMilestoneProgressPct(deskCount)}%`}
-            sub={`${fmtNum(deskCount)} → ${fmtNum(NEXT_DESK_SUPPLY_MILESTONE)} next · ${fmtNum(MAX_DESK_SUPPLY)} max`}
+            label="treasury desk milestone"
+            value={`${treasuryDeskProgressPct(state.treasury.desksOwned)}%`}
+            sub={`${fmtNum(state.treasury.desksOwned)} → ${fmtNum(TREASURY_DESK_TARGET)} treasury-owned desks`}
           />
           <Stat
             label="airdrop pool"
@@ -89,7 +95,11 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
           <Stat
             label="yield reserve"
             value={fmtHub(plan.yieldReserveUnits, d)}
-            sub="$OTC · CRCLx · OpenAI · Anthropic basket · never sold"
+            sub={
+              onChain
+                ? `floor · locked in vault, no withdraw ix exists`
+                : "$OTC · CRCLx · OpenAI · Anthropic basket · never sold"
+            }
           />
           <Stat
             label="LP reserve"
@@ -113,7 +123,12 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
         </div>
       </Panel>
 
-      <Panel title="AIRDROP" id="hub-airdrop">
+      <HubSupplyChart
+        liveDeskCount={chartLiveDeskCount}
+        liveCirculatingHub={chartLiveCirculatingHub}
+      />
+
+      <Panel title="AIRDROP" collapsible>
         <Row
           k="mechanism"
           v="Merkle claim · one claim per desk asset · paid to the desk's current owner"
@@ -151,9 +166,46 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
           v={onChain ? <AddressLink address={onChain.airdropVault} /> : "—"}
         />
         <Row
+          k="snapshot round"
+          v={
+            onChain
+              ? `${fmtNum(onChain.snapshotRound)}${onChain.snapshotRound > 1 ? " · desk count extended since round 1" : ""}`
+              : "—"
+          }
+        />
+        <Row
           k="tokenomics PDA"
           v={<AddressLink address={tokenomicsPda(programId)[0].toBase58()} />}
         />
+      </Panel>
+
+      <Panel title="TREASURY LOCK" collapsible>
+        <Row
+          k="floor"
+          v={onChain ? `${fmtHub(onChain.treasuryLockUnits, d)} · 2.5% of max supply` : "—"}
+        />
+        <Row k="vault" v={onChain ? <AddressLink address={onChain.treasuryLockVault} /> : "—"} />
+        <Row
+          k="mechanism"
+          v="the genesis floor is never debited; OTC-launcher holder rewards deposited on top via fund_treasury_reward are redistributed to active desk holders by tier weight"
+        />
+        <Row
+          k="reward pool deposited"
+          v={onChain ? fmtHub(onChain.rewardDepositedUnits, d) : "—"}
+        />
+        <Row
+          k="reward pool distributed"
+          v={onChain ? fmtHub(onChain.rewardDistributedUnits, d) : "—"}
+        />
+        <Row
+          k="reward pool pending"
+          v={
+            onChain
+              ? `${fmtHub(onChain.rewardPendingUnits, d)}${onChain.rewardPendingUnits > 0n ? " · awaiting open_reward_round" : ""}`
+              : "—"
+          }
+        />
+        <Row k="reward rounds opened" v={onChain ? fmtNum(onChain.rewardRoundCount) : "—"} />
       </Panel>
 
       <CollapsibleCard

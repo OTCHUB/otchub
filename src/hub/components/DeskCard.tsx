@@ -2,11 +2,10 @@ import { TIER_NAMES, TIER_WEIGHTS_BP, type ProtocolState } from "@hub-sdk";
 import type { DeskLookupResult } from "../hooks/useDeskTier";
 import { fmtNum, fmtSol, fmtWeight } from "../lib/format";
 import { magicEdenItemUrl } from "../lib/marketplace";
-import { CONSIGN_WARN_LAMPORTS, yieldBoostPctOverBase } from "../lib/yield";
+import { UNCLAIMED_WARN_LAMPORTS, yieldBoostPctOverBase } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
 import { Panel, Row } from "./ui/Panel";
 import { Notice } from "./ui/StateBox";
-import { TierBadge } from "./ui/TierProgress";
 
 type Props = { asset: string; data: DeskLookupResult; state: ProtocolState };
 
@@ -53,7 +52,7 @@ export function DeskCard({ asset, data, state }: Props) {
 
   const weightBp = TIER_WEIGHTS_BP[tier.tier - 1] ?? 0;
   const boostPct = yieldBoostPctOverBase(tier.tier);
-  const warn = pending !== null && pending.lamports >= CONSIGN_WARN_LAMPORTS;
+  const warn = pending !== null && pending.lamports >= UNCLAIMED_WARN_LAMPORTS;
   const roundsSince = pending
     ? pending.rounds === 0
       ? "current — nothing closed since last claim"
@@ -65,22 +64,22 @@ export function DeskCard({ asset, data, state }: Props) {
       {warn && (
         <Notice tone="amber">
           <div className="tracking-widest">
-            [ UNCLAIMED YIELD ≥ {fmtSol(CONSIGN_WARN_LAMPORTS, 2)} ]
+            [ UNCLAIMED YIELD ≥ {fmtSol(UNCLAIMED_WARN_LAMPORTS, 2)} ]
           </div>
           <div className="mt-1 text-amber-200/80">
             <div>
               {fmtSol(pending!.lamports)} is claimable by the owner-at-activation in one tx.
             </div>
-            <div>Claim before listing or transferring — a transfer voids the tier (§A6.1).</div>
+            <div>Claim before listing or transferring — a transfer voids the tier.</div>
           </div>
         </Notice>
       )}
       <Panel
         title="DESK TIER"
         right={
-          <span className="flex items-center gap-1.5">
-            {meLink} <TierBadge tier={tier.tier} voided={tier.voided} />
-          </span>
+          <>
+            {meLink} · {tier.voided ? "VOIDED" : "ACTIVE"}
+          </>
         }
       >
         <div className="flex gap-3">

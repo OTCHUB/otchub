@@ -63,10 +63,7 @@ export function TierLadder({
       }
     >
       {Array.from({ length: maxTier }, (_, i) => i + 1).map((t) => (
-        <span
-          key={t}
-          className={`h-1.5 w-4 ${t <= tier && !voided ? fill : "bg-green-500/10"}`}
-        />
+        <span key={t} className={`h-1.5 w-4 ${t <= tier && !voided ? fill : "bg-green-500/10"}`} />
       ))}
     </div>
   );

@@ -4,8 +4,12 @@ import {
   MPL_CORE_PROGRAM_ID,
   burnPda,
   configPda,
+  creatorFeePda,
+  hubPotPda,
   otcPayPda,
+  otcPotPda,
   potPda,
+  tokenomicsPda,
   treasuryPda,
   vaultPda,
   type ConfigView,
@@ -27,20 +31,32 @@ export type Deployment = {
   note?: string;
 };
 
-// Mainnet $HUB program: not deployed yet — populate when the mainnet deployer ships it.
-// Cosmetic fallback only: DeploymentsPage self-detects a live mainnet deploy via a real
-// Config-account read (useProtocolState) and overrides this the moment one succeeds, so
-// forgetting to update this constant post-launch can't make the page lie about deploy status.
-// The value that actually decides which chain the whole app talks to is VITE_HUB_CLUSTER +
-// VITE_HUB_PROGRAM_ID (web/.env or otchub/.env.production.local) — see hubconnect-spec.md
-// launch checklist. hub_mint / otc_mint / desk_collection need NO code change at launch: every
-// consumer reads them live off the on-chain Config singleton once initialize_config sets them.
-const HUB_MAINNET: string | null = null;
+// Mainnet $HUB program: deployed + OtterSec-verified 2026-09-08 at the same id as devnet
+// (see verify.osec.io/status/7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i). `initialize_config`
+// has not run yet — the Config PDA won't exist until the $HUB mint launches — so
+// useProtocolState()/ProtocolGate still render the "uninitialized" state on mainnet-beta until
+// then; this constant only drives the static DEPLOYMENTS registry (DeploymentsPage), which
+// self-detects a live mainnet deploy via a real Config-account read and overrides this the
+// moment one succeeds, so forgetting to update it post-launch can't make the page lie about
+// deploy status. The value that actually decides which chain the whole app talks to is
+// VITE_HUB_CLUSTER + VITE_HUB_PROGRAM_ID (web/.env or otchub/.env.production.local) — see
+// hubconnect-spec.md launch checklist. hub_mint / otc_mint / desk_collection need NO code change
+// at launch: every consumer reads them live off the on-chain Config singleton once
+// initialize_config sets them.
+const HUB_MAINNET: string | null = "7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i";
 /** Anchor 1.x writes the IDL to a Program Metadata account — written at devnet deploy. */
-const HUB_IDL_DEVNET = "CnSKvxwKb3eNS6oF6GaAyAn8m3B8axXSCQYeBYrjdQfS";
+const HUB_IDL_DEVNET = "GSw7mRX3gsHEYsEvH8Gr8vWoDYkabT3PzAUsznqx7dxi";
 const OTC_PROGRAM_MAINNET = "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW";
-/** "OTC Desks" Core collection — read from the OTC Config (9b5V…REU4) on mainnet, 2026-09-07. */
-const OTC_DESKS_COLLECTION_MAINNET = "D7sLW9uKZG3G7bNbWfMHvKSgVhU9nXdv7huTfepF5Jrh";
+/** OTC Desks pot wallet — read from otcdesks.cash/docs on-chain links, 2026-09-08. This is the
+ *  `otc_desk_pot` value `initialize_config` needs on mainnet (Config.otcDeskPot mirrors it once
+ *  set); exported so the mainnet init script can import it instead of hardcoding it inline. */
+export const OTC_DESK_POT_MAINNET = "BZcvtxDy4WihU24k3pezzajuiqYtTUHPfH7b5m26BucR";
+/** "OTC Desks" Core collection — read from the OTC Config (9b5V…REU4) on mainnet, 2026-09-07.
+ *  Exported for the explicit, clearly-labeled "Mainnet preview" lookup (MainnetPreviewPanel.tsx) —
+ *  the only place this is used outside this registry. Never wired into the connected wallet's
+ *  own portfolio/activation state, which always stays scoped to whatever cluster is actually
+ *  connected (HubProvider `cluster`/`connection`). */
+export const OTC_DESKS_COLLECTION_MAINNET = "D7sLW9uKZG3G7bNbWfMHvKSgVhU9nXdv7huTfepF5Jrh";
 /** Pump.fun bonding-curve program — same id on devnet and mainnet (pump-public-docs). */
 const PUMP_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 
@@ -56,8 +72,8 @@ export const DEPLOYMENTS: Deployment[] = [
     group: "hub",
     role: "Stake-to-earn core: Config, desk tiers, epochs, pot accounting, treasury sweeps (Anchor).",
     address: { devnet: HUB_PROGRAM_ID, "mainnet-beta": HUB_MAINNET },
-    status: { devnet: "live", "mainnet-beta": "pending" },
-    note: "Mainnet deploy waits on the full devnet M2/M3 suite + verified build.",
+    status: { devnet: "live", "mainnet-beta": "live" },
+    note: "Mainnet-beta: deployed + OtterSec-verified; initialize_config pending the $HUB mint.",
   },
   {
     id: "hub-idl",
@@ -117,12 +133,36 @@ const PDA_ROWS: [string, string, string, PdaFn][] = [
   ["pot", "POT PDA", "System-owned SOL pot; yield liability is paid from here.", potPda],
   ["burn", "BURN STATE PDA", "Burn-slice accounting for the $HUB burn leg.", burnPda],
   ["treasury", "TREASURY PDA", "Desk custody / exits / sweeps counters.", treasuryPda],
-  ["vault", "VAULT PDA", "Program-signed custody for consigned desks.", vaultPda],
+  ["vault", "VAULT PDA", "Program-signed custody for treasury LP token positions.", vaultPda],
   [
     "otc-pay",
     "OTC PAY PDA",
     "$OTC step-fee rate/premium + POL reserve pointer (§A4.1).",
     otcPayPda,
+  ],
+  [
+    "tokenomics",
+    "TOKENOMICS PDA",
+    "Supply allocation plan, airdrop root, and treasury reward round cursor (§A7.1).",
+    tokenomicsPda,
+  ],
+  [
+    "otc-pot",
+    "OTC POT PDA",
+    "§A5 90% leg — $OTC yield-vault bookkeeping + lifetime average buy rate.",
+    otcPotPda,
+  ],
+  [
+    "creator-fee",
+    "CREATOR-FEE PDA",
+    "§A6.3 second flywheel — pending $OTC from the OTC launcher's holder-fee leg.",
+    creatorFeePda,
+  ],
+  [
+    "hub-pot",
+    "HUB POT PDA (M.I.M ETF)",
+    "§A5.1 MemeStock basket ($OTC / CRCLx / OpenAI / Anthropic) bookkeeping.",
+    hubPotPda,
   ],
 ];
 
