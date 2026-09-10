@@ -250,7 +250,7 @@ body {
   --chart-bar-fill: #14532d;
   --chart-bar-edge: #22c55e;
   --chart-seg-a: #1d9a52;
-  --chart-seg-b: #0891b2;
+  --chart-seg-b: #059669;
   --chart-seg-c: #22c55e;
   --chart-seg-d: #d97706;
   --chart-tip-bg: #000000;
@@ -384,11 +384,11 @@ html.skin-modern {
   --c-green-200: 232 238 244;
   --c-green-300: 201 210 220;
   --c-green-400: 219 228 238;
-  --c-green-500: 92 225 255;
-  --c-green-600: 92 225 255;
-  --c-green-700: 167 139 255;
-  --c-green-800: 167 139 255;
-  --c-green-900: 148 119 245;
+  --c-green-500: 0 255 157;
+  --c-green-600: 0 255 157;
+  --c-green-700: 255 200 0;
+  --c-green-800: 255 200 0;
+  --c-green-900: 222 173 62;
   --c-emerald-200: 124 255 107;
   --c-emerald-300: 124 255 107;
   --c-emerald-400: 124 255 107;
@@ -405,9 +405,9 @@ html.skin-modern {
   --c-cyan-700: 40 160 133;
   --c-cyan-800: 34 134 111;
   --c-cyan-900: 28 108 90;
-  --c-amber-200: 240 193 74;
-  --c-amber-300: 240 193 74;
-  --c-amber-400: 240 193 74;
+  --c-amber-200: 255 200 0;
+  --c-amber-300: 255 200 0;
+  --c-amber-400: 255 200 0;
   --c-amber-500: 222 173 62;
   --c-amber-600: 199 150 50;
   --c-amber-700: 176 130 42;
@@ -453,8 +453,8 @@ html.skin-modern {
   --popover: 217 22% 9%;
   --border: 214 16% 20%;
   --input: 214 16% 20%;
-  --ring: 193 100% 68%;
-  --primary: 193 100% 68%;
+  --ring: 152 100% 50%;
+  --primary: 152 100% 50%;
   --primary-foreground: 240 6% 0%;
   --muted-foreground: 213 9% 58%;
 
@@ -462,20 +462,20 @@ html.skin-modern {
   --chart-grid: #1b2430;
   --chart-axis: #2a313a;
   --chart-tick: #5c6570;
-  --chart-primary: #5ce1ff;
+  --chart-primary: #00ff9d;
   --chart-secondary: #f0c14a;
-  --chart-tertiary: #a78bff;
+  --chart-tertiary: #ffc800;
   --chart-danger: #ff5cc8;
   --chart-pos: #3dffd2;
   --chart-bar-fill: #2c3b4f;
-  --chart-bar-edge: #5ce1ff;
-  --chart-seg-a: #5ce1ff;
-  --chart-seg-b: #a78bff;
+  --chart-bar-edge: #00ff9d;
+  --chart-seg-a: #00ff9d;
+  --chart-seg-b: #ffc800;
   --chart-seg-c: #3dffd2;
   --chart-seg-d: #f0c14a;
   --chart-tip-bg: #12161c;
   --chart-tip-border: #2a313a;
-  --chart-tip-label: #5ce1ff;
+  --chart-tip-label: #00ff9d;
   --chart-tip-text: #e8eef4;
   --chart-tip-radius: 12px;
 }
@@ -488,8 +488,8 @@ html.skin-modern body {
 }
 html.skin-modern .skin-stage {
   background:
-    radial-gradient(1200px 800px at 15% -10%, rgb(92 225 255 / 0.1), transparent 60%),
-    radial-gradient(1000px 700px at 85% 15%, rgb(167 139 255 / 0.08), transparent 60%),
+    radial-gradient(1200px 800px at 15% -10%, rgb(0 255 157 / 0.1), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(255 200 0 / 0.08), transparent 60%),
     radial-gradient(900px 900px at 50% 110%, rgb(255 92 200 / 0.06), transparent 60%),
     #000000;
 }
@@ -513,9 +513,9 @@ html.skin-modern .term-window {
   backdrop-filter: blur(16px) saturate(1.5);
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
   box-shadow:
-    0 0 0 1px rgb(92 225 255 / 0.22),
-    0 0 0 2px rgb(167 139 255 / 0.1),
-    0 16px 48px -12px rgb(92 225 255 / 0.14),
+    0 0 0 1px rgb(0 255 157 / 0.22),
+    0 0 0 2px rgb(255 200 0 / 0.1),
+    0 16px 48px -12px rgb(0 255 157 / 0.14),
     0 24px 64px -24px rgb(0 0 0 / 0.7);
 }
 html.skin-modern .term-window .bg-black {
@@ -588,15 +588,15 @@ html.skin-modern input:focus,
 html.skin-modern select:focus,
 html.skin-modern textarea:focus {
   outline: none;
-  border-color: rgba(92, 225, 255, 0.6);
-  box-shadow: 0 0 0 1px rgba(92, 225, 255, 0.5), 0 0 16px rgba(92, 225, 255, 0.35);
+  border-color: rgba(0, 255, 157, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 255, 157, 0.5), 0 0 16px rgba(0, 255, 157, 0.35);
 }
 html.skin-modern input,
 html.skin-modern textarea {
-  caret-color: #5ce1ff;
+  caret-color: #00ff9d;
 }
 html.skin-modern ::selection {
-  background: rgba(92, 225, 255, 0.28);
+  background: rgba(0, 255, 157, 0.28);
 }
 
 /* Metal scrollbars in the void. */
@@ -615,10 +615,10 @@ html.skin-modern ::-webkit-scrollbar-thumb {
 
 /* Fee-flow routes march in iris cyan; broken routes dim magenta. */
 html.skin-modern .pot-flow-x {
-  background-image: repeating-linear-gradient(90deg, rgb(92 225 255 / 0.8) 0 4px, transparent 4px 8px);
+  background-image: repeating-linear-gradient(90deg, rgb(0 255 157 / 0.8) 0 4px, transparent 4px 8px);
 }
 html.skin-modern .pot-flow-y {
-  background-image: repeating-linear-gradient(180deg, rgb(92 225 255 / 0.8) 0 4px, transparent 4px 8px);
+  background-image: repeating-linear-gradient(180deg, rgb(0 255 157 / 0.8) 0 4px, transparent 4px 8px);
 }
 html.skin-modern .pot-flow-broken {
   background-image: repeating-linear-gradient(90deg, rgb(255 92 200 / 0.45) 0 3px, transparent 3px 8px);
@@ -642,11 +642,11 @@ html.skin-modern.light {
   --c-green-200: 30 41 59;
   --c-green-300: 30 41 59;
   --c-green-400: 51 65 85;
-  --c-green-500: 8 145 178;
-  --c-green-600: 8 145 178;
-  --c-green-700: 124 58 237;
-  --c-green-800: 124 58 237;
-  --c-green-900: 109 40 217;
+  --c-green-500: 5 150 105;
+  --c-green-600: 5 150 105;
+  --c-green-700: 180 83 9;
+  --c-green-800: 146 64 14;
+  --c-green-900: 120 53 15;
   --c-emerald-200: 4 108 78;
   --c-emerald-300: 4 108 78;
   --c-emerald-400: 13 148 136;
@@ -658,7 +658,7 @@ html.skin-modern.light {
   --c-cyan-200: 7 100 116;
   --c-cyan-300: 13 148 136;
   --c-cyan-400: 15 158 145;
-  --c-cyan-500: 8 145 178;
+  --c-cyan-500: 5 150 105;
   --c-cyan-600: 20 170 160;
   --c-cyan-700: 45 200 185;
   --c-cyan-800: 110 225 210;
@@ -703,8 +703,8 @@ html.skin-modern.light {
   --popover: 0 0% 100%;
   --border: 214 20% 86%;
   --input: 214 20% 86%;
-  --ring: 190 90% 34%;
-  --primary: 190 90% 34%;
+  --ring: 160 84% 33%;
+  --primary: 160 84% 33%;
   --primary-foreground: 0 0% 100%;
   --muted-foreground: 215 16% 42%;
 
@@ -712,20 +712,20 @@ html.skin-modern.light {
   --chart-grid: #dce4ee;
   --chart-axis: #c0cad8;
   --chart-tick: #748199;
-  --chart-primary: #0891b2;
+  --chart-primary: #059669;
   --chart-secondary: #b45309;
-  --chart-tertiary: #7c3aed;
+  --chart-tertiary: #b45309;
   --chart-danger: #c026d3;
   --chart-pos: #0d9488;
   --chart-bar-fill: #cfd9e6;
-  --chart-bar-edge: #0891b2;
-  --chart-seg-a: #0891b2;
-  --chart-seg-b: #7c3aed;
+  --chart-bar-edge: #059669;
+  --chart-seg-a: #059669;
+  --chart-seg-b: #b45309;
   --chart-seg-c: #0d9488;
   --chart-seg-d: #b45309;
   --chart-tip-bg: #f5f8fb;
   --chart-tip-border: #c0cad8;
-  --chart-tip-label: #0891b2;
+  --chart-tip-label: #059669;
   --chart-tip-text: #1e2632;
   --chart-tip-radius: 12px;
 }
@@ -738,8 +738,8 @@ html.skin-modern.light body {
 /* Pale metal canvas with soft iris glows behind the frosted panels. */
 html.skin-modern.light .skin-stage {
   background:
-    radial-gradient(1200px 800px at 15% -10%, rgb(8 145 178 / 0.1), transparent 60%),
-    radial-gradient(1000px 700px at 85% 15%, rgb(124 58 237 / 0.08), transparent 60%),
+    radial-gradient(1200px 800px at 15% -10%, rgb(5 150 105 / 0.12), transparent 60%),
+    radial-gradient(1000px 700px at 85% 15%, rgb(180 83 9 / 0.07), transparent 60%),
     radial-gradient(900px 900px at 50% 110%, rgb(192 38 211 / 0.06), transparent 60%),
     #e3e9ef;
 }
@@ -747,9 +747,9 @@ html.skin-modern.light .skin-stage {
 /* Frosted chassis on light: white glass with a darkened iris ring. */
 html.skin-modern.light .term-window {
   box-shadow:
-    0 0 0 1px rgb(8 145 178 / 0.28),
-    0 0 0 2px rgb(124 58 237 / 0.08),
-    0 16px 48px -12px rgb(8 145 178 / 0.12),
+    0 0 0 1px rgb(5 150 105 / 0.3),
+    0 0 0 2px rgb(180 83 9 / 0.07),
+    0 16px 48px -12px rgb(5 150 105 / 0.12),
     0 24px 64px -24px rgb(30 41 59 / 0.22);
 }
 
@@ -758,15 +758,15 @@ html.skin-modern.light input:focus,
 html.skin-modern.light select:focus,
 html.skin-modern.light textarea:focus {
   outline: none;
-  border-color: rgba(8, 145, 178, 0.65);
-  box-shadow: 0 0 0 1px rgba(8, 145, 178, 0.45), 0 0 16px rgba(8, 145, 178, 0.22);
+  border-color: rgba(5, 150, 105, 0.65);
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.45), 0 0 16px rgba(5, 150, 105, 0.22);
 }
 html.skin-modern.light input,
 html.skin-modern.light textarea {
-  caret-color: #0891b2;
+  caret-color: #059669;
 }
 html.skin-modern.light ::selection {
-  background: rgba(8, 145, 178, 0.22);
+  background: rgba(5, 150, 105, 0.22);
 }
 
 /* Metal scrollbars on the pale chassis. */
@@ -780,10 +780,10 @@ html.skin-modern.light ::-webkit-scrollbar-thumb {
 
 /* Fee-flow routes march in darkened iris cyan; broken routes dim magenta. */
 html.skin-modern.light .pot-flow-x {
-  background-image: repeating-linear-gradient(90deg, rgb(8 145 178 / 0.8) 0 4px, transparent 4px 8px);
+  background-image: repeating-linear-gradient(90deg, rgb(5 150 105 / 0.8) 0 4px, transparent 4px 8px);
 }
 html.skin-modern.light .pot-flow-y {
-  background-image: repeating-linear-gradient(180deg, rgb(8 145 178 / 0.8) 0 4px, transparent 4px 8px);
+  background-image: repeating-linear-gradient(180deg, rgb(5 150 105 / 0.8) 0 4px, transparent 4px 8px);
 }
 html.skin-modern.light .pot-flow-broken {
   background-image: repeating-linear-gradient(90deg, rgb(162 28 145 / 0.5) 0 3px, transparent 3px 8px);
