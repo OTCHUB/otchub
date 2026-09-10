@@ -13,13 +13,15 @@ import Connect from './pages/Connect';
 import { HUB_ENABLED } from './lib/hubFlag';
 // Add page imports here
 
-// $HUB dashboard stays dark until the token launches on mainnet. Lazy import so
-// the module (and @anchor-lang/core) is not bundled into the main chunk while off.
-// Mounted at both /hub (live config) and /devnet (forced devnet sandbox — see
-// HUB_DEVNET_CONFIG in pages/Hub.jsx); otchub.dev/fomo is a separate app
-// entirely (Cloudflare Workers Route on the shared zone, see rufomo/wrangler.toml)
-// and never reaches this router.
-const Hub = HUB_ENABLED ? React.lazy(() => import('./pages/Hub')) : null;
+// Lazy import so the module (and @anchor-lang/core) is not bundled into the
+// main chunk unless a $HUB route is actually visited. Mounted at both /hub
+// (live mainnet config, gated behind HUB_ENABLED below) and /devnet (forced
+// devnet sandbox — see HUB_DEVNET_CONFIG in pages/Hub.jsx). /devnet is a
+// risk-free QA environment and stays reachable even while /hub is dark, since
+// it never depends on the mainnet program or token mint being live.
+// otchub.dev/fomo is a separate app entirely (Cloudflare Workers Route on the
+// shared zone, see rufomo/wrangler.toml) and never reaches this router.
+const Hub = React.lazy(() => import('./pages/Hub'));
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,23 +46,16 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Render the main app. Home is always the root — otchub.dev/hub and
-  // otchub.dev/devnet are the $HUB protocol dashboard (live config vs. a
-  // forced-devnet sandbox); /otc is kept as a legacy alias since it was
-  // Home's path during the (never-shipped) period when Hub sat at "/".
-  if (!HUB_ENABLED) {
-    return (
-      <Routes>
-        {/* Add your page Route elements here */}
-        <Route path="/" element={<Home />} />
-        <Route path="/otc" element={<Navigate to="/" replace />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/connect" element={<Connect />} />
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    );
-  }
-
+  // Render the main app. Home is always the root — single-domain,
+  // path-based routing on otchub.dev (app.otchub.dev / devnet.otchub.dev
+  // are retired). /otc is kept as a legacy alias since it was Home's path
+  // during the (never-shipped) period when Hub sat at "/".
+  //
+  // /hub (mainnet $HUB dashboard) and /devnet (forced-devnet QA sandbox,
+  // see HUB_DEVNET_CONFIG in pages/Hub.jsx) are two independent mounts of
+  // the same component tree. /devnet never depends on HUB_ENABLED — it's
+  // meant to stay usable for testing while mainnet is still dark — so only
+  // /hub is wrapped in the launch gate.
   return (
     <React.Suspense fallback={null}>
       <Routes>
@@ -72,8 +67,8 @@ const AuthenticatedApp = () => {
             /deployments, /desk/:asset — relative, so they resolve under
             either mount. HubRoutes redirects any other unknown sub-path
             back to its own root. */}
-        <Route path="/hub/*" element={<Hub />} />
         <Route path="/devnet/*" element={<Hub devnet />} />
+        {HUB_ENABLED && <Route path="/hub/*" element={<Hub />} />}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </React.Suspense>

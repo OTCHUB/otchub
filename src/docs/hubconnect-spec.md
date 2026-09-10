@@ -376,7 +376,7 @@ hubconnect/
 ├── sdk/                       # typed client SDK (activation, claims, read APIs)
 │   ├── idl/                   # hub.json / hub.ts copied from target/ (scripts/copy-idl.mjs)
 │   └── src/constants.ts       # mirror of programs/hub/src/constants.rs + HUB_PROGRAM_ID
-├── web/                       # treasury dashboard (Vite); app.otchub.dev
+├── web/                       # treasury dashboard (Vite); legacy standalone shell, since merged into otchub.dev/hub + /devnet
 ├── docs/                      # this spec + verification evidence
 └── scripts/                   # devnet-deploy.sh · verify-build.sh · devnet-*.ts · hub-authority.ts
 ```
@@ -642,18 +642,21 @@ desk counts) and has the Helius RPC path — so the yield tracker is added **the
 as a new panel, reading hubconnect program accounts (Config, Pot, Epoch,
 TreasuryState, BurnState) via the same RPC connection. hubconnect exposes only
 read-only account decoders in its SDK (`sdk`); no privileged endpoints exist.
-The interim standalone dashboard (`web/`, deployed at app.otchub.dev) reads the
-same accounts and lists every address below in its registry view
-(`web/src/hub/lib/deployments.ts`).
+The interim standalone dashboard (`web/`, formerly deployed at the now-retired
+app.otchub.dev) read the same accounts and listed every address below in its
+registry view (`web/src/hub/lib/deployments.ts`).
 
-**Merge status (2026-09-07):** `web/src/hub` and `sdk/` are vendored into the
-otchub repo (`otchub/src/hub`, `otchub/src/hub-sdk`, alias `@hub-sdk`) and the
-module is mounted at the otchub domain root — `/` (dashboard), `/treasury`,
-`/deployments`, `/desk/:asset`; the OTC_DESK analytics moved to `/otc` and
-`/hub/*` redirects. otchub supplies `rpcUrl` / `cluster` / `programId` via
-`VITE_HUB_*` (defaults: public devnet RPC, IDL program id). `web/` remains the
-standalone shell for app.otchub.dev until the domains are consolidated;
-`hubconnect` stays the source of truth — re-copy on change.
+**Merge status (2026-09-07, superseded — domains consolidated):** `web/src/hub`
+and `sdk/` are vendored into the otchub repo (`otchub/src/hub`,
+`otchub/src/hub-sdk`, alias `@hub-sdk`) and the module is mounted at
+`otchub.dev/hub` (mainnet, gated behind `VITE_HUB_ENABLED`) and
+`otchub.dev/devnet` (forced-devnet QA sandbox, always reachable) — single
+domain, path-based routing; `app.otchub.dev` and `devnet.otchub.dev` are
+retired. The OTC_DESK analytics live at `/` with `/otc` kept as a legacy
+alias. otchub supplies `rpcUrl` / `cluster` / `programId` per mount via
+`VITE_HUB_*` / `VITE_HUB_DEVNET_*` (defaults: public devnet RPC, IDL program
+id). `web/` is no longer deployed standalone; `hubconnect` stays the source
+of truth — re-copy on change.
 
 ### C3. Live metrics strip (top of panel)
 

@@ -11,9 +11,11 @@ import { ExternalLink, Eye, Globe, Menu, MessagesSquare, Send, Sparkles, Users, 
 import { HUB_ENABLED } from "@/lib/hubFlag";
 
 // $HUB protocol dashboard lives at otchub.dev/hub — an in-SPA route, so it
-// navigates via react-router (spa: true) instead of a full page load. Stays
-// dark in the menu until launch, same gate as the route itself in App.jsx
-// (hubGated: true below).
+// navigates via react-router (spa: true) instead of a full page load. The
+// mainnet entry stays dark in the menu until launch, same gate as the route
+// itself in App.jsx (hubGated: true below). The devnet sandbox at
+// otchub.dev/devnet has no such gate — it's a risk-free QA environment and
+// is always listed, independent of HUB_ENABLED.
 //
 // Grouped into three sections, ordered so the two ecosystems stay visually
 // separate as each grows independently, with social/chat kept apart from
@@ -37,6 +39,16 @@ const LINKS = [
     icon: Sparkles,
     spa: true,
     hubGated: true,
+  },
+  {
+    id: "hub-devnet",
+    group: "otc-hub",
+    label: "$HUB Protocol (Devnet)",
+    hint: "QA sandbox — devnet only, no real funds",
+    href: "/devnet",
+    icon: Sparkles,
+    spa: true,
+    badge: "DEVNET",
   },
   {
     id: "ru-fomo-web",

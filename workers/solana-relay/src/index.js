@@ -10,9 +10,10 @@
 // data migration. Same request/response shape as the Base44 function — the
 // client only changes its target URL (see src/lib/otcClaim.js).
 
+// Single-domain architecture: otchub.dev serves /, /hub, /devnet, /fomo via
+// path-based routing. app.otchub.dev and devnet.otchub.dev are retired.
 const ALLOWED_ORIGINS = new Set([
   "https://otchub.dev",
-  "https://app.otchub.dev",
   "https://www.otchub.dev",
   "http://localhost:5173",
   "http://localhost:3000",
