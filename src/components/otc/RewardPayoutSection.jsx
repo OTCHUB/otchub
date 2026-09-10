@@ -12,7 +12,7 @@ const shortMint = (mint) => `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 
 // Per-payout stonk icon: the member token's own logo, falling back to its
 // first letter when no image is available or it fails to load.
-function PayoutIcon({ mint, symbol, logo }) {
+export function PayoutIcon({ mint, symbol, logo }) {
   const [failedUrl, setFailedUrl] = useState("");
   const label = symbol || shortMint(mint);
   return (
@@ -43,17 +43,17 @@ export default function RewardPayoutSection({ payout, symbols = {} }) {
             className="flex max-w-full items-center gap-2 text-green-300 hover:text-emerald-300">
             <PayoutIcon mint={payout.rewardMint} symbol={nameOf(payout.rewardMint)} logo={logoOf(payout.rewardMint)} />
             <span className="min-w-0 break-words">
-              Reported primary reward: <span className="font-bold">${payout.rewardSymbol || nameOf(payout.rewardMint) || "?"}</span>
+              <span className="font-bold">${payout.rewardSymbol || nameOf(payout.rewardMint) || "?"}</span> · reported
             </span>
           </a>
         ) : (
           <p className="break-words text-green-300">
-            Reported primary reward: {payout.rewardSymbol ? `$${payout.rewardSymbol}` : "symbol unavailable"}
+            {payout.rewardSymbol ? `$${payout.rewardSymbol} · reported` : "symbol unavailable"}
           </p>
         )}
         {basket.length > 1 && (
           <div>
-            <p className="text-green-300">Rotating reward basket ({basket.length} tokens)</p>
+            <p className="text-green-300">Basket · {basket.length} tokens</p>
             <ul className="mt-1 flex flex-wrap gap-1.5">
               {basket.map((mint) => (
                 <li key={mint}>
@@ -67,10 +67,10 @@ export default function RewardPayoutSection({ payout, symbols = {} }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-green-500/60">Rewards rotate through this basket; the highlighted member is the reported current reward.</p>
+            <p className="mt-1 text-green-500/60">Rotates through the basket; highlighted = current.</p>
           </div>
         )}
-      </> : <p className="text-green-500/70">Payout metadata unavailable; this does not mean no rewards.</p>}
+      </> : <p className="text-green-500/70">Payout metadata unavailable.</p>}
     </section>
   );
 }

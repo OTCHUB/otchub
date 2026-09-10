@@ -11,6 +11,15 @@ export const fmtUsd = (v, d = 2) => {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })}`;
 };
 
+// Compact USD with fixed K/M/B suffix and 2 decimals: $1.23M, $45.67K.
+export const fmtUsdCompact = (v) => {
+  const n = num(v);
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  const [div, suf] = abs >= 1e9 ? [1e9, "B"] : abs >= 1e6 ? [1e6, "M"] : abs >= 1e3 ? [1e3, "K"] : [1, ""];
+  return `$${(n / div).toFixed(2)}${suf}`;
+};
+
 export const fmtPct = (v, d = 2) => {
   const n = num(v);
   if (n == null) return "—";

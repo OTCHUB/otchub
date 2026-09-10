@@ -1,0 +1,26 @@
+import React from "react";
+import { PayoutIcon } from "@/components/otc/RewardPayoutSection";
+
+// Tape-row payout badge: only the reward token icon — stacked, slightly
+// overlapped when the payout rotates through a MemeStock basket — keeping
+// launcher rows dense. Full payout details live in the token profile dialog.
+export default function RowPayout({ payout, symbols = {}, resolve }) {
+  const basket = Array.isArray(payout?.rewardBasket) && payout.rewardBasket.length > 1 ? payout.rewardBasket : [];
+  const mints = basket.length ? basket : payout?.rewardMint ? [payout.rewardMint] : [];
+  if (!mints.length && !payout?.rewardSymbol) return null;
+  const symOf = (mint) => symbols[mint] || resolve?.(mint)?.symbol
+    || (payout.rewardMint === mint ? payout.rewardSymbol : null) || "?";
+  const logoOf = (mint) => resolve?.(mint)?.logo || null;
+  const title = `Rewards holders in ${mints.length
+    ? mints.map((m) => `$${symOf(m)}`).join(", ")
+    : `$${payout.rewardSymbol}`} · source-reported, unverified`;
+  return (
+    <span className="inline-flex shrink-0 items-center border border-amber-400/50 bg-amber-400/10 px-0.5" title={title}>
+      {mints.length ? mints.slice(0, 4).map((mint, i) => (
+        <span key={mint} className={i ? "-ml-1.5" : ""}>
+          <PayoutIcon mint={mint} symbol={symOf(mint)} logo={logoOf(mint)} />
+        </span>
+      )) : <span className="px-0.5 font-mono text-[10px] font-bold text-amber-300">{(payout.rewardSymbol || "?").slice(0, 4)}</span>}
+    </span>
+  );
+}

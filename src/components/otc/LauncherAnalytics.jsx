@@ -1,8 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Globe, Send } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Globe, Send } from "lucide-react";
 import XIcon from "@/components/otc/XIcon";
+import RowPayout from "@/components/otc/RowPayout";
 import { base44 } from "@/api/base44Client";
-import { fmtUsd } from "@/lib/format";
+import { fmtUsdCompact } from "@/lib/format";
+import { useTokenSymbols } from "@/lib/useTokenSymbols";
 import { useLauncherLive } from "@/lib/useLauncherLive";
 import { confirmPendingGraduations } from "@/lib/launcherGraduationConfirm";
 import { usePumpSample } from "@/lib/usePumpSample";
@@ -73,7 +75,11 @@ function TokenDetails({ token, symbols = {} }) {
         {logo && <a href={logo} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-300 underline">Open original image ↗</a>}
       </div>
       <div className="min-w-0 space-y-3">
-        <div className="break-all font-mono text-[13px] text-green-500/70">{token.mint} <CopyCa mint={token.mint} /></div>
+        <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] text-green-500/70">
+          <span className="min-w-0 truncate sm:hidden" title={token.mint}>{token.mint.slice(0, 6)}…{token.mint.slice(-6)}</span>
+          <span className="hidden break-all sm:inline">{token.mint}</span>
+          <CopyCa mint={token.mint} />
+        </div>
         <div className="flex flex-wrap gap-2" aria-label="Token social links">
           {socials.map(({ label, Icon, url }) => <a key={label} href={url} target="_blank" rel="noopener noreferrer"
             aria-label={label} className="inline-flex min-h-11 items-center gap-1.5 border border-green-500/30 px-3 text-xs text-cyan-300 hover:bg-green-500/10">
@@ -82,14 +88,14 @@ function TokenDetails({ token, symbols = {} }) {
           {!socials.length && <span className="text-xs text-green-500/60">Social links unavailable.</span>}
         </div>
         <dl className="grid grid-cols-2 gap-2 text-xs">
-          {[["24h Volume", fmtUsd(token.vol24)], ["24h Momentum", momentum(token.change24h)],
-            ["Market Cap", fmtUsd(token.mcap)], ["Liquidity", fmtUsd(token.liquidity)]].map(([label, value]) =>
+          {[["Vol 24h", fmtUsdCompact(token.vol24)], ["24h", momentum(token.change24h)],
+            ["Mcap", fmtUsdCompact(token.mcap)], ["Liq", fmtUsdCompact(token.liquidity)]].map(([label, value]) =>
             <div key={label} className="min-w-0 border border-green-500/20 p-2">
               <dt className="text-green-500/60">{label}</dt><dd className="break-words font-mono text-green-300">{value}</dd>
             </div>)}
         </dl>
         <div className="border border-green-500/20 p-2"><CurveProgress token={token} />
-          <p className="mt-1 text-[12px] text-green-500/60">Reserve-derived funding progress, not market cap.</p></div>
+          <p className="mt-1 text-[12px] text-green-500/60">Reserve funding, not mcap.</p></div>
         <p className="text-[12px] text-green-500/60">Market snapshot: {token.metricsAt ? new Date(token.metricsAt).toLocaleString() : "unavailable"}
           <br />Status evidence: {token.statusAt ? new Date(token.statusAt).toLocaleString() : "unavailable"}</p>
       </div>
@@ -109,9 +115,9 @@ function CopyCa({ mint }) {
         e.preventDefault(); e.stopPropagation();
         try { await navigator.clipboard.writeText(mint); setOk(true); setTimeout(() => setOk(false), 1200); } catch { /* Clipboard permission may be denied. */ }
       }}
-      className={`border px-1 font-mono text-[11px] ${ok ? "border-emerald-400 text-emerald-300" : "border-green-500/30 text-green-500/60 hover:text-green-300"}`}
+      className={`inline-flex shrink-0 items-center border p-1 ${ok ? "border-emerald-400 text-emerald-300" : "border-green-500/30 text-green-500/60 hover:text-green-300"}`}
     >
-      {ok ? "[✓]" : "[⧉ CA]"}
+      {ok ? <Check className="h-3 w-3" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
     </button>
   );
 }
@@ -211,6 +217,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     };
   };
   const tape = ranked.map(withDexQuote);
+  // Payout icons on the tape: resolve the visible page's reward mints (basket
+  // members included) to logos/symbols once, cached for the session.
+  const payoutMints = [...new Set(tape.slice(0, 30).flatMap((t) => {
+    const p = t.payoutInfo;
+    if (!p) return [];
+    return p.rewardBasket?.length > 1 ? p.rewardBasket : p.rewardMint ? [p.rewardMint] : [];
+  }))];
+  const resolvePayout = useTokenSymbols(payoutMints);
   // GRAD RATE = verified GRADUATED launches vs ALL launches on the tape
   // (exact server-side counts from the live feed — no cohort sampling). Rows
   // outside the probed candidates stay UNKNOWN, so this is a verified
@@ -286,7 +300,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       <div className="mt-2 grid grid-cols-2 gap-1.5 text-center sm:grid-cols-4">
         {[
           ["Launches", c?.launches ?? "—"],
-          ["24h volume", c ? fmtUsd(c.vol24h) : "—"],
+          ["24h volume", c ? fmtUsdCompact(c.vol24h) : "—"],
           ["Grad rate", gradSample?.rate != null ? `${(gradSample.rate * 100).toFixed(1)}%` : "—"],
           ["Median age", c ? fmtAge(c.medianAgeH) : "—"],
         ].map(([k, v]) => (
@@ -340,17 +354,18 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center hover:bg-green-500/10 focus-visible:outline focus-visible:outline-cyan-400">
                 <TokenAsset token={t} />
               </button>
-              <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled || !onTrade}
-                className="min-w-0 truncate text-left font-bold text-green-300 hover:text-emerald-300 disabled:opacity-40" title={`${t.name || t.symbol} — select for in-app swap`}>
+              <button type="button" aria-label={`Open profile for ${t.name || t.symbol || t.mint}`}
+                onClick={(e) => { e.stopPropagation(); detailTrigger.current = e.currentTarget; setDetailMint(t.mint); }}
+                className="shrink-0 whitespace-nowrap text-left font-bold text-green-300 hover:text-emerald-300"
+                title={`${t.name || t.symbol} — open profile`}>
                 ${t.symbol || t.mint.slice(0, 6)}
               </button>
               {isOfficialHubMint(t.mint) && (
                 <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold text-fuchsia-300"
                   title="Official OTC_HUB token — mint verified against the official CA">★</span>
               )}
-              {t.payoutInfo?.rewardSymbol && (
-                <span className="shrink-0 border border-amber-400/50 bg-amber-400/10 px-1 font-mono text-[10px] font-bold text-amber-300"
-                  title={`$${t.symbol || t.mint.slice(0, 6)} reportedly rewards holders in $${t.payoutInfo.rewardSymbol} · unverified`}>⟳{t.payoutInfo.rewardSymbol}</span>
+              {t.payoutInfo && (
+                <RowPayout payout={t.payoutInfo} symbols={feed?.rewardSymbols || {}} resolve={resolvePayout} />
               )}
               <span className={`shrink-0 font-mono text-[10px] ${STATUS_SHORT[statusOf(t)]?.[1] ?? "text-green-500/40"}`}>
                 {STATUS_SHORT[statusOf(t)]?.[0] ?? "UNK"}
@@ -362,9 +377,17 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>{momentum(t.change24h)}</span>
               )}
               {t.dexLive && <span className="text-emerald-400" title="Live DexScreener quote (browser, ~15s)">●</span>}
-              <span>mc {fmtUsd(t.mcap)}</span>
-              <span className="hidden sm:inline">vol {fmtUsd(t.vol24)}</span>
+              <span>mc {fmtUsdCompact(t.mcap)}</span>
+              <span>vol {fmtUsdCompact(t.vol24)}</span>
+              <span>liq {fmtUsdCompact(t.liquidity)}</span>
               <span className="text-green-500/50">{fmtAge(t.ageH)}</span>
+              {onTrade && (
+                <button type="button" onClick={() => onTrade?.(t)} disabled={tradingDisabled}
+                  title={`Swap $${t.symbol || "?"} in-app`} aria-label={`Swap ${t.symbol || t.mint} in-app`}
+                  className="inline-flex items-center gap-1 border border-green-500/30 px-1 py-0.5 font-bold text-green-300 hover:border-emerald-400 hover:text-emerald-300 disabled:opacity-40">
+                  <ArrowLeftRight className="h-3 w-3" aria-hidden="true" />swap
+                </button>
+              )}
             </span>
           </div>
         ))}
@@ -383,13 +406,13 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <div className="border border-emerald-500/30 p-1.5">
           <div className="uppercase tracking-widest text-emerald-400/80">OTC launcher</div>
           <div className="mt-0.5 font-mono text-green-300">
-            grad {(gradSample?.rate != null ? (gradSample.rate * 100).toFixed(1) : "—")}% · vol {fmtUsd(c?.vol24h)} · n={c?.launches ?? "—"}
+            grad {(gradSample?.rate != null ? (gradSample.rate * 100).toFixed(1) : "—")}% · vol {fmtUsdCompact(c?.vol24h)} · n={c?.launches ?? "—"}
           </div>
         </div>
         <div className="border border-fuchsia-500/30 p-1.5">
           <div className="uppercase tracking-widest text-fuchsia-400/80">pump.fun sample</div>
           <div className="mt-0.5 font-mono text-green-300">
-            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsd(n.medianVol24)} · n=${n.n}${n.source?.startsWith("browser") ? " ● browser scan" : ""}` : "— sample unavailable"}
+            {n ? `grad ${(n.graduatedShare * 100).toFixed(1)}% · med vol ${fmtUsdCompact(n.medianVol24)} · n=${n.n}${n.source?.startsWith("browser") ? " ● browser scan" : ""}` : "— sample unavailable"}
           </div>
         </div>
       </div>
