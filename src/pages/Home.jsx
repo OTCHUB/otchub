@@ -4,7 +4,6 @@ import { fetchDashboardBody } from "@/lib/dashboardFeed";
 import { RefreshCw, Twitter } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
-import SkinToggle from "@/components/otc/SkinToggle";
 import MetricsStrip from "@/components/otc/MetricsStrip";
 import ArbitrageCard from "@/components/otc/ArbitrageCard";
 import LauncherAnalytics from "@/components/otc/LauncherAnalytics";
@@ -228,7 +227,7 @@ export default function Home() {
               <span className="truncate">OTC_HUB · OTC Analytics and Tools</span>
               <span className="inline-block animate-pulse text-green-500">▋</span>
             </h1>
-            {/* single-line actions: hamburger nav + X profile + theme/skin/refresh */}
+            {/* single-line actions: hamburger nav + X profile + theme/refresh */}
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <CommunityMenu />
               <a
@@ -242,7 +241,6 @@ export default function Home() {
                 <Twitter className="h-4 w-4" />
               </a>
               <ThemeToggle />
-              <SkinToggle />
               <button
                 onClick={refresh}
                 disabled={refreshing}

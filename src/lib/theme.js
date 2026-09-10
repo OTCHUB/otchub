@@ -3,37 +3,22 @@
 // utilities are CSS-variable driven (see index.css / tailwind.config.js), so
 // toggling the class swaps the whole palette with no component changes.
 const KEY = "otc_theme";
-const SKIN_KEY = "otc_skin";
 
 // Dispatched on every theme/skin change so JS-colored visuals (chart
 // telemetry via src/lib/chartTheme.js) re-read their CSS tokens live.
 export const THEME_CHANGE_EVENT = "otc-theme-change";
 
-// RETRO (hubconnect's classic green terminal) is the default skin for new
-// visitors, so otchub and the vendored $HUB module render identically out of
-// the box; "modern" ("Iridescent Terminal") remains available as opt-in.
+// RETRO (hubconnect's classic green terminal) is the one and only skin —
+// the modern "Iridescent Terminal" was retired: the retro terminal carries
+// the modernized layout just as well. Any previously stored "modern" choice
+// is ignored, so every visitor gets the legacy terminal look back.
 export function getStoredSkin() {
-  try {
-    return window.localStorage.getItem(SKIN_KEY) === "modern" ? "modern" : "retro";
-  } catch {
-    return "retro";
-  }
+  return "retro";
 }
 
 export function applySkin(skin) {
   document.documentElement.classList.toggle("skin-modern", skin === "modern");
   window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
-}
-
-export function toggleSkin() {
-  const next = getStoredSkin() === "modern" ? "retro" : "modern";
-  applySkin(next);
-  try {
-    window.localStorage.setItem(SKIN_KEY, next);
-  } catch {
-    /* storage unavailable — skin lasts for this session only */
-  }
-  return next;
 }
 
 export function getStoredTheme() {
