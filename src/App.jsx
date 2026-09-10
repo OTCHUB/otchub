@@ -23,6 +23,17 @@ import { HUB_ENABLED } from './lib/hubFlag';
 // shared zone, see rufomo/wrangler.toml) and never reaches this router.
 const Hub = React.lazy(() => import('./pages/Hub'));
 
+// The $HUB chunk carries @anchor-lang/core — heavy. While it loads, a blank
+// fallback reads as a dead/gated page, so show a terminal-style loading screen
+// instead (this Suspense only ever covers the lazy Hub mounts: /hub, /devnet).
+const HubFallback = () => (
+  <div className="flex min-h-screen max-w-[100vw] items-center justify-center bg-black font-mono">
+    <span className="animate-pulse text-sm uppercase tracking-widest text-green-400">
+      &gt; LOADING $HUB TERMINAL…
+    </span>
+  </div>
+);
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
@@ -57,7 +68,7 @@ const AuthenticatedApp = () => {
   // meant to stay usable for testing while mainnet is still dark — so only
   // /hub is wrapped in the launch gate.
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<HubFallback />}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/otc" element={<Navigate to="/" replace />} />
