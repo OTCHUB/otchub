@@ -99,7 +99,7 @@ export default function HeroLanding({ latest, onGoPanel }) {
             <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
               <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
               <span className="shrink-0 text-green-500/50">CA</span>
-              <span className="min-w-0 truncate sm:hidden" title={OTC_MINT}>{OTC_MINT.slice(0, 6)}…{OTC_MINT.slice(-6)}</span>
+              <span className="min-w-0 truncate sm:hidden" title={OTC_MINT}>{OTC_MINT.slice(0, 8)}…{OTC_MINT.slice(-8)}</span>
               <span className="hidden break-all sm:inline">{OTC_MINT}</span>
             </span>
             <button
