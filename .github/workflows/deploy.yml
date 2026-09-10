@@ -1,0 +1,48 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build and deploy
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Vite loads .env.production.local automatically for `vite build`.
+      # This file is gitignored (*.local), so CI writes it from repo secrets
+      # right before building — mirrors the local production-build setup.
+      - name: Write production env
+        run: |
+          cat <<EOF > .env.production.local
+          VITE_HUB_RPC_URL=${{ secrets.VITE_HUB_RPC_URL }}
+          VITE_HUB_CLUSTER=${{ secrets.VITE_HUB_CLUSTER }}
+          VITE_HUB_PROGRAM_ID=${{ secrets.VITE_HUB_PROGRAM_ID }}
+          VITE_BASE44_APP_ID=${{ secrets.VITE_BASE44_APP_ID }}
+          EOF
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=otchub
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
