@@ -27,8 +27,8 @@ const mintVsFloorDesc = (s) => {
   if (mint == null || !floor) return "—";
   const pct = ((mint - floor) / floor) * 100;
   return pct <= 0
-    ? `Mint ${Math.abs(pct).toFixed(0)}% under the ${fmtSol(floor)} SOL floor`
-    : `Floor ${fmtSol(floor)} SOL · minting +${pct.toFixed(0)}%`;
+    ? `Verdict · MINT — ${Math.abs(pct).toFixed(0)}% under the ${fmtSol(floor)} SOL floor`
+    : `Verdict · SECONDARY — ${fmtSol(floor)} SOL floor saves ${pct.toFixed(0)}%`;
 };
 const FEATURES = [
   { icon: Coins, label: "$OTC MCAP", value: (s) => fmtUsd(s?.token_market_cap), desc: () => "Live market cap", href: "otc-swap" },
@@ -46,7 +46,7 @@ const FEATURES = [
     label: "EARN / DESK",
     value: (s) => `${fmtSol(perDesk24hSolOf(s))} SOL`,
     desc: (s) => `≈ ${fmtUsd((perDesk24hSolOf(s) ?? 0) * (s?.sol_price_usd ?? 0))} per desk · 24h`,
-    href: "otc-arbitrage",
+    href: "otc-per-desk",
   },
   {
     icon: ArrowLeftRight,
@@ -99,14 +99,16 @@ export default function HeroLanding({ latest, onGoPanel }) {
             <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
               <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
               <span className="shrink-0 text-green-500/50">CA</span>
-              <span className="truncate">{OTC_MINT}</span>
+              <span className="min-w-0 truncate sm:hidden" title={OTC_MINT}>{OTC_MINT.slice(0, 6)}…{OTC_MINT.slice(-6)}</span>
+              <span className="hidden break-all sm:inline">{OTC_MINT}</span>
             </span>
             <button
               onClick={copyCa}
-              className="inline-flex shrink-0 items-center gap-1.5 border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold tracking-wider text-emerald-400 hover:bg-emerald-500/20"
+              title={copied ? "Copied" : "Copy contract address"}
+              aria-label="Copy contract address"
+              className="inline-flex shrink-0 items-center border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-emerald-400 hover:bg-emerald-500/20"
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "COPIED" : "COPY CA"}
             </button>
           </div>
 

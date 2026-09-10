@@ -423,7 +423,7 @@ export default function Home() {
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <CollapsibleCard title="Per-desk earn">
+          <CollapsibleCard title="Per-desk earn" id="otc-per-desk" openSignal={panelOpenSignal["otc-per-desk"] || 0}>
             <PerDeskTrendChart latest={latest} />
           </CollapsibleCard>
           <CollapsibleCard title="By stock">
