@@ -480,7 +480,7 @@ export default function Home() {
 
         <FooterBranding />
       </div>
-      <QuickNavBar />
+      <QuickNavBar onWallet={goWalletConnect} />
     </div>
   );
 }
