@@ -6,7 +6,7 @@
 
 import { decodeLauncherCurve, hasConfirmedAmmPair, launcherStatus, NEAR_THRESHOLD } from "./launcherCurve.js";
 import { createLauncherRiskService, emptyLauncherRisk } from "./launcherRisk.js";
-import { resolveRewardMeta } from "./rewardStockCatalog.js";
+import { resolveRewardMetaProxied } from "./rewardStockCatalog.js";
 
 const COINS_URL = "https://otcdesks.cash/api/coins";
 const DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/";
@@ -239,14 +239,14 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     for (const row of rows) {
       const p = row.payoutInfo;
       if (!p) continue;
-      const primary = resolveRewardMeta(p.rewardMint, p.rewardSymbol);
+      const primary = resolveRewardMetaProxied(p.rewardMint, p.rewardSymbol);
       if (primary) {
         if (p.rewardMint && !(p.rewardMint in rewardCatalog.byMint)) rewardCatalog.byMint[p.rewardMint] = primary;
         if (primary.symbol && !(primary.symbol in rewardCatalog.bySymbol)) rewardCatalog.bySymbol[primary.symbol] = primary;
       }
       for (const mint of p.rewardBasket || []) {
         if (mint in rewardCatalog.byMint) continue;
-        const member = resolveRewardMeta(mint, rewardSymbols[mint] || null);
+        const member = resolveRewardMetaProxied(mint, rewardSymbols[mint] || null);
         if (member) rewardCatalog.byMint[mint] = member;
       }
     }

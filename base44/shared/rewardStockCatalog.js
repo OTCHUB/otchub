@@ -113,3 +113,33 @@ export function resolveRewardMeta(rewardMint, rewardSymbol) {
     custom: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Feed-facing resolution — what the launcher tape actually renders.
+//
+// Stock icons are bundled as app assets (public/stocks/<icon>, backfilled by
+// scripts/backfill_stock_icons.mjs) so the tape never depends on
+// otcdesks.cash being up or staying at the same address. Custom rewards
+// (mint-keyed, unknown until a launch happens) stream through the public
+// getRewardIcon proxy, which fetches the official firebase image via the
+// app runtime's egress.
+//
+// Future-proofing: a stock added to REWARD_STOCKS but not yet backfilled 404s
+// locally and the client PayoutIcon retries through the proxy (same 1:1
+// upstream), so icons still render; run the backfill script to bundle them.
+export const REWARD_ICON_PROXY_URL = "https://otchubdev.base44.app/functions/getRewardIcon?id=";
+export const STOCKS_ASSET_BASE = "/stocks/";
+
+export const rewardIconProxyUrl = (id) => REWARD_ICON_PROXY_URL + encodeURIComponent(id);
+
+// Feed-facing twin of resolveRewardMeta: identical 1:1 resolution, but icons
+// point at our own origin — bundled asset for stocks, proxy for customs.
+export function resolveRewardMetaProxied(rewardMint, rewardSymbol) {
+  const meta = resolveRewardMeta(rewardMint, rewardSymbol);
+  if (!meta || !meta.icon) return meta;
+  if (!meta.custom) {
+    return { ...meta, icon: STOCKS_ASSET_BASE + meta.icon.slice(STOCKS_ORIGIN.length) };
+  }
+  const mint = reportedMint(rewardMint);
+  return mint ? { ...meta, icon: rewardIconProxyUrl(mint) } : meta;
+}

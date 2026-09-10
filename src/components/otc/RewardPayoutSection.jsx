@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { rewardIconProxyUrl } from "@/lib/rewardIcons";
 
 // Reward payout card for the launcher token details dialog: the source-
 // reported primary reward and its mint and — for MemeStock baskets — the full
@@ -13,15 +14,21 @@ const shortMint = (mint) => `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 
 // Icon src is ONLY the site-sourced catalog URL — never a symbol-pattern
 // guess. Unknown rewards fall back to the symbol's first letter.
+// Icon sources tried in order: the feed catalog URL (bundled /stocks asset
+// for catalog stocks, the origin proxy for custom rewards), then — for a
+// known stock whose bundled asset is missing (a newly added catalog entry,
+// not yet backfilled) — the proxy, which fetches the official 1:1 upstream
+// icon. Everything failing falls back to the symbol's first letter.
 export function PayoutIcon({ mint, symbol, icon }) {
-  const [failedUrl, setFailedUrl] = useState("");
+  const [failed, setFailed] = useState(0);
   const label = symbol || shortMint(mint);
-  const src = icon && icon !== failedUrl ? icon : "";
+  const candidates = [...new Set([icon, symbol ? rewardIconProxyUrl(symbol) : null].filter(Boolean))];
+  const src = candidates[failed] || "";
   return (
     <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-[9px] font-bold leading-none text-slate-900">
       {src ? (
         <img src={src} alt="" width={16} height={16} loading="lazy" decoding="async" referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(src)} className="h-full w-full object-contain" />
+          onError={() => setFailed((n) => n + 1)} className="h-full w-full object-contain" />
       ) : label.slice(0, 1)}
     </span>
   );
