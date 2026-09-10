@@ -5,8 +5,10 @@ import React, { useEffect, useRef } from "react";
 // dark screen pixels inside the art survive) to full transparency, and mounts
 // the resulting transparent PNG as a live canvas element in the hero.
 const SRC =
-  "https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/124d210b7_7CE42299-5687-4369-A84C-6E52057849C4.jpeg";
-const THRESH = 60; // near-black JPEG floor; pixel art edges are crisp so no halo
+  "https://media.base44.com/images/public/6a97c0a4fb3601dc274f8d83/bc3fe1076_204B8830-6B01-4719-88B5-4CA2676CBAC2.jpeg";
+// Near-black JPEG floor. Must stay BELOW the mascot's dark pedestal (#333333
+// = 51) so the flood fill eats only the background, never the base.
+const THRESH = 36;
 
 export default function MascotLogo({ className = "" }) {
   const hostRef = useRef(null);

@@ -1,14 +1,28 @@
-// CommunityMenu — "COMMUNITY" header dropdown: hover on desktop, tap-toggle
-// on mobile (this header has no hamburger; the menu opens in place). Modular:
+// CommunityMenu — the header's hamburger navigation: hover on desktop,
+// tap-toggle on mobile. Protocol apps + community tool sites. Modular:
 // add entries to LINKS. Terminal aesthetic matches the header links.
 // The open panel is portaled to <body> and placed from the button's live
 // rect — panel windows (overflow-hidden glass in the MODERN skin, stacking
 // contexts anywhere) can never clip or cover it.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessagesSquare, Users, Send, Eye, Globe } from "lucide-react";
+import { ExternalLink, Eye, Globe, Menu, MessagesSquare, Send, Users, Zap } from "lucide-react";
 
 const LINKS = [
+  {
+    id: "otc-app",
+    label: "OTC app · otcdesks.cash",
+    hint: "official protocol app",
+    href: "https://otcdesks.cash",
+    icon: ExternalLink,
+  },
+  {
+    id: "ru-fomo-web",
+    label: "RU_FOMO alpha terminal",
+    hint: "live FOMO tape + safety gate",
+    href: "https://fomo.otchub.dev",
+    icon: Zap,
+  },
   {
     id: "x-chat",
     label: "OTC Community (X Chat)",
@@ -104,22 +118,22 @@ export default function CommunityMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="true"
-        title="OTC community links + community tool sites"
-        className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
+        title="Navigation — protocol apps + community tools"
+        className="inline-flex items-center justify-center border border-green-500/50 p-1.5 text-green-400 hover:bg-green-500/10 sm:p-2"
       >
-        COMMUNITY {open ? "▴" : "▾"}
+        <Menu className="h-4 w-4" aria-hidden="true" />
       </button>
       {open && pos && createPortal(
         <div
           ref={panelRef}
           role="menu"
-          aria-label="OTC community links"
+          aria-label="OTC navigation links"
           onMouseLeave={() => setOpen(false)}
           style={{ position: "fixed", top: pos.top, left: pos.left }}
           className="z-50 w-72 max-w-[calc(100vw-1.5rem)] border border-green-500/50 bg-black font-mono shadow-[0_0_24px_rgba(34,197,94,0.15)] backdrop-blur-md"
         >
           <div className="border-b border-green-500/20 px-3 py-1.5 text-[11px] uppercase tracking-widest text-green-500/50">
-            Community links
+            Navigation
           </div>
           {LINKS.map((l) => (
             <a

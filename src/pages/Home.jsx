@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { fetchDashboardBody } from "@/lib/dashboardFeed";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Twitter } from "lucide-react";
 import CommunityMenu from "@/components/otc/CommunityMenu";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import SkinToggle from "@/components/otc/SkinToggle";
@@ -26,7 +26,8 @@ import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
 import BootScreen, { hasSeenBoot } from "@/components/otc/BootScreen";
-import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
+import { TerminalTopBar } from "@/components/otc/TerminalBars";
+import QuickNavBar from "@/components/otc/QuickNavBar";
 import KeeperPanel from "@/components/otc/KeeperPanel";
 import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
@@ -217,46 +218,35 @@ export default function Home() {
   }
 
   return (
-    <div className="skin-stage min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
+    <div className="skin-stage min-h-screen max-w-[100vw] overflow-x-hidden bg-black pt-[34px] pb-[52px] font-mono text-green-400">
       <TerminalTopBar label="OTC hub terminal" />
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         {/* Header */}
-        <header className="term-window border border-green-500/30 bg-black p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h1 className="flex items-center gap-3 text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg xl:text-xl">
-                OTC_HUB · OTC Analytics and Tools
-                <span className="ml-1 inline-block animate-pulse text-green-500">▋</span>
-              </h1>
-            </div>
-            {/* actions row: wraps + shrinks on narrow screens so the header
-                never overflows horizontally on mobile */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <header className="term-window border border-green-500/30 bg-black p-2.5 sm:p-3">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="flex min-w-0 items-center gap-2 truncate text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg">
+              <span className="truncate">OTC_HUB · OTC Analytics and Tools</span>
+              <span className="inline-block animate-pulse text-green-500">▋</span>
+            </h1>
+            {/* single-line actions: hamburger nav + X profile + theme/skin/refresh */}
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <CommunityMenu />
               <a
-                href="https://otcdesks.cash"
+                href="https://x.com/otchubdev"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-green-500/50 px-2 py-1 text-[12px] uppercase text-green-400 hover:bg-green-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
-                title="Official otcdesks.cash protocol app"
+                className="inline-flex items-center justify-center border border-green-500/50 p-1.5 text-green-400 hover:bg-green-500/10 sm:p-2"
+                title="OTC_HUB on X (@otchubdev)"
+                aria-label="OTC_HUB profile on X"
               >
-                [OTC app ↗]
-              </a>
-              <a
-                href="https://fomo.otchub.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 whitespace-nowrap border border-fuchsia-500/70 px-2 py-1 text-[12px] font-bold text-fuchsia-400 hover:bg-fuchsia-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
-                title="RU_FOMO — live FOMO trader tape, signal scores and anti-rug safety gate"
-              >
-                [RU_FOMO ↗]
+                <Twitter className="h-4 w-4" />
               </a>
               <ThemeToggle />
               <SkinToggle />
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="inline-flex items-center whitespace-nowrap border border-green-500/50 px-2 py-1 text-green-400 hover:bg-green-500/10 disabled:opacity-40 sm:px-2.5 sm:py-1.5"
+                className="inline-flex items-center justify-center border border-green-500/50 p-1.5 text-green-400 hover:bg-green-500/10 disabled:opacity-40 sm:p-2"
                 title="Force a fresh data snapshot (admin)"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -458,7 +448,7 @@ export default function Home() {
 
         <FooterBranding />
       </div>
-      <TerminalBottomBar>© 2026 otchub.dev</TerminalBottomBar>
+      <QuickNavBar />
     </div>
   );
 }
