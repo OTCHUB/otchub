@@ -60,6 +60,14 @@ export default function Home() {
   // Boot sequence plays ONCE per browser session — reloads skip it.
   const [bootDone, setBootDone] = useState(hasSeenBoot);
   const [walletOpenSignal, setWalletOpenSignal] = useState(0);
+  // Hero stat shortcuts: bump the target panel's open signal and scroll to it.
+  const [panelOpenSignal, setPanelOpenSignal] = useState({});
+  const goPanel = useCallback((id) => {
+    setPanelOpenSignal((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }, []);
   const [selectedToken, setSelectedToken] = useState(null); // null keeps the default OTC/SOL pair
   const [swapOpenSignal, setSwapOpenSignal] = useState(0);
   const [swapBusy, setSwapBusy] = useState(false);
@@ -268,7 +276,7 @@ export default function Home() {
         </header>
 
         {/* Hero landing — scroll straight into the analytics below */}
-        <HeroLanding latest={latest} />
+        <HeroLanding latest={latest} onGoPanel={goPanel} />
 
         {/* Wallet */}
         <div className="mt-3">
@@ -314,7 +322,7 @@ export default function Home() {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2" id="otc-swap">
             <CollapsibleCard title={selectedToken ? `Trade · $${selectedToken.symbol || "token"}` : "Trade · $OTC token"}
-              openSignal={swapOpenSignal} locked={swapBusy}>
+              openSignal={swapOpenSignal + (panelOpenSignal["otc-swap"] || 0)} locked={swapBusy}>
               <JupiterSwapPanel
                 wallet={wallet}
                 latest={latest}
@@ -329,7 +337,7 @@ export default function Home() {
               />
             </CollapsibleCard>
           </div>
-          <CollapsibleCard title="Trade · NFT desks">
+          <CollapsibleCard title="Trade · NFT desks" id="otc-nft-trade">
             <NftTradeCard />
           </CollapsibleCard>
         </div>
@@ -340,11 +348,11 @@ export default function Home() {
         {/* Arbitrage + Protocol */}
         <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-3">
           <div className="h-full lg:col-span-2">
-            <CollapsibleCard title="Arbitrage" id="otc-arbitrage">
+            <CollapsibleCard title="Arbitrage" id="otc-arbitrage" openSignal={panelOpenSignal["otc-arbitrage"] || 0}>
               <ArbitrageCard latest={latest} holdings={data?.holdings} />
             </CollapsibleCard>
           </div>
-          <CollapsibleCard title="Protocol">
+          <CollapsibleCard title="Protocol" id="otc-protocol" openSignal={panelOpenSignal["otc-protocol"] || 0}>
             <ProtocolPanel latest={latest} />
           </CollapsibleCard>
         </div>

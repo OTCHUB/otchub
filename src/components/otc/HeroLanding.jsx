@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowDown, Check, Coins, Copy, DollarSign, Flame, Gem, HandCoins, LineChart, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, Check, Coins, Copy, DollarSign, Flame, Gem, HandCoins, LineChart } from "lucide-react";
 import MascotLogo from "@/components/otc/MascotLogo";
 import HeroRewardStats from "@/components/otc/HeroRewardStats";
 import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
@@ -20,31 +20,44 @@ const perDesk24hSolOf = (s) => {
     .sort((a, b) => String(b.day).localeCompare(String(a.day)));
   return closed[0]?.per_desk_sol ?? null;
 };
+// Every card is a shortcut: `href` names the panel it jumps to (the page
+// opens the target card and scrolls to it — see Home's goPanel).
+const mintVsFloorDesc = (s) => {
+  const mint = s?.mint_cost_sol, floor = s?.nft_floor_sol;
+  if (mint == null || !floor) return "—";
+  const pct = ((mint - floor) / floor) * 100;
+  return pct <= 0
+    ? `Mint ${Math.abs(pct).toFixed(0)}% under the ${fmtSol(floor)} SOL floor`
+    : `Floor ${fmtSol(floor)} SOL · minting +${pct.toFixed(0)}%`;
+};
 const FEATURES = [
-  { icon: Coins, label: "$OTC MCAP", value: (s) => fmtUsd(s?.token_market_cap), desc: () => "Live market cap" },
-  { icon: DollarSign, label: "$OTC PRICE", value: (s) => fmtUsd(s?.token_price_usd), desc: () => "Live price per token" },
+  { icon: Coins, label: "$OTC MCAP", value: (s) => fmtUsd(s?.token_market_cap), desc: () => "Live market cap", href: "otc-swap" },
+  { icon: DollarSign, label: "$OTC PRICE", value: (s) => (s?.token_price_usd != null ? `$${s.token_price_usd.toFixed(4)}` : "—"), desc: () => "Live price per token", href: "otc-swap" },
   {
     icon: Flame,
     label: "SUPPLY BURNT",
     value: (s) => (s?.token_burnt != null ? `${(s.token_burnt / 1e6).toFixed(2)}M` : "—"),
     desc: (s) => (s?.token_total_supply ? `${((s.token_burnt / s.token_total_supply) * 100).toFixed(1)}% of supply burnt` : "—"),
+    href: "otc-protocol",
   },
-  { icon: Gem, label: "DESK SUPPLY", value: (s) => fmtNum(s?.nft_total_supply), desc: () => "OTC Desks NFT live supply" },
+  { icon: Gem, label: "DESK SUPPLY", value: (s) => fmtNum(s?.nft_total_supply), desc: () => "OTC Desks NFT live supply", href: "otc-nft-trade" },
   {
     icon: HandCoins,
     label: "EARN / DESK",
     value: (s) => `${fmtSol(perDesk24hSolOf(s))} SOL`,
     desc: (s) => `≈ ${fmtUsd((perDesk24hSolOf(s) ?? 0) * (s?.sol_price_usd ?? 0))} per desk · 24h`,
+    href: "otc-arbitrage",
   },
   {
-    icon: TrendingUp,
-    label: "ARB SPREAD",
-    value: (s) => (s?.spread_pct != null ? `${s.spread_pct.toFixed(1)}%` : "—"),
-    desc: (s) => `${fmtSol(s?.spread_sol)} SOL edge`,
+    icon: ArrowLeftRight,
+    label: "MINT VS SECONDARY",
+    value: (s) => `${fmtSol(s?.mint_cost_sol)} SOL`,
+    desc: mintVsFloorDesc,
+    href: "otc-arbitrage",
   },
 ];
 
-export default function HeroLanding({ latest }) {
+export default function HeroLanding({ latest, onGoPanel }) {
   const [copied, setCopied] = useState(false);
   const desks = latest?.desks_minted ?? 0;
   const desksPct = Math.max(0, Math.min(100, (desks / DESK_CAP) * 100));
@@ -120,14 +133,20 @@ export default function HeroLanding({ latest }) {
 
           {/* Live feature cards */}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            {FEATURES.map(({ icon: Icon, label, value, desc }) => (
-              <div key={label} className="border border-green-500/20 bg-green-500/5 p-2">
+            {FEATURES.map(({ icon: Icon, label, value, desc, href }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => onGoPanel?.(href)}
+                title={`Open the ${label.toLowerCase()} panel`}
+                className="border border-green-500/20 bg-green-500/5 p-2 text-left transition-colors hover:border-green-400/50 hover:bg-green-500/10"
+              >
                 <div className="flex items-center gap-1.5 text-[10px] tracking-widest text-green-500/60">
                   <Icon className="h-3.5 w-3.5 shrink-0" /> {label}
                 </div>
                 <div className="mt-1.5 text-[15px] font-bold text-green-300">{value(latest)}</div>
                 <div className="mt-0.5 text-[10px] leading-snug text-green-500/50">{desc(latest)}</div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
