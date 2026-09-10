@@ -68,7 +68,7 @@ function serializeForSigning(tx) {
 // deep-link wallets where the prompt navigates away and never resolves).
 // Race each call against a generous timeout so a stalled prompt surfaces as a
 // clear error instead of hanging the whole claim run forever.
-const SIGN_TIMEOUT_MS = 120000;
+const SIGN_TIMEOUT_MS = 60000;
 
 // Rejectors of every currently pending sign call — used by the CANCEL button
 // so the user can always end a stuck "AWAITING SIGNATURE" state themselves.
@@ -122,7 +122,16 @@ async function signTransactionRaw(conn, tx) {
   if (conn.kind === "injected" && conn.provider?.signTransaction) {
     const signed = await withSignTimeout(conn.provider.signTransaction(tx), "Wallet sign prompt");
     if (!signed) throw new Error("Wallet did not return a signed transaction");
-    return new Uint8Array(signed.serialize());
+    // Use requireAllSignatures:false / verifySignatures:false so that version
+    // mismatches between the dApp's @solana/web3.js and the wallet's internal
+    // copy (which may compile message bytes slightly differently) never cause
+    // a spurious "Signature verification failed" error after the user approves.
+    // The blockchain itself verifies signatures on broadcast.
+    return new Uint8Array(
+      signed instanceof VersionedTransaction
+        ? signed.serialize()
+        : signed.serialize({ requireAllSignatures: false, verifySignatures: false })
+    );
   }
 
   // Wallet Standard: solana:signTransaction feature.
@@ -187,7 +196,16 @@ async function signAllTransactionsRaw(conn, txs) {
     if (!Array.isArray(signed) || signed.length !== txs.length) {
       throw new Error("Wallet returned wrong number of signed transactions");
     }
-    return signed.map((s) => new Uint8Array(s.serialize()));
+    // Same rationale as signTransactionRaw: skip signature verification at
+    // serialization time — wallet/dApp version mismatches in message compilation
+    // can cause false "Signature verification failed" errors after a real approval.
+    return signed.map((s) =>
+      new Uint8Array(
+        s instanceof VersionedTransaction
+          ? s.serialize()
+          : s.serialize({ requireAllSignatures: false, verifySignatures: false })
+      )
+    );
   }
   const out = [];
   for (const tx of txs) out.push(await signTransactionRaw(conn, tx));
