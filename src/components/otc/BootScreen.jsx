@@ -26,13 +26,11 @@ const LINES = [
   "OTC_HUB ready. Loading interface...",
 ];
 
-// Block-letter ASCII wordmark (OTC_HUB), 5 rows — pure text, no images.
+// Block-letter ASCII wordmark (OTC_HUB), 3 rows — pure text, no images.
 const WORDMARK = [
-  " ####   ######  ####       #    # #    # ##### ",
-  "#    #   ##    #           #    # #    # #    #",
-  "#    #   ##    #           ###### #    # ##### ",
-  "#    #   ##    #           #    # #    # #    #",
-  " ####    ##    ####  ______ #    #  ####  ##### ",
+  "▄████▄ ██████ ▄█████ ██  ██ ██  ██ █████▄ ",
+  "██  ██   ██   ██     ██████ ██  ██ ██▄▄██ ",
+  "▀████▀   ██   ▀█████ ██  ██ ▀████▀ ██▄▄█▀ ",
 ].join("\n");
 // Box-drawing banner — same for every screen size, mono-spaced.
 const BANNER = [
