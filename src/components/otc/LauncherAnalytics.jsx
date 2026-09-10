@@ -338,11 +338,43 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           Filters{activeFilters.length ? ` · ${activeFilters.length}` : ""} {filtersOpen ? "▴" : "▾"}
         </button>
       </div>
+      {/* Quick access row: one-tap status filters (the full status/scope
+          controls stay behind the Filters expander) + the primary ranking
+          modes. Bonding-phase picks (BOND/ABT2GRAD) auto-rank by curve
+          progress; GRAD ranks by 24h volume. */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        {[
+          ["GRAD", "GRADUATED", "vol24"],
+          ["BOND", "BONDING", "curveProgress"],
+          ["ABT2GRAD", "ABOUT_TO_GRADUATE", "curveProgress"],
+        ].map(([label, value, rankKpi]) => (
+          <button key={value} type="button" aria-pressed={status === value}
+            onClick={() => {
+              const next = status === value ? "ALL" : value;
+              setStatus(next); setPage(1); setKpi(rankKpi);
+            }}
+            className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${status === value ? "border-cyan-400 bg-cyan-500/10 text-cyan-300" : "border-green-500/30 text-green-500/70 hover:text-green-300"}`}
+            title={`Show ${value.replace(/_/g, " ").toLowerCase()} launches · ranked by ${rankKpi === "curveProgress" ? "curve progress" : "24h volume"}`}>
+            {label} ({counts[value] ?? 0})
+          </button>
+        ))}
+        <span className="text-green-500/30">·</span>
+        {[
+          ["VOL", "vol24", "24h volume"],
+          ["MCAP", "mcap", "market cap"],
+        ].map(([label, value, title]) => (
+          <button key={value} type="button" aria-pressed={kpi === value} onClick={() => { setKpi(value); setPage(1); }}
+            className={`border px-1.5 py-0.5 text-[10px] font-bold uppercase ${kpi === value ? "border-green-400 bg-green-500/10 text-green-300" : "border-green-500/30 text-green-500/70 hover:text-green-300"}`}
+            title={`Rank by ${title}`}>
+            {label}
+          </button>
+        ))}
+      </div>
       {filtersOpen && (
         <div className="mt-1.5 space-y-1">
           <div role="tablist" aria-label="Launcher status" className="flex flex-wrap gap-1">
             {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-              onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE") setKpi("curveProgress"); }} className={`border px-1.5 py-0.5 text-[10px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+              onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE" || s === "BONDING") setKpi("curveProgress"); }} className={`border px-1.5 py-0.5 text-[10px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
               {s} ({counts[s] ?? 0})
             </button>)}
           </div>
