@@ -23,7 +23,11 @@ const KPIS = [
   { key: "change24h", label: "Top gainers" },
   { key: "mcap", label: "Market cap" },
   { key: "curveProgress", label: "Progress" },
+  { key: "newest", label: "Newest" },
+  { key: "oldest", label: "Oldest" },
 ];
+// Reward payout shape filter: single reward vs rotating MemeStock basket.
+const PAYOUTS = ["ALL", "SINGLE", "BASKET"];
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
 // Compact status chips for dense rows (full status stays in the details dialog).
@@ -142,6 +146,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const [err, setErr] = useState(null);
   const [kpi, setKpi] = useState("vol24");
   const [status, setStatus] = useState("ALL");
+  const [payout, setPayout] = useState("ALL");
   const [search, setSearch] = useState("");
   const [detailMint, setDetailMint] = useState(null);
   const detailTrigger = useRef(null), panelRef = useRef(null);
@@ -157,6 +162,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     page, pageSize, status, sort: kpi,
     ...(search.trim() ? { search: search.trim().toLowerCase() } : {}),
     ...(maxAgeHours != null ? { maxAgeHours } : {}),
+    ...(payout !== "ALL" ? { payout } : {}),
   });
   // Browser-side pump.fun market sample (large GeckoTerminal pool scan); the
   // server payload ships a small search-based fallback until this arrives.
@@ -325,6 +331,17 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
           {tf}
         </button>)}
       </div>
+      <div role="tablist" aria-label="Reward payout filter" className="mt-1 flex flex-wrap items-center gap-1">
+        <span className="text-[11px] uppercase tracking-widest text-green-500/50">Payout</span>
+        {PAYOUTS.map((p) => (
+          <button key={p} type="button" role="tab" aria-selected={payout === p}
+            onClick={() => { setPayout(p); setPage(1); }}
+            className={`border px-1.5 py-1 text-[11px] ${payout === p ? "border-amber-400 text-amber-300" : "border-green-500/30 text-green-500/70"}`}
+            title={p === "BASKET" ? "Rotating multi-token MemeStock reward baskets" : p === "SINGLE" ? "Single source-reported reward token" : "No payout filter"}>
+            {p}
+          </button>
+        ))}
+      </div>
       <input aria-label="Search launcher tokens" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         placeholder="Symbol, name or mint · searches the full tape"
         className="mt-2 w-full border border-green-500/30 bg-black px-2 py-1 text-[12px] text-green-300" />
@@ -402,7 +419,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
             </span>
           </div>
         ))}
-        {!ranked.length && <div className="px-2 py-3 text-center text-[12px] uppercase text-green-500/50">{feed ? "No matching launches · try another status, timeframe or search" : live.error ? "Unavailable" : "Loading…"}</div>}
+        {!ranked.length && <div className="px-2 py-3 text-center text-[12px] uppercase text-green-500/50">{feed ? "No matching launches · try another status, timeframe, payout or search" : live.error ? "Unavailable" : "Loading…"}</div>}
       </div>
       <Pager page={page - 1} pages={pageCount} onPage={(p) => setPage(p + 1)} total={matches} label="launches" />
       <div className="mt-1 text-[11px] uppercase text-green-500/50">

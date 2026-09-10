@@ -9,8 +9,9 @@ const FRESH_MS = 30_000, MAX_AGE_MS = 120_000;
 const DEFAULT_PAGE_SIZE = 50;
 // Full-tape params. Any present param switches the response from the legacy
 // bounded roster to a server-filtered/paged view of the ENTIRE roster.
-const PAGE_KEYS = ["page", "pageSize", "sort", "status", "search", "maxAgeHours"];
-const SORT_KEYS = ["vol24", "change24h", "mcap", "curveProgress"];
+const PAGE_KEYS = ["page", "pageSize", "sort", "status", "search", "maxAgeHours", "payout"];
+const SORT_KEYS = ["vol24", "change24h", "mcap", "curveProgress", "newest", "oldest"];
+const PAYOUT_KEYS = ["ALL", "SINGLE", "BASKET"];
 const STATUS_KEYS = ["ALL", "GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"];
 
 // Accepts query strings (numbers arrive as text) and JSON numbers alike.
@@ -58,6 +59,9 @@ export async function parseFeedParams(req, url) {
         const page = positiveInt(value, 1, 10_000);
         if (page === null) throw invalidParams();
         params.page = page;
+      } else if (key === "payout") {
+        if (!PAYOUT_KEYS.includes(value)) throw invalidParams();
+        params.payout = value;
       } else {
         const hours = positiveInt(value, 1, 8760);
         if (hours === null) throw invalidParams();
@@ -85,6 +89,15 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
 
   const statusKey = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
 
+  // Source-reported payout shape: BASKET = rotating multi-token reward,
+  // SINGLE = one reward mint/symbol, NONE = no payout metadata.
+  const payoutKey = (row) => {
+    const p = row.payoutInfo;
+    if (!p) return "NONE";
+    if (Array.isArray(p.rewardBasket) && p.rewardBasket.length > 1) return "BASKET";
+    return p.rewardMint || p.rewardSymbol ? "SINGLE" : "NONE";
+  };
+
   // One projection per request: the legacy bounded roster when no feed params
   // are given, otherwise the FULL tape filtered, sorted and paged server-side.
   const respondBody = (cache, params, stale, sourceError) => {
@@ -107,7 +120,10 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
     const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
     for (const row of scoped) statusCounts[statusKey(row)]++;
     if (params.status && params.status !== "ALL") scoped = scoped.filter((row) => statusKey(row) === params.status);
-    const sorted = rankLauncherRows(scoped, params.sort || "vol24");
+    if (params.payout === "SINGLE" || params.payout === "BASKET") scoped = scoped.filter((row) => payoutKey(row) === params.payout);
+    // newest = smallest age first, oldest = largest age first; nulls last.
+    const sortField = params.sort === "newest" || params.sort === "oldest" ? "ageH" : (params.sort || "vol24");
+    const sorted = rankLauncherRows(scoped, sortField, params.sort === "newest");
     const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
     const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize));
     // Pages past the end are clamped to the last page, never empty.

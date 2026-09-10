@@ -15,6 +15,13 @@ const MIRROR_TTL_MS = 30_000; // one shared read per poll window
 
 const STATUS_KEYS = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"];
 const statusKeyOf = (row) => (STATUS_KEYS.includes(row.status) ? row.status : "UNKNOWN");
+// Source-reported payout shape — same contract as the server's payoutKey.
+const payoutKeyOf = (row) => {
+  const p = row.payoutInfo;
+  if (!p) return "NONE";
+  if (Array.isArray(p.rewardBasket) && p.rewardBasket.length > 1) return "BASKET";
+  return p.rewardMint || p.rewardSymbol ? "SINGLE" : "NONE";
+};
 
 // Null-last stable ranking — same ordering contract as the server's
 // rankLauncherRows (duplicated here because the server module can't be
@@ -78,7 +85,11 @@ export function projectLauncherView(mirror, params = {}) {
   if (params.status && params.status !== "ALL") {
     scoped = scoped.filter((row) => statusKeyOf(row) === params.status);
   }
-  const sorted = rankRows(scoped, params.sort || "vol24");
+  if (params.payout === "SINGLE" || params.payout === "BASKET") {
+    scoped = scoped.filter((row) => payoutKeyOf(row) === params.payout);
+  }
+  const sortField = params.sort === "newest" || params.sort === "oldest" ? "ageH" : (params.sort || "vol24");
+  const sorted = rankRows(scoped, sortField, params.sort === "newest");
   const pageSize = params.pageSize ?? 50;
   const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize));
   const page = Math.min(params.page ?? 1, pageCount);
