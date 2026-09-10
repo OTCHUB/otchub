@@ -366,7 +366,7 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     }
     const statusCounts = { ALL: rows.length };
     for (const row of rows) {
-      const s = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+      const s = ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     }
     // Completed-but-unconfirmed curves for the client to verify: DexScreener

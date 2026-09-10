@@ -129,7 +129,8 @@ test("reserve-derived quote funding is zero, exactly 90, and 100 on completion",
     realToken: 0n, realQuote: 0n, complete: true })), 100);
   assert.equal(curveFundingProgress(reserves({ virtualToken: 11_000_000n, virtualQuote: 10_000_000n,
     realToken: 1_000_000n, realQuote: 8_999_999n })), 89.9999);
-  assert.equal(launcherStatus({ curveComplete: false, curveProgress: 89.9999 }, false), "BONDING");
+  assert.equal(launcherStatus({ curveComplete: false, curveProgress: 89.9999 }, false), "ABOUT_TO_GRADUATE");
+  assert.equal(launcherStatus({ curveComplete: false, curveProgress: 69.9999 }, false), "BONDING");
 });
 
 test("u64 arithmetic stays exact beyond Number precision and rejects invalid/overflow targets", () => {
@@ -176,7 +177,7 @@ test("graduation requires the exact mint, Solana, a known AMM, pair address, and
     ...[0, -1, null, NaN, Infinity, "100"].map((usd) => pair(token, { liquidity: { usd } })),
   ]) assert.equal(hasConfirmedAmmPair(token, [bad]), false);
   const complete = { curveComplete: true, curveProgress: 100 };
-  assert.equal(launcherStatus(complete, false), "ABOUT_TO_GRADUATE");
+  assert.equal(launcherStatus(complete, false), "MIGRATING");
   assert.equal(launcherStatus(complete, true), "GRADUATED");
   assert.equal(launcherStatus({ curveComplete: false, curveProgress: 0 }, true), "GRADUATED");
   assert.equal(launcherStatus(null, false), "UNKNOWN");
@@ -406,7 +407,7 @@ test("bounded roster ships all 150 candidates; disjoint union kept with 100/30 b
   assert.equal(body.candidateCount, 150);
   assert.equal(body.statusChecked, 150);
   assert.equal(body.statusError, null);
-  assert.equal(body.nearThreshold, 90);
+  assert.equal(body.nearThreshold, 70);
   assert.equal(launcherCandidates(body.ranked).length, 150);
   assert.deepEqual(s.calls.filter((c) => c.type === "rpc").map((c) => c.params[0].length), [100, 50]);
   assert.deepEqual(s.calls.filter((c) => c.type === "dex").map((c) => c.url.slice(DEX.length).split(",").length), [30, 30, 30, 30, 30]);
@@ -477,20 +478,23 @@ test("paged tape serves the full roster with server-side filter, sort and paging
 test("every status category pages at the 50-entry default when its count exceeds one page", async () => {
   const bonding = Array.from({ length: 55 }, (_, i) => coin(100 + i, { volume24h: 6000 - i, change24h: -1 }));
   const graduated = Array.from({ length: 55 }, (_, i) => coin(200 + i, { volume24h: 1, change24h: 100 - i }));
-  const near = Array.from({ length: 30 }, (_, i) => coin(300 + i, { volume24h: 1, change24h: -2 },
+  const almost = Array.from({ length: 30 }, (_, i) => coin(300 + i, { volume24h: 1, change24h: -2 },
     { createdAt: NOW / 1000 - 1800 }));
+  const migrating = Array.from({ length: 5 }, (_, i) => coin(500 + i, { volume24h: 1, change24h: -4 },
+    { createdAt: NOW / 1000 - 2400 }));
   const filler = Array.from({ length: 100 }, (_, i) => coin(400 + i, { volume24h: 50 - i / 10, change24h: -3 }));
-  const coins = [...bonding, ...graduated, ...near, ...filler];
+  const coins = [...bonding, ...graduated, ...almost, ...migrating, ...filler];
   const accounts = new Map();
   for (const c of bonding) accounts.set(derive(c.mint), account());
   for (const c of graduated) accounts.set(derive(c.mint), account());
-  for (const c of near) accounts.set(derive(c.mint), account({ complete: true }));
+  for (const c of almost) accounts.set(derive(c.mint), account(near));
+  for (const c of migrating) accounts.set(derive(c.mint), account({ complete: true }));
   const s = setup({ state: { coins, accounts, dex: { pairs: graduated.map((c) => pair(c.mint)) } } });
   const read = async (query) => (await s.read(request(query))).body;
-  const keyOf = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+  const keyOf = (row) => ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
   // GRADUATED/BONDING/UNKNOWN exceed 50 entries (multi-page); ABOUT_TO_GRADUATE
-  // fits a single page (no pager, over-range pages clamp).
-  const categories = { GRADUATED: 55, BONDING: 55, UNKNOWN: 100, ABOUT_TO_GRADUATE: 30, ALL: 240 };
+  // and MIGRATING fit a single page (no pager, over-range pages clamp).
+  const categories = { GRADUATED: 55, BONDING: 55, UNKNOWN: 100, ABOUT_TO_GRADUATE: 30, MIGRATING: 5, ALL: 245 };
   for (const [status, total] of Object.entries(categories)) {
     const first = await read(`?status=${status}`);
     assert.equal(first.pageSize, 50, `${status}: default page size is 50`);
@@ -663,7 +667,7 @@ test("status precedence keeps completion pending, absent/invalid accounts unknow
       [derive(mint(6)), account({ realToken: 1000n })],
     ]), dex: { pairs: [pair(mint(1)), pair(mint(3), { dexId: "pumpfun" }), pair(mint(5), { chainId: "ethereum" })] } } });
   const { body } = await s.read();
-  assert.deepEqual(body.ranked.map((r) => r.status), ["GRADUATED", "ABOUT_TO_GRADUATE", "ABOUT_TO_GRADUATE", "UNKNOWN", "UNKNOWN", "UNKNOWN"]);
+  assert.deepEqual(body.ranked.map((r) => r.status), ["GRADUATED", "ABOUT_TO_GRADUATE", "MIGRATING", "UNKNOWN", "UNKNOWN", "UNKNOWN"]);
   assert.equal(body.ranked[0].curveProgress, 0, "AMM evidence must not invent 100% reserves");
   assert.equal(body.ranked[2].curveComplete, true);
   assert.equal(body.ranked[2].curveProgress, 100);

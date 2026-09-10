@@ -2,7 +2,9 @@
 // Decode only the stable 49-byte prefix; newer fields follow `complete`.
 export const PUMP_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 export const PUMP_CURVE_DISCRIMINATOR = Object.freeze([23, 183, 248, 55, 96, 216, 172, 96]);
-export const NEAR_THRESHOLD = 90;
+// Launches at or above this curve-funding progress count as ABOUT_TO_GRADUATE;
+// completed-but-unconfirmed curves are a separate MIGRATING status.
+export const NEAR_THRESHOLD = 70;
 const U64_MAX = (1n << 64n) - 1n;
 const AMMS = new Set(["pumpswap", "raydium", "meteora"]);
 const ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -72,7 +74,7 @@ export function hasConfirmedAmmPair(mint, pairs) {
 
 export function launcherStatus(curve, graduated) {
   if (graduated) return "GRADUATED";
-  if (curve?.curveComplete === true) return "ABOUT_TO_GRADUATE"; // Migration pending/unconfirmed.
+  if (curve?.curveComplete === true) return "MIGRATING"; // Funding complete; AMM migration pending/unconfirmed.
   if (!Number.isFinite(curve?.curveProgress)) return "UNKNOWN";
   return curve.curveProgress >= NEAR_THRESHOLD ? "ABOUT_TO_GRADUATE" : "BONDING";
 }

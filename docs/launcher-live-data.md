@@ -4,8 +4,8 @@
 change `getLauncherAnalytics`, public metrics, entities, frontend code, or trades.
 GET/POST accept optional full-tape feed params: `page` (1–10000, clamped to
 the last page), `pageSize` (1–100), `sort` (`vol24` | `change24h` | `mcap` |
-`curveProgress`), `status` (`ALL` | `GRADUATED` | `BONDING` | `ABOUT_TO_GRADUATE`
-| `UNKNOWN`), `search` (≤64 chars) and `maxAgeHours` (1–8760). With no params
+`curveProgress`), `status` (`ALL` | `GRADUATED` | `BONDING` | `MIGRATING`
+| `ABOUT_TO_GRADUATE` | `UNKNOWN`), `search` (≤64 chars) and `maxAgeHours` (1–8760). With no params
 the legacy bounded roster is served. Other unknown parameters, including `mint`,
 `mints` and `limit`, return 400; unsupported methods return 405; OPTIONS returns 204.
 `curveProgress` sorts by bonding-curve funding progress (known statuses only);
@@ -23,7 +23,7 @@ The JSON response contains:
 | `candidateCount` | Size of the deduplicated inspection union, at most 150. |
 | `statusChecked` | Candidates with at least one successfully completed curve or DEX probe. Empty/no-account results count; this is **not** the number of known statuses or a guarantee that both probes succeeded. |
 | `statusError` | Null, or sorted unique codes for unavailable/invalid probes. |
-| `nearThreshold` | 90, inclusive percentage threshold. |
+| `nearThreshold` | 70, inclusive percentage threshold. |
 | `sourceError` | `COINS_UNAVAILABLE` on stale responses only. |
 
 Each row has `mint`, `symbol`, `name`, `image`, `logoUrl`, `socials`, `payoutInfo`, `vol24`, `mcap`, `liquidity`,
@@ -144,11 +144,12 @@ Status precedence:
    `chainId: solana`, `dexId` exactly `pumpswap`, `raydium`, or `meteora`, a
    base58-shaped pair address and finite, positive USD liquidity. This is
    third-party AMM evidence, not an independent on-chain migration verification.
-2. **ABOUT_TO_GRADUATE** if an authenticated curve account is complete, or its
-   measured progress is at least 90. Complete means curve funding is finished;
-   migration is still pending/unconfirmed without the AMM evidence above.
-3. **BONDING** if authenticated reserves yield progress below 90.
-4. **UNKNOWN** otherwise. Missing curves, missing DEX pairs, a `pumpfun` pair,
+2. **MIGRATING** if an authenticated curve account is complete: curve funding
+   is finished; AMM migration is still pending/unconfirmed without the AMM
+   evidence above.
+3. **ABOUT_TO_GRADUATE** if measured progress is at least 70.
+4. **BONDING** if authenticated reserves yield progress below 70.
+5. **UNKNOWN** otherwise. Missing curves, missing DEX pairs, a `pumpfun` pair,
    unrecognized AMMs, malformed data, or unavailable probes do not prove graduation.
 
 `curveComplete` is boolean only for a successfully decoded curve, otherwise null.

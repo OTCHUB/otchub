@@ -12,7 +12,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const PAGE_KEYS = ["page", "pageSize", "sort", "status", "search", "maxAgeHours", "payout"];
 const SORT_KEYS = ["vol24", "change24h", "mcap", "curveProgress", "newest", "oldest"];
 const PAYOUT_KEYS = ["ALL", "SINGLE", "BASKET"];
-const STATUS_KEYS = ["ALL", "GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"];
+const STATUS_KEYS = ["ALL", "GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE", "UNKNOWN"];
 
 // Accepts query strings (numbers arrive as text) and JSON numbers alike.
 const positiveInt = (value, min, max) => {
@@ -87,7 +87,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
   const { build, attachRisks } = createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl, clock, probeTimeoutMs, riskService, riskOptions, graduationStore, coinsArchive, freshPages });
   let cached = null, inflight = null;
 
-  const statusKey = (row) => ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+  const statusKey = (row) => ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
 
   // Source-reported payout shape: BASKET = rotating multi-token reward,
   // SINGLE = one reward mint/symbol, NONE = no payout metadata.
@@ -118,7 +118,7 @@ export function createLauncherLiveHandler({ rpc, deriveCurveAddress, fetchImpl =
     if (params.search) scoped = scoped.filter((row) => `${row.symbol} ${row.name} ${row.mint}`.toLowerCase().includes(params.search));
     // Faceted counts over the current search/timeframe scope: each tab shows
     // how many launches it holds; ALL counts every launch in scope.
-    const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
+    const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, MIGRATING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
     for (const row of scoped) statusCounts[statusKey(row)]++;
     if (params.status && params.status !== "ALL") scoped = scoped.filter((row) => statusKey(row) === params.status);
     if (params.payout === "SINGLE" || params.payout === "BASKET") scoped = scoped.filter((row) => payoutKey(row) === params.payout);

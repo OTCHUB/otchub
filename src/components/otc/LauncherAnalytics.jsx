@@ -27,10 +27,10 @@ const KPIS = [
 ];
 // Reward payout shape filter: single reward vs rotating MemeStock basket.
 const PAYOUTS = ["ALL", "SINGLE", "BASKET"];
-const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "ALL", "UNKNOWN"];
+const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "MIGRATING", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
 // Compact status chips for dense rows (full status stays in the details dialog).
-const STATUS_SHORT = { GRADUATED: ["GRAD", "text-emerald-400"], BONDING: ["BOND", "text-cyan-400/80"], ABOUT_TO_GRADUATE: ["NEAR", "text-amber-400"], UNKNOWN: ["UNK", "text-green-500/40"] };
+const STATUS_SHORT = { GRADUATED: ["GRAD", "text-emerald-400"], BONDING: ["BOND", "text-cyan-400/80"], ABOUT_TO_GRADUATE: ["NEAR", "text-amber-400"], MIGRATING: ["MIGR", "text-fuchsia-400"], UNKNOWN: ["UNK", "text-green-500/40"] };
 // Launch-age windows for the tape; ALL shows every launch, historical included.
 /** @type {Array<[string, number|null]>} */
 const TIMEFRAMES = [["1H", 1], ["24H", 24], ["7D", 168], ["30D", 720], ["ALL", null]];
@@ -335,13 +335,14 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
       </div>
       {/* Quick access row: one-tap status filters (the full status/scope
           controls stay behind the Filters expander) + the primary ranking
-          modes. Bonding-phase picks (BOND/ABT2GRAD) auto-rank by curve
+          modes. Bonding-phase picks (BOND/ABT2GRAD/MIGR) auto-rank by curve
           progress; GRAD ranks by 24h volume. */}
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         {[
           ["GRAD", "GRADUATED", "vol24"],
           ["BOND", "BONDING", "curveProgress"],
           ["ABT2GRAD", "ABOUT_TO_GRADUATE", "curveProgress"],
+          ["MIGR", "MIGRATING", "curveProgress"],
         ].map(([label, value, rankKpi]) => (
           <button key={value} type="button" aria-pressed={status === value}
             onClick={() => {
@@ -369,7 +370,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
         <div className="mt-1.5 space-y-1">
           <div role="tablist" aria-label="Launcher status" className="flex flex-wrap gap-1">
             {STATUSES.map((s) => <button key={s} type="button" role="tab" aria-selected={status === s}
-              onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE" || s === "BONDING") setKpi("curveProgress"); }} className={`border px-1.5 py-0.5 text-[10px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
+              onClick={() => { setStatus(s); setPage(1); if (s === "ABOUT_TO_GRADUATE" || s === "BONDING" || s === "MIGRATING") setKpi("curveProgress"); }} className={`border px-1.5 py-0.5 text-[10px] ${status === s ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}>
               {s} ({counts[s] ?? 0})
             </button>)}
           </div>

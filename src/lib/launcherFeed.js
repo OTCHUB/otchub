@@ -13,7 +13,7 @@ const LIVE_KEY = "launcher_live";
 const ANALYTICS_KEY = "launcher_analytics";
 const MIRROR_TTL_MS = 30_000; // one shared read per poll window
 
-const STATUS_KEYS = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE"];
+const STATUS_KEYS = ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"];
 const statusKeyOf = (row) => (STATUS_KEYS.includes(row.status) ? row.status : "UNKNOWN");
 // Source-reported payout shape — same contract as the server's payoutKey.
 const payoutKeyOf = (row) => {
@@ -80,7 +80,7 @@ export function projectLauncherView(mirror, params = {}) {
   if (params.search) {
     scoped = scoped.filter((row) => `${row.symbol} ${row.name} ${row.mint}`.toLowerCase().includes(params.search));
   }
-  const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
+  const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, MIGRATING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
   for (const row of scoped) statusCounts[statusKeyOf(row)]++;
   if (params.status && params.status !== "ALL") {
     scoped = scoped.filter((row) => statusKeyOf(row) === params.status);

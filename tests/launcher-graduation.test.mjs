@@ -61,7 +61,7 @@ test("the feed lists completed-but-unconfirmed curves for browser confirmation",
     state: { accounts: new Map([[derive(mint(1)), account(true)]]) } });
   const { response, body } = await s.read();
   assert.equal(response.status, 200);
-  assert.equal(body.ranked[0].status, "ABOUT_TO_GRADUATE");
+  assert.equal(body.ranked[0].status, "MIGRATING");
   assert.equal(body.ranked[0].curveProgress, 100);
   assert.deepEqual(body.pendingGraduation, [mint(1)]);
 });
