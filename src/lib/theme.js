@@ -9,12 +9,14 @@ const SKIN_KEY = "otc_skin";
 // telemetry via src/lib/chartTheme.js) re-read their CSS tokens live.
 export const THEME_CHANGE_EVENT = "otc-theme-change";
 
-// MODERN is the default skin for new visitors; "retro" is opt-in.
+// RETRO (hubconnect's classic green terminal) is the default skin for new
+// visitors, so otchub and the vendored $HUB module render identically out of
+// the box; "modern" ("Iridescent Terminal") remains available as opt-in.
 export function getStoredSkin() {
   try {
-    return window.localStorage.getItem(SKIN_KEY) === "retro" ? "retro" : "modern";
+    return window.localStorage.getItem(SKIN_KEY) === "modern" ? "modern" : "retro";
   } catch {
-    return "modern";
+    return "retro";
   }
 }
 
