@@ -2,12 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { SOL_MINT } from "@/lib/stockPrices";
+import { magicEdenUrl, openMagicEden } from "@/lib/meLink";
 import HoldingsDetail from "@/components/otc/HoldingsDetail";
 import { useLiveVaultHoldings } from "@/lib/useLiveVaultHoldings";
 import HelpNote from "@/components/otc/HelpNote";
 import Pager from "@/components/otc/Pager";
-
-const ME_BASE = "https://magiceden.io/item-details";
 
 export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwned = false, claimPlan = null, claimPrices = null, lifetimeByDesk = null, onDeskCommand = null }) {
   const [mode, setMode] = useState(walletOwned ? "INVENTORY" : "SNIPE");
@@ -228,10 +227,10 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
                       {noStock ? "VAULT_EMPTY — claimed out" : `NET(STK−LST) ${fmtSol(spread, 3)}`}
                     </div>
                     <a
-                      href={`${ME_BASE}/${h.asset_id}`}
+                      href={magicEdenUrl(h.asset_id)}
                       target="_blank"
                       rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => openMagicEden(e, h.asset_id)}
                       className={`mt-1.5 block border px-1.5 py-1.5 text-center font-mono text-[11px] font-bold hover:bg-emerald-500/10 ${noStock ? "border-red-500/50 text-red-400" : "border-emerald-500/50 text-emerald-400"}`}
                     >
                       [BUY_ON_ME ↗]

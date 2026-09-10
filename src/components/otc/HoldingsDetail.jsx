@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Image } from "@/components/ui/image";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { SOL_MINT } from "@/lib/stockPrices";
+import { magicEdenUrl, openMagicEden } from "@/lib/meLink";
 
 export default function HoldingsDetail({
   h,
@@ -152,7 +153,7 @@ export default function HoldingsDetail({
               </button>
             </>
           ) : (
-            <a href={`https://magiceden.io/item-details/${h.asset_id}`} target="_blank" rel="noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center border border-emerald-500/50 px-3 font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
+            <a href={magicEdenUrl(h.asset_id)} target="_blank" rel="noreferrer" onClick={(e) => openMagicEden(e, h.asset_id)} className="flex min-h-[44px] flex-1 items-center justify-center border border-emerald-500/50 px-3 font-bold text-emerald-400 hover:bg-emerald-500/10">[BUY_ON_ME ↗]</a>
           )}
           <a href={`https://solscan.io/token/${h.asset_id}`} target="_blank" rel="noreferrer" className="flex min-h-[44px] items-center justify-center border border-green-500/30 px-3 text-green-400 hover:bg-green-500/10">[SOLSCAN]</a>
         </div>
