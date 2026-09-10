@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 // All panels open by default; click anywhere on the header bar to toggle.
 // `openSignal` lets other panels force this card open: bump the counter and
@@ -13,12 +13,34 @@ export default function CollapsibleCard({ title, children, defaultOpen = true, m
   });
   const toggle = () => { if (!locked) setOpen((o) => !o); };
 
+  const revealRef = useRef(null);
+  // Apple-style scroll reveal: cards sit one notch down and rise into place
+  // as they enter the viewport. Falls back to instantly-visible when
+  // IntersectionObserver is unavailable or the user prefers reduced motion.
+  useLayoutEffect(() => {
+    const el = revealRef.current;
+    if (!el) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+      el.classList.remove("reveal-pending");
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        el.classList.remove("reveal-pending");
+        el.classList.add("reveal-in");
+        io.disconnect();
+      }
+    }, { rootMargin: "0px 0px -6% 0px", threshold: 0.08 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     if (openSignal) setOpen(true);
   }, [openSignal]);
 
   return (
-    <div id={id} className="term-window flex h-full flex-col break-inside-avoid">
+    <div id={id} ref={revealRef} className="term-window reveal-pending flex h-full flex-col break-inside-avoid">
       <div
         onClick={toggle}
         title={locked ? "Keep this panel open until the swap finishes" : undefined}

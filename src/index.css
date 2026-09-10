@@ -429,8 +429,8 @@ body::after {
     0 12px 32px rgb(0 0 0 / 0.40);
 }
 
-/* Iridescent border ring: a 1px gradient (emerald → cyan → violet,
-   masked to the frame edge) slowly cycling hue around every panel. */
+/* Iridescent border ring: a static 1px gradient (emerald → cyan →
+   violet) masked to the frame edge — no motion. */
 .term-window::before {
   content: "";
   position: absolute;
@@ -444,46 +444,36 @@ body::after {
     rgb(var(--c-green-300) / 0.60),
     rgb(var(--c-cyan-400) / 0.50),
     rgb(var(--c-green-400) / 0.65));
-  background-size: 300% 300%;
-  animation: irid-drift 16s linear infinite;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
 }
 
-/* Hover gleam: a cyan-cored light streak sweeps once across the panel. */
-.term-window::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+/* Apple-style scroll reveal: panels sit one notch down and rise into
+   place as they enter the viewport. CollapsibleCard's observer swaps
+   .reveal-pending for .reveal-in; without JS support panels stay visible. */
+.term-window.reveal-pending {
   opacity: 0;
-  transition: opacity 0.5s ease;
-  background: linear-gradient(115deg,
-    transparent 35%,
-    rgb(255 255 255 / 0.04) 46%,
-    rgb(var(--c-cyan-300) / 0.06) 50%,
-    rgb(255 255 255 / 0.03) 55%,
-    transparent 68%);
-  background-size: 220% 220%;
-  background-position: 130% 0;
+  transform: translateY(22px) scale(0.99);
 }
 
-.term-window:hover::after {
-  opacity: 1;
-  animation: irid-gleam 1.4s ease-out;
+.term-window.reveal-in {
+  animation: reveal-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes irid-drift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+@keyframes reveal-rise {
+  from { opacity: 0; transform: translateY(22px) scale(0.99); }
+  to { opacity: 1; transform: none; }
 }
 
-@keyframes irid-gleam {
-  from { background-position: 130% 0; }
-  to { background-position: -30% 0; }
+@media (prefers-reduced-motion: reduce) {
+  .term-window.reveal-pending,
+  .term-window.reveal-in {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }
 
 /* Frosted fixed bars (top status, bottom disclaimer, quick nav). */
