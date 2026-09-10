@@ -5,13 +5,13 @@ import React from "react";
 // from, so this is the "verify the source yourself" link for anyone reading the footer.
 const HUB_GITHUB_URL = "https://github.com/OTCHUB/hubconnect";
 
-// Mirrors the $HUB standalone shell's footer (hubconnect/web/src/Footer.tsx) — same copy
-// pattern, credits, and link styling — so the $HUB page inside otchub closes out the same way
-// every other otchub eco site does.
+// Byte-identical with the $HUB standalone shell's footer (hubconnect/web/src/Footer.tsx) — same
+// copy, order, and link styling — so the $HUB page reads the same on otchub.dev, app.otchub.dev,
+// and devnet.otchub.dev.
 export default function Footer() {
   return (
     <footer className="mt-4 space-y-1 text-center text-[10px] text-green-500/30">
-      <div>© 2026 otchub.dev</div>
+      <div>$HUB · COMMUNITY_TOOLING · NOT AFFILIATED WITH OTC DESKS</div>
       <div>
         DATA: SOLANA RPC (ON-CHAIN READS) · ECOSYSTEM:{" "}
         <a
@@ -42,6 +42,7 @@ export default function Footer() {
           source ↗
         </a>
       </div>
+      <div>© 2026 otchub.dev</div>
     </footer>
   );
 }

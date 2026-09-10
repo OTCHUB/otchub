@@ -72,6 +72,12 @@ function HubHeader() {
           <NavLink to="/treasury" className={navCls}>
             [TREASURY]
           </NavLink>
+          <NavLink to="/tokenomics" className={navCls}>
+            [TOKENOMICS]
+          </NavLink>
+          <NavLink to="/mechanics" className={navCls}>
+            [MECHANICS]
+          </NavLink>
           <NavLink to="/deployments" className={navCls}>
             [DEPLOYMENTS]
           </NavLink>
