@@ -25,7 +25,7 @@ import WalletConnect from "@/components/otc/WalletConnect";
 import WalletPortfolio from "@/components/otc/WalletPortfolio";
 import JupiterSwapPanel from "@/components/otc/JupiterSwapPanel";
 import NftTradeCard from "@/components/otc/NftTradeCard";
-import BootScreen from "@/components/otc/BootScreen";
+import BootScreen, { hasSeenBoot } from "@/components/otc/BootScreen";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 import KeeperPanel from "@/components/otc/KeeperPanel";
 import ContractsPanel from "@/components/otc/ContractsPanel";
@@ -54,7 +54,8 @@ export default function Home() {
       return null;
     }
   });
-  const [bootDone, setBootDone] = useState(false);
+  // Boot sequence plays ONCE per browser session — reloads skip it.
+  const [bootDone, setBootDone] = useState(hasSeenBoot);
   const [walletOpenSignal, setWalletOpenSignal] = useState(0);
   const [selectedToken, setSelectedToken] = useState(null); // null keeps the default OTC/SOL pair
   const [swapOpenSignal, setSwapOpenSignal] = useState(0);
@@ -202,6 +203,15 @@ export default function Home() {
   const perDesk24hSol = sortedPd[0]?.per_desk_sol ?? 0;
 
   if (loading || !bootDone) {
+    // Session already booted: a quiet spinner while data loads, never a
+    // boot replay.
+    if (loading && bootDone) {
+      return (
+        <div className="skin-stage fixed inset-0 flex items-center justify-center bg-black">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-green-500/20 border-t-green-400" />
+        </div>
+      );
+    }
     return <BootScreen onComplete={() => setBootDone(true)} />;
   }
 

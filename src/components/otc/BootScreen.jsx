@@ -1,93 +1,67 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { fetchDashboardBody } from "@/lib/dashboardFeed";
-import { fmtNum, fmtSol, fmtUsd, fmtPct } from "@/lib/format";
+import React, { useEffect, useRef, useState } from "react";
 import { TerminalTopBar, TerminalBottomBar } from "@/components/otc/TerminalBars";
 import { getStoredSkin } from "@/lib/theme";
 
-const HEADER = [
-  "+---------------------------------------------+",
-  "|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |",
-  "|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |",
-  "+---------------------------------------------+",
-];
+// Session-scoped flag: the boot sequence plays ONCE per browser session —
+// reloads and same-session navigation skip straight to the dashboard with a
+// quiet spinner, so users never sit through the boot animation twice.
+const BOOT_SEEN_KEY = "otc_boot_seen";
 
-function buildLines(data) {
-  const snap = data?.latest;
-  const tge = snap?.token_tge_supply ?? 1_000_000_000;
-  const supply = snap?.token_total_supply;
-  const burnt = snap?.token_burnt ?? (supply != null ? tge - supply : null);
-  const burntPct = burnt != null ? (burnt / tge) * 100 : null;
-  return [
-    "OTC_HUB BIOS v2.1.0  (c) 2026 COMMUNITY_TOOLING",
-    "Performing power-on self test.................. OK",
-    "Mounting /dev/helius....................... OK",
-    "Loading on-chain IDL: otcdesks.cash program...... OK",
-    "Initializing DAS asset resolver................ OK",
-    "Connecting DexScreener spot feed............... OK",
-    "Connecting Magic Eden marketplace.............. OK",
-    "Resolving OTC token mint MukLDtJ8...udpump..... OK",
-    `Fetching pot treasury balance.................. ${snap ? "OK" : "WAIT"}`,
-    `Querying snapshot database..................... ${data?.snapshot_count ?? 0} rows`,
-    `Indexing ${fmtNum(snap?.nft_total_supply ?? snap?.desks_minted ?? 0)} OTC desk NFTs.............. OK`,
-    `OTC supply ${fmtNum(supply)} · burnt ${fmtNum(burnt)} (${fmtPct(burntPct)})`,
-    `Desks minted ${fmtNum(snap?.desks_minted)} / 5000 · listed ${fmtNum(snap?.nft_listed_count)}`,
-    `SOL ${fmtUsd(snap?.sol_price_usd)} · OTC ${fmtUsd(snap?.token_price_usd, 5)}`,
-    `Pot balance ${fmtSol(snap?.pot_sol_balance)} SOL`,
-    "Computing accrued stock holdings.............. OK",
-    "Calculating mint vs secondary arbitrage....... OK",
-    "Calibrating 2% taker fee + 5% royalty.......... OK",
-    "Synchronizing 5-min snapshot workflow.......... OK",
-    "Starting dashboard render services............ OK",
-    "",
-    "OTC_HUB ready. Loading interface...",
-  ];
-}
+export const hasSeenBoot = () => {
+  try {
+    return window.sessionStorage.getItem(BOOT_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+// Minimal fixed boot script: a handful of quick lines, no dependency on
+// network data — the sequence runs at full speed even while the dashboard
+// fetch is still in flight.
+const LINES = [
+  "OTC_HUB BIOS v2.1.0  (c) 2026 COMMUNITY_TOOLING",
+  "Mounting /dev/helius....................... OK",
+  "Loading on-chain IDL: otcdesks.cash...... OK",
+  "Connecting live market feeds............... OK",
+  "Starting dashboard render services........ OK",
+  "OTC_HUB ready. Loading interface...",
+];
 
 export default function BootScreen({ onComplete }) {
   const [lines, setLines] = useState([]);
   const [done, setDone] = useState(false);
-  const [data, setData] = useState(null);
   // Boot-time skin: the modern skin renders a sans hero instead of the
   // ASCII banner, so the boot sequence is fully converted too.
   const [skin] = useState(getStoredSkin);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
-    let cancelled = false;
-    fetchDashboardBody()
-      .then((body) => {
-        if (!cancelled) setData(body);
-      })
-      .catch(() => {
-        if (!cancelled) setData({ offline: true });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const built = useMemo(() => (data ? buildLines(data) : null), [data]);
-
-  useEffect(() => {
-    if (!built) return;
     let i = 0;
     const id = setInterval(() => {
-      if (i < built.length) {
-        setLines((prev) => [...prev, built[i]]);
+      if (i < LINES.length) {
+        setLines((prev) => [...prev, LINES[i]]);
         i++;
       } else {
         clearInterval(id);
         setDone(true);
-        setTimeout(() => onComplete?.(), 250);
+        try {
+          window.sessionStorage.setItem(BOOT_SEEN_KEY, "1");
+        } catch {
+          /* storage unavailable — boot replays next visit */
+        }
+        setTimeout(() => onCompleteRef.current?.(), 150);
       }
-    }, 45);
+    }, 25);
     return () => clearInterval(id);
-  }, [built, onComplete]);
+  }, []);
 
   // The bar tracks EXACTLY how many of the milestone lines have printed —
   // one line = one step of the sequence, 100% only when the last line is up.
-  const progress = built?.length
-    ? Math.max(0, Math.min(100, Math.round((lines.length / built.length) * 100)))
-    : 0;
+  const progress = Math.max(
+    0,
+    Math.min(100, Math.round((lines.length / LINES.length) * 100))
+  );
 
   return (
     <div className="skin-stage relative flex h-[100dvh] w-full flex-col overflow-hidden bg-black pt-[34px] pb-[34px] font-mono text-green-400">
@@ -113,27 +87,17 @@ export default function BootScreen({ onComplete }) {
             </div>
           ) : (
             <div className="whitespace-pre text-[9px] leading-tight text-green-500/70 sm:text-[11px]">
-              {HEADER.join("\n")}
+              {"+---------------------------------------------+\n|  OTC_ECOSYSTEM_TOOLING :: SOLANA TERMINAL   |\n|  CREATED BY HUB_YIELD_OPTIMIZER_PROTOCOL     |\n+---------------------------------------------+"}
             </div>
           )}
           <div className="mt-3 space-y-0 text-[11px] leading-relaxed sm:text-[12px]">
-            {!data && (
-              <div>
+            {lines.map((l, idx) => (
+              <div key={idx}>
                 <span className="text-green-500/50">&gt; </span>
-                <span className="animate-pulse">Querying OTC_HUB database...</span>
+                {l}
               </div>
-            )}
-            {lines.map((l, idx) =>
-              l === "" ? (
-                <div key={idx} className="h-2" />
-              ) : (
-                <div key={idx}>
-                  <span className="text-green-500/50">&gt; </span>
-                  {l}
-                </div>
-              )
-            )}
-            {!done && data && <span className="animate-pulse text-green-400">▋</span>}
+            ))}
+            {!done && <span className="animate-pulse text-green-400">▋</span>}
           </div>
           {done && (
             <div className="mt-2 text-emerald-400">
