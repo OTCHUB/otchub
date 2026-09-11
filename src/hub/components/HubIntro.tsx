@@ -1,5 +1,5 @@
 import { BoltIcon } from "./ui/Icons";
-import { BasketIcons } from "./ui/StockIcon";
+import { RewardFlow } from "./ui/RewardFlow";
 
 const PILLARS = [
   {
@@ -47,11 +47,8 @@ export function HubIntro() {
               $HUB protocol
             </span>
           </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-green-600">
-              m.i.m basket
-            </span>
-            <BasketIcons />
+          <div className="mt-2">
+            <RewardFlow compact />
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {PILLARS.map((p) => (

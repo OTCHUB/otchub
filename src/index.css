@@ -508,3 +508,27 @@ html.light .term-window {
 html.light .term-bar {
   background: linear-gradient(180deg, rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.66));
 }
+
+/* ------------------------------------------------------------------
+   Hub M.I.M reward flow: a seamless conveyor of stock payout icons
+   moving from the HUB Pot toward activated desks. The lane (see
+   src/hub/components/ui/RewardFlow.tsx) holds two identical copies in
+   a w-max flex row, so the -50% → 0 transform loops rightward forever
+   with no visible wrap. Transform-only (GPU compositable); reduced-
+   motion users see the first copy statically.
+   ------------------------------------------------------------------ */
+@keyframes hub-reward-flow {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+.hub-reward-flow {
+  animation: hub-reward-flow 22s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-reward-flow {
+    animation: none;
+  }
+}

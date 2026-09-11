@@ -10,6 +10,7 @@ import { fmtNum, fmtUnits } from "../lib/format";
 import type { TxLog } from "../lib/swap";
 import { AddressLink } from "./ui/AddressLink";
 import { StockIcon } from "./ui/StockIcon";
+import { RewardFlow } from "./ui/RewardFlow";
 import { Panel, Row, Stat } from "./ui/Panel";
 import { TxLogView } from "./ui/TxLogView";
 
@@ -177,6 +178,9 @@ export function HubPotPanel({ desks, address }: Props) {
         The Magic Internet Money basket — tier-weighted payouts of $OTC, CRCLx, NVDAx and SPCXx,
         rebalanced from 13 stocks into 4 native tickers. Pure yield, zero cost.
       </p>
+      <div className="mt-3">
+        <RewardFlow />
+      </div>
 
       <div className="mt-3">
         <span className={pillCls}>
