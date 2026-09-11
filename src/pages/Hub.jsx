@@ -13,6 +13,7 @@ import { TerminalTopBar } from "@/components/otc/TerminalBars";
 import HubQuickNav from "@/hub/components/HubQuickNav";
 import {
   EnvBadge,
+  getSignerForAddress as getHubSignerForAddress,
   HubProvider,
   HubRoutes,
   rpcHost,
@@ -20,6 +21,18 @@ import {
   useWallet,
   WalletProvider,
 } from "@/hub";
+
+// Two independent wallet-connect paths feed this page: the OTC dashboard's own
+// (@/lib/walletSigner + @/lib/solanaWallets, connected on "/" and mirrored in below) and this
+// hub module's own vendored WALLET_CONNECT panel (src/hub/lib/wallets.ts), used when a wallet is
+// connected directly on "/hub"/"/devnet" without ever visiting "/". Each keeps its own
+// module-level signer registry, so a wallet connected via the hub's native panel populated only
+// the hub module's registry — resolveSigner below checked ONLY the host's, leaving the swap/claim
+// panels permanently "read-only" (balances/quotes still work off the address alone) even though a
+// real signer was registered. Check both registries so either connect path can sign.
+function resolveHubSigner(address) {
+  return getSignerForAddress(address) ?? getHubSignerForAddress(address);
+}
 
 // $HUB protocol landing (Treasury · Burn · Pot · yield) — mounted at "/hub/*"
 // (and, as a forced-devnet sandbox, "/devnet/*") so the hub module's relative
@@ -208,7 +221,7 @@ export default function Hub({ devnet = false }) {
       programId={config.programId}
       cluster={config.cluster}
       queryClient={queryClientInstance}
-      resolveSigner={getSignerForAddress}
+      resolveSigner={resolveHubSigner}
       swapTransport={hubSwapTransport}
     >
       <WalletProvider>
