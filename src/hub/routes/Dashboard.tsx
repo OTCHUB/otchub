@@ -35,32 +35,34 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
             {/* The eight key numbers as one strip right under the intro. */}
             <MetricsStrip state={state} />
 
-            {/* Two-lane flow: the compact wallet surface (connect → balances → desk grid, with
-                every per-desk action in the DeskSheet the grid opens) beside the trading
-                surface — side by side on desktop, stacked on mobile. */}
+            {/* Two packed stacks on desktop — no column ever shows a void beside a taller
+                neighbor, because every panel stacks flush inside its own column instead of
+                padding below an uneven grid row. Left = your position (wallet → yield →
+                tools); right = market & protocol data (trade surface → round tracker →
+                trend charts). Mobile collapses to one flow in the same order. */}
             <div className="grid items-start gap-2 lg:grid-cols-2">
-              <div id="hub-wallet" className="min-w-0">
-                <WalletPanel state={state} walletAddress={walletAddress} />
+              <div className="min-w-0 space-y-2">
+                <div id="hub-wallet">
+                  <WalletPanel state={state} walletAddress={walletAddress} />
+                </div>
+                <div id="hub-yield">
+                  <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+                </div>
+                {/* Secondary tooling — collapsed by default to keep the page light. */}
+                <div id="hub-desk-lookup">
+                  <Panel title="DESK LOOKUP" collapsible defaultCollapsed>
+                    <DeskLookupPanel state={state} />
+                  </Panel>
+                </div>
+                {/* QA tool — devnet sandbox only; never surfaces on the mainnet dashboard. */}
+                {cluster === "devnet" && <MainnetPreviewPanel />}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 space-y-2">
                 <HubBondingDashboard state={state} address={address} />
+                <EpochTracker state={state} />
+                <DashboardTrends state={state} />
               </div>
             </div>
-
-            <EpochTracker state={state} />
-            <DashboardTrends state={state} />
-            <div id="hub-yield">
-              <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
-            </div>
-
-            {/* Secondary tooling — collapsed by default to keep the page light. */}
-            <div id="hub-desk-lookup">
-              <Panel title="DESK LOOKUP" collapsible defaultCollapsed>
-                <DeskLookupPanel state={state} />
-              </Panel>
-            </div>
-            {/* QA tool — devnet sandbox only; never surfaces on the mainnet dashboard. */}
-            {cluster === "devnet" && <MainnetPreviewPanel />}
 
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] text-green-700">
               <span>last read {new Date(fetchedAt).toLocaleTimeString()}</span>
