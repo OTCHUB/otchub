@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 type PanelProps = {
   title: ReactNode;
@@ -20,9 +20,11 @@ type PanelProps = {
 };
 
 /**
- * The app's one `Panel` primitive — the square DOS-terminal window (`[ TITLE ]` header, 1px
- * border, monospace, zero radius). Collapsible mechanics are CSS-only (grid-template-rows +
- * opacity transition). Mirrors otchub's vendored `Panel` so both apps render identically.
+ * The app's one `Panel` primitive — wearing otchub's frosted-glass terminal skin so every $HUB
+ * page reads as the same dashboard as "/" (see `.term-window` in src/index.css: translucent
+ * green-glass sheet, static iridescent edge ring, Apple-style scroll reveal). The DOS-terminal
+ * bones are unchanged: `[−]/[+]` collapse toggle, zero radius, monospace, and the same CSS-only
+ * grid-template-rows + opacity collapse transition.
  */
 export function Panel({
   title,
@@ -37,6 +39,7 @@ export function Panel({
 }: PanelProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const isCollapsed = collapsible && (collapsedProp ?? internalCollapsed);
+  const revealRef = useRef<HTMLElement | null>(null);
 
   const toggle = () => {
     const next = !isCollapsed;
@@ -44,26 +47,62 @@ export function Panel({
     onCollapsedChange?.(next);
   };
 
+  // Apple-style scroll reveal — the same observer contract as otchub's CollapsibleCard
+  // (src/components/otc/CollapsibleCard.jsx): panels sit one notch down and rise into
+  // place as they enter the viewport. Reduced-motion users (and environments without
+  // IntersectionObserver) see them instantly.
+  useLayoutEffect(() => {
+    const el = revealRef.current;
+    if (!el) return;
+    if (
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
+      !("IntersectionObserver" in window)
+    ) {
+      el.classList.remove("reveal-pending");
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        io.disconnect();
+        el.classList.remove("reveal-pending");
+        el.classList.add("reveal-in");
+        // Release the compositing hint once the entrance finishes.
+        el.addEventListener("animationend", () => el.classList.remove("reveal-in"), {
+          once: true,
+        });
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <section
-      className={`rounded-none border border-green-500/30 bg-black font-mono text-green-400 ${className}`}
+      ref={revealRef}
+      className={`term-window reveal-pending break-inside-avoid font-mono text-green-400 ${className}`}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-green-500/30 px-3 py-1.5 text-xs">
-        <span className="tracking-widest text-green-300">[ {title} ]</span>
-        <span className="flex items-center gap-2">
-          {right && <span className="text-green-600">{right}</span>}
+      <header
+        onClick={collapsible ? toggle : undefined}
+        title={collapsible ? (isCollapsed ? "expand" : "collapse") : undefined}
+        className={`flex items-center justify-between gap-2 border-b border-green-500/30 px-3 py-2 text-[12px] uppercase tracking-widest text-green-500/70 ${
+          collapsible ? "cursor-pointer select-none" : ""
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-2">
           {collapsible && (
-            <button
-              type="button"
-              onClick={toggle}
-              aria-expanded={!isCollapsed}
-              title={isCollapsed ? "expand" : "collapse"}
-              className="text-green-500 hover:text-green-300"
-            >
-              [{isCollapsed ? "+" : "-"}]
-            </button>
+            <span className="shrink-0 text-green-500/60">{isCollapsed ? "[+]" : "[−]"}</span>
           )}
+          <span className="truncate text-green-300">{title}</span>
         </span>
+        {/* stopPropagation keeps the right slot's own buttons/links (e.g. the curve trade
+         * panel's slippage settings) from toggling the panel through the header click. */}
+        {right && (
+          <span onClick={(e) => e.stopPropagation()} className="flex shrink-0 items-center gap-2">
+            {right}
+          </span>
+        )}
       </header>
       {isCollapsed && collapsedSummary !== undefined && (
         <div className="border-b border-green-500/10 px-3 py-2 text-xs">{collapsedSummary}</div>
@@ -119,7 +158,7 @@ export function Stat({
   sub?: ReactNode;
 }) {
   return (
-    <div className="rounded-none border border-green-500/20 px-3 py-2">
+    <div className="rounded-none border border-green-500/20 bg-green-500/5 px-3 py-2">
       <div className="text-[10px] uppercase tracking-widest text-green-600">{label}</div>
       <div className="mt-0.5 text-base text-green-300">{value}</div>
       {sub && <div className="mt-0.5 text-[10px] text-green-700">{sub}</div>}

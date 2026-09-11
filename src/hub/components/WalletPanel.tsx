@@ -59,7 +59,7 @@ export function WalletPanel({ state, walletAddress }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="border border-green-500/30 bg-black px-3 py-2.5 font-mono">
+      <div className="term-window px-3 py-2.5 font-mono">
         <div className="flex items-start gap-2">
           <BoltIcon className="h-4 w-4 shrink-0 text-green-500" />
           <div>

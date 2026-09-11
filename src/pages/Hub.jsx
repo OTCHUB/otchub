@@ -5,6 +5,7 @@ import { queryClientInstance } from "@/lib/query-client";
 import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
 import CommunityMenu from "@/components/otc/CommunityMenu";
+import MascotLogo from "@/components/otc/MascotLogo";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import Footer from "@/components/otc/Footer";
 import { TerminalTopBar } from "@/components/otc/TerminalBars";
@@ -53,66 +54,73 @@ export const HUB_DEVNET_CONFIG = {
 const WALLET_STORAGE_KEY = "otc_wallet_address";
 
 const navCls = ({ isActive }) =>
-  `inline-flex items-center whitespace-nowrap border px-2 py-1 text-[12px] sm:px-2.5 sm:py-1.5 sm:text-[13px] ${
+  `inline-flex items-center whitespace-nowrap border px-2 py-1 text-[11px] uppercase tracking-widest sm:px-2.5 sm:py-1.5 sm:text-[12px] ${
     isActive
       ? "border-green-400 bg-green-500/15 text-green-200"
-      : "border-green-500/50 text-green-400 hover:bg-green-500/10"
+      : "border-green-500/40 text-green-400/80 hover:bg-green-500/10 hover:text-green-300"
   }`;
 
+// Same chrome as the OTC dashboard's header (pages/Home.jsx): mascot + wordmark +
+// blink cursor left, icon actions right, section nav as bracketed links, and the
+// cluster telemetry as a hairline strip — so hopping between "/" and "/hub" reads
+// as one continuous terminal.
 function HubHeader() {
   const { cluster, programId, connection } = useHub();
   return (
-    <header className="term-window border border-green-500/30 bg-black">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-green-500/30 p-3">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1
-              className="cursor-help text-sm font-bold uppercase tracking-widest text-green-400 sm:text-base"
-              title="H.U.B. — Headquarters for Unhinged Brokers"
-            >
-              &gt; $HUB :: TREASURY DASHBOARD &amp; YIELD TRACKER
-              <span className="ml-1 inline-block animate-blink text-green-500">▋</span>
-            </h1>
-            <EnvBadge />
-          </div>
-          <p className="text-[10px] uppercase tracking-widest text-green-500/50">
-            the big green button of OTC Desks.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {/* Relative (no leading slash) — resolves under /hub or /devnet alike. */}
-          <NavLink to="" end className={navCls}>
-            [DASHBOARD]
-          </NavLink>
-          <NavLink to="treasury" className={navCls}>
-            [TREASURY]
-          </NavLink>
-          <NavLink to="tokenomics" className={navCls}>
-            [TOKENOMICS]
-          </NavLink>
-          <NavLink to="mechanics" className={navCls}>
-            [MECHANICS]
-          </NavLink>
-          <NavLink to="deployments" className={navCls}>
-            [DEPLOYMENTS]
-          </NavLink>
-          {cluster === "devnet" && (
-            <NavLink to="drip" className={navCls}>
-              [FAUCET]
-            </NavLink>
-          )}
+    <header className="term-window border border-green-500/30 bg-black p-2.5 sm:p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1
+          className="flex min-w-0 cursor-help items-center gap-2"
+          title="H.U.B. — Headquarters for Unhinged Brokers"
+        >
+          <span className="shrink-0 leading-none">
+            <MascotLogo className="h-8 w-8 object-contain sm:h-9 sm:w-9" />
+          </span>
+          <span className="truncate text-base font-bold uppercase tracking-widest text-green-400 sm:text-lg">
+            $HUB
+          </span>
+          <span className="hidden text-[10px] uppercase tracking-widest text-green-500/50 md:inline">
+            treasury · yield tracker
+          </span>
+          <span className="inline-block animate-blink text-green-500">▋</span>
+          <EnvBadge />
+        </h1>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
             to="/"
-            className="inline-flex items-center whitespace-nowrap border border-emerald-500/70 px-2 py-1 text-[12px] font-bold text-emerald-400 hover:bg-emerald-500/10 sm:px-2.5 sm:py-1.5 sm:text-[13px]"
-            title="OTC_DESK analytics: $OTC price, desk arbitrage, pot revenue, claims"
+            className="inline-flex items-center whitespace-nowrap border border-emerald-500/50 px-2 py-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/10 sm:px-2.5 sm:text-[12px]"
+            title="OTC_HUB analytics: $OTC price, desk arbitrage, pot revenue, claims"
           >
-            [OTC_HUB →]
+            OTC_HUB →
           </Link>
           <CommunityMenu />
           <ThemeToggle />
         </div>
       </div>
-      <div className="flex flex-wrap gap-x-4 px-3 py-1 text-[10px] text-green-500/50">
+      <nav className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Hub sections">
+        {/* Relative (no leading slash) — resolves under /hub or /devnet alike. */}
+        <NavLink to="" end className={navCls}>
+          [DASHBOARD]
+        </NavLink>
+        <NavLink to="treasury" className={navCls}>
+          [TREASURY]
+        </NavLink>
+        <NavLink to="tokenomics" className={navCls}>
+          [TOKENOMICS]
+        </NavLink>
+        <NavLink to="mechanics" className={navCls}>
+          [MECHANICS]
+        </NavLink>
+        <NavLink to="deployments" className={navCls}>
+          [DEPLOYMENTS]
+        </NavLink>
+        {cluster === "devnet" && (
+          <NavLink to="drip" className={navCls}>
+            [FAUCET]
+          </NavLink>
+        )}
+      </nav>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 border-t border-green-500/20 pt-1.5 text-[10px] text-green-500/50">
         <span>cluster: {cluster}</span>
         <span className="truncate">rpc: {rpcHost(connection.rpcEndpoint)}</span>
         <span className="truncate">program: {programId.toBase58()}</span>

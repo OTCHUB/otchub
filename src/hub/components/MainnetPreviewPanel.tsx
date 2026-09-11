@@ -34,7 +34,7 @@ export function MainnetPreviewPanel() {
   };
 
   return (
-    <div className="border border-amber-500/30">
+    <div className="term-window">
       <button
         type="button"
         onClick={() => setEnabled((v) => !v)}
