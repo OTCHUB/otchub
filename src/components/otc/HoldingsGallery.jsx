@@ -85,6 +85,13 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
   // Desk-number search: match the typed text (e.g. 1602) against the desk
   // name/number across ALL modes — inventory, listings, stock and snipes.
   const q = query.trim().toLowerCase();
+  // Holders' card labels are tight on phones — "OTC Desk #NNN" truncates to
+  // nothing there, so strip it to just the desk number below the sm breakpoint
+  // (full name + hover title remain on desktop).
+  const deskShortName = (name) => {
+    const m = /#\s*(\d+)/.exec(name || "");
+    return m ? `#${m[1]}` : name || "";
+  };
   const filtered = q ? full.filter((h) => (h.name || "").toLowerCase().includes(q)) : full;
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const page = Math.min(pageNo, pages - 1);
@@ -198,7 +205,10 @@ export default function HoldingsGallery({ holdings, byStock, floorSol, walletOwn
                 {noStock && <span className="absolute left-1 top-1 bg-red-500/90 px-1 font-mono text-[11px] font-bold text-black">NO_STOCK</span>}
               </div>
               <div className="border-t border-green-500/20 p-1.5">
-                <div className="truncate font-mono text-[12px] text-green-300">{h.name}</div>
+                <div className="truncate font-mono text-[12px] text-green-300" title={h.name}>
+                  <span className="sm:hidden">{deskShortName(h.name)}</span>
+                  <span className="hidden sm:inline">{h.name}</span>
+                </div>
                 {walletOwned ? (
                   <>
                     {h.is_listed && h.listing_price_sol != null && (
