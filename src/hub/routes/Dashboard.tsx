@@ -3,6 +3,7 @@ import { DeskLookupPanel } from "../components/DeskLookupPanel";
 import { Disclaimer } from "../components/Disclaimer";
 import { EarningPreview } from "../components/EarningPreview";
 import { EpochTracker } from "../components/EpochTracker";
+import { DashboardTrends } from "../components/DashboardTrends";
 import { HubBondingDashboard } from "../components/HubBondingDashboard";
 import { HubIntro } from "../components/HubIntro";
 import { MainnetPreviewPanel } from "../components/MainnetPreviewPanel";
@@ -46,6 +47,7 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
             </div>
 
             <EpochTracker state={state} />
+            <DashboardTrends state={state} />
             <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
 
             <Panel
