@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import About from './pages/About';
 import Connect from './pages/Connect';
+import MintIcon from './pages/MintIcon';
 import { HUB_ENABLED } from './lib/hubFlag';
 // Add page imports here
 
@@ -74,6 +75,9 @@ const AuthenticatedApp = () => {
         <Route path="/otc" element={<Navigate to="/" replace />} />
         <Route path="/about" element={<About />} />
         <Route path="/connect" element={<Connect />} />
+        {/* $HUB mint icon studio: exact circular crop of the official logo,
+            publishable to a permanent public URL for token metadata. */}
+        <Route path="/mint-icon" element={<MintIcon />} />
         {/* $HUB protocol metrics: "", /treasury, /tokenomics, /mechanics,
             /deployments, /desk/:asset — relative, so they resolve under
             either mount. HubRoutes redirects any other unknown sub-path
