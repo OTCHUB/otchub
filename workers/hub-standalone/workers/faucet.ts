@@ -49,7 +49,7 @@ import {
   fetchCollectionCounts,
   fetchHubPot,
   parseMint,
-} from "../../sdk/src";
+} from "../../../src/hub-sdk/src";
 import {
   DESK_COOLDOWN_SECONDS,
   DRIP_COOLDOWN_SECONDS,

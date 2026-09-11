@@ -31,7 +31,7 @@ import {
   HUB_PROGRAM_ID,
   configPda,
   createReader,
-} from "../../sdk/src";
+} from "../../../src/hub-sdk/src";
 import {
   CURVE_WALLET_MIN_LAMPORTS,
   DEPOSIT_MAX_AGE_SECONDS,
