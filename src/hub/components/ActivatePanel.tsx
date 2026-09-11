@@ -411,8 +411,17 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       )}
       {err && <div className="mt-2 text-[11px] text-amber-400">ERR: {err}</div>}
       <TxLogView logs={logs} />
-      <div className="mt-2 text-[10px] text-green-700">
-        {`SOL fee = flat step_fee, paid once per activate/upgrade call (90% pot, 10% ops) — independent of how many tiers the call crosses. $HUB burn = full tier cost on a fresh activation, or just the difference from your current tier on an upgrade — never paid twice; it targets a fixed USD price per tier, so the token amount moves with $HUB's live market price, and only ${(state.config.tierCostBurnBp / 100).toFixed(0)}% of it is actually destroyed — the rest credits the active-desk reward pool. $OTC fee = a live Jupiter $OTC→$HUB route sized to clear that $HUB burn (swapped and burned on-chain), plus an equal-scaled amount into the program-custodied yield vault — ${OTC_TOTAL_PREMIUM}× total, dynamic with $HUB's market price. The tx is simulated unsigned first; a failing sim is dropped with no fee spent.`}
+      <div className="mt-2 space-y-0.5 text-[10px] text-green-700">
+        <div>SOL fee: flat 0.5 per call · 90% pot / 10% ops — same whether you jump one tier or three.</div>
+        <div>
+          $HUB burn: full tier cost on a fresh activation, only the difference on an upgrade — pegged
+          to a fixed USD price per tier, so the token amount tracks $HUB's live price; only{" "}
+          {(state.config.tierCostBurnBp / 100).toFixed(0)}% destroyed, the rest funds the reward pool.
+        </div>
+        <div>
+          $OTC path: {OTC_TOTAL_PREMIUM}× premium — half swapped to $HUB + burned, half → yield vault.
+          Simulated before signing.
+        </div>
       </div>
     </Panel>
   );

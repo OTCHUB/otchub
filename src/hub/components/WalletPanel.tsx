@@ -5,6 +5,7 @@ import { shortKey } from "../lib/format";
 import { useWallet } from "../WalletProvider";
 import { ActivatePanel } from "./ActivatePanel";
 import { ClaimPanel } from "./ClaimPanel";
+import { ActivationGuide } from "./ActivationGuide";
 import { HubPotPanel } from "./HubPotPanel";
 import { Panel } from "./ui/Panel";
 import { WalletConnect } from "./WalletConnect";
@@ -111,6 +112,7 @@ export function WalletPanel({ state, walletAddress }: Props) {
             desks={portfolio.data?.desks ?? []}
             onClaimed={() => void portfolio.refetch()}
           />
+          <ActivationGuide />
           <div ref={activateRef}>
             <ActivatePanel
               address={address}

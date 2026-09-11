@@ -138,9 +138,11 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
     <div className="space-y-2">
       <Panel title="HOW $HUB WORKS" collapsible>
         <p className={p}>
-          $HUB turns every OTC desk NFT into a yield-earning position: own a desk → activate it into
-          a tier → every round splits 90 / 5 / 2.5 / 2.5 between stakers, a $HUB burn, the treasury,
-          and $HUB/$OTC liquidity → you claim, pro-rata by tier. The treasury's own desk stack boosts
+          OTC Desks already pay <span className="text-green-300">native yield</span> — perpetual
+          stock yield from OTC ecosystem revenue, just for holding the NFT. $HUB adds a second layer
+          on top: own a desk → activate it into a tier → every round splits 90 / 5 / 2.5 / 2.5
+          between stakers, a $HUB burn, the treasury, and $HUB/$OTC liquidity → you claim, pro-rata
+          by tier. The treasury's own desk stack boosts
           a second, independent yield basket (the M.I.M ETF, section 4) on the same pro-rata
           schedule. Every leg is funded by protocol activity — never taken from other holders — and
           the burn leg permanently shrinks supply, round after round.
@@ -225,10 +227,10 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
       <CollapsibleCard title="2. ACTIVATE INTO A TIER">
         <ul className="space-y-1">
           <li className={li}>
-            Every desk NFT can be activated into one of four tiers. Activation is tied to the desk
-            itself, not your wallet — sell an already-activated desk and the new owner would keep
-            earning immediately, if not for the ownership check in section 1 above, which is why
-            most transfers reset it.
+            Every desk NFT can be activated into one of four tiers, pegged to the USD value of $HUB.
+            Activation lives on the desk but only pays its current owner: sell or move it and the
+            activation voids — the forfeited boost returns to the HUB Pot, and the new owner
+            re-activates to earn again.
           </li>
           <li className={li}>
             Every activation or upgrade pays the same flat SOL fee into the reward pool either way.
@@ -287,8 +289,9 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
           <div className="mt-1 text-[10px] text-green-700">
             SOL fee is flat — paid once per activate/upgrade call, the same whether it's a fresh T1
             or a fresh T4. $HUB burn is cumulative — an upgrade only burns the difference from the
-            tier you're already at — and targets a fixed USD price per tier, so the token amount
-            shown here tracks $HUB's live market price; only {(config.tierCostBurnBp / 100).toFixed(0)}
+            tier you're already at — and targets a fixed USD peg per tier (T1 $50 · T2 $60 · T3
+            $70 · T4 $80), so the token amount shown here tracks $HUB's live market price; only{" "}
+            {(config.tierCostBurnBp / 100).toFixed(0)}
             % of it is destroyed, the rest funds the active-desk reward pool.
           </div>
         </div>
