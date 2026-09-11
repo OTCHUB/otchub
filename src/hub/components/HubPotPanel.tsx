@@ -72,6 +72,7 @@ export function HubPotPanel({ desks, address }: Props) {
   const round = q.data?.latestRound ?? null;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<HubPotClaimPhase | null>(null);
   const [logs, setLogs] = useState<TxLog[]>([]);
@@ -175,8 +176,7 @@ export function HubPotPanel({ desks, address }: Props) {
   return (
     <Panel title="M.I.M ETF">
       <p className="text-xs leading-relaxed text-green-400/90">
-        The Magic Internet Money basket — tier-weighted payouts of $OTC, CRCLx, NVDAx and SPCXx,
-        rebalanced from 13 stocks into 4 native tickers. Pure yield, zero cost.
+        Tier-weighted payouts of $OTC · CRCLx · NVDAx · SPCXx. Pure yield, zero cost.
       </p>
       <div className="mt-3">
         <RewardFlow />
@@ -233,64 +233,75 @@ export function HubPotPanel({ desks, address }: Props) {
         <div className="mt-4">
           <div className={sectionLabelCls}>Claim · {fmtNum(claimRows.length)} unclaimed</div>
           {claimRows.length === 0 ? (
-            <div className={`text-xs ${mutedCls}`}>
-              Nothing unclaimed this round — no active desk has a share yet, or it's already been
-              paid.
-            </div>
+            <div className={`text-xs ${mutedCls}`}>Nothing unclaimed this round.</div>
           ) : (
-            <div className={listContainerCls}>
-              {claimRows.map((r) => (
-                <label
-                  key={r.asset}
-                  className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-xs transition ${
-                    selected.has(r.asset) ? "bg-green-500/10" : "hover:bg-green-500/5"
-                  }`}
+            <>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={run}
+                  disabled={busy || !claimRows.length}
+                  className={PRIMARY_BTN}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(r.asset)}
+                  {busy
+                    ? `${phase ?? "prep"}…`
+                    : selected.size
+                      ? `Claim selected (${selected.size})`
+                      : "Claim all"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPicking((o) => !o)}
+                  disabled={busy}
+                  className={GHOST_BTN}
+                >
+                  {picking ? "Close list" : "Select desks"}
+                </button>
+                {selected.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelected(new Set())}
                     disabled={busy}
-                    onChange={() => toggle(r.asset)}
-                    className="accent-green-500"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <AddressLink address={r.asset} />
-                  </span>
-                  <span className="flex flex-wrap items-center justify-end gap-x-2 text-right text-green-300">
-                    {BUCKET_KEYS.filter((b) => r.share[b] > 0n).map((b) => (
-                      <span key={b} className="inline-flex items-center gap-1">
-                        <StockIcon symbol={BUCKET_SYMBOLS[b]} className="h-3.5 w-3.5" />
-                        {fmtUnits(r.share[b], decimals[b])}
-                        <span className="text-green-600">{BUCKET_LABELS[b]}</span>
+                    className={GHOST_BTN}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {picking && (
+                <div className={listContainerCls}>
+                  {claimRows.map((r) => (
+                    <label
+                      key={r.asset}
+                      className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-xs transition ${
+                        selected.has(r.asset) ? "bg-green-500/10" : "hover:bg-green-500/5"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.asset)}
+                        disabled={busy}
+                        onChange={() => toggle(r.asset)}
+                        className="accent-green-500"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <AddressLink address={r.asset} />
                       </span>
-                    ))}
-                  </span>
-                </label>
-              ))}
-            </div>
+                      <span className="flex flex-wrap items-center justify-end gap-x-2 text-right text-green-300">
+                        {BUCKET_KEYS.filter((b) => r.share[b] > 0n).map((b) => (
+                          <span key={b} className="inline-flex items-center gap-1">
+                            <StockIcon symbol={BUCKET_SYMBOLS[b]} className="h-3.5 w-3.5" />
+                            {fmtUnits(r.share[b], decimals[b])}
+                            <span className="text-green-600">{BUCKET_LABELS[b]}</span>
+                          </span>
+                        ))}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={run}
-              disabled={busy || !claimRows.length}
-              className={PRIMARY_BTN}
-            >
-              {busy
-                ? `${phase ?? "prep"}…`
-                : selected.size
-                  ? `Claim selected (${selected.size})`
-                  : "Claim all"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelected(new Set())}
-              disabled={busy || !selected.size}
-              className={GHOST_BTN}
-            >
-              Clear
-            </button>
-          </div>
           {!signer && (
             <div className="mt-1 text-[10px] text-amber-300/80">
               Read-only address — connect the wallet itself (Wallet Connect) to sign claims.

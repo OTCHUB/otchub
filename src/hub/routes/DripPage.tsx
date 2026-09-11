@@ -6,7 +6,7 @@ import { useWallet } from "../WalletProvider";
 import { parsePubkey } from "../hooks/useDeskTier";
 import { useProtocolState } from "../hooks/useProtocolState";
 import { useWalletPortfolio } from "../hooks/useWalletPortfolio";
-import { ActivatePanel } from "../components/ActivatePanel";
+import { ActivateFlow } from "../components/ActivateFlow";
 import { WalletConnect } from "../components/WalletConnect";
 import { BackLink } from "../components/ui/BackLink";
 import { Panel } from "../components/ui/Panel";
@@ -63,6 +63,10 @@ export function DripPage() {
   const protocol = useProtocolState();
   const protocolState = protocol.status.kind === "ready" ? protocol.status.state : null;
   const portfolio = useWalletPortfolio(canActivateInline ? wallet.address : null, protocolState);
+  // The faucet desk the inline activation step targets — resolved from the shared portfolio query.
+  const dripDesk = dripResult
+    ? (portfolio.data?.desks.find((d) => d.asset === dripResult.desk.asset) ?? null)
+    : null;
 
   useEffect(() => {
     setDripResult(null);
@@ -294,13 +298,16 @@ export function DripPage() {
             </p>
           </Panel>
           {protocol.status.kind === "ready" ? (
-            <ActivatePanel
-              address={wallet.address}
-              state={protocol.status.state}
-              desks={portfolio.data?.desks ?? []}
-              selectedAsset={dripResult.desk.asset}
-              onChanged={() => void portfolio.refetch()}
-            />
+            dripDesk ? (
+              <ActivateFlow
+                address={wallet.address}
+                state={protocol.status.state}
+                desk={dripDesk}
+                onChanged={() => void portfolio.refetch()}
+              />
+            ) : (
+              <div className="text-xs text-green-700">locating your new desk…</div>
+            )
           ) : protocol.status.kind === "error" ? (
             <ErrorBox message={protocol.status.message} />
           ) : protocol.status.kind === "uninitialized" ? (

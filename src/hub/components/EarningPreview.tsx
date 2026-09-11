@@ -151,14 +151,9 @@ export function EarningPreview({ state, rawDeskDailyLamports }: Props) {
       </div>
 
       <div className="mt-2 text-[10px] text-green-700">
-        <div>burn slice removed before distribution · {cadence}</div>
-        <div className="mt-1">
-          $HUB BURN is a live, USD-pegged price — only {(state.config.tierCostBurnBp / 100).toFixed(0)}
-          % of it is destroyed; the rest credits the active-desk reward pool (not reflected above).
-        </div>
-        <div className="mt-1 text-cyan-700">
-          non-custodial — your desk NFT never leaves your wallet.
-        </div>
+        {cadence} · only {(state.config.tierCostBurnBp / 100).toFixed(0)}% of the $HUB burn is
+        destroyed, the rest credits the reward pool · non-custodial — your desk never leaves your
+        wallet.
       </div>
     </Panel>
   );

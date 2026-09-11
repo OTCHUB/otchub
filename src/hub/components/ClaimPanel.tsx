@@ -1,32 +1,31 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { otcDueForLamports, pendingYieldLamports, TIER_NAMES, type ProtocolState } from "@hub-sdk";
-import { useHub } from "../HubProvider";
+import {
+  otcDueForLamports,
+  pendingYieldLamports,
+  TIER_NAMES,
+  type ProtocolState,
+} from "@hub-sdk";
 import type { OwnedDesk } from "../hooks/useWalletPortfolio";
-import { executeClaimYield, type ClaimPhase } from "../lib/claim";
-import { fmtNum, fmtSol, fmtUnits } from "../lib/format";
-import { magicEdenItemUrl } from "../lib/marketplace";
-import type { TxLog } from "../lib/swap";
+import { useClaimRunner } from "../hooks/useClaimRunner";
+import { fmtSol, fmtUnits } from "../lib/format";
 import { AddressLink } from "./ui/AddressLink";
-import { Panel } from "./ui/Panel";
 import { TxLogView } from "./ui/TxLogView";
-
-type Props = { address: string; state: ProtocolState; desks: OwnedDesk[]; onClaimed?: () => void };
 
 /** $OTC mint decimals fallback when no ATA balance has been fetched to read the real value from. */
 const OTC_DECIMALS = 6;
 
-const btn = "border px-2.5 py-1 text-[12px] disabled:opacity-30";
+type Props = { address: string; state: ProtocolState; desks: OwnedDesk[]; onClaimed?: () => void };
 
-/** CLAIM_PORTAL — `claim_yield` for the wallet's activated desks, paid in $OTC (§A5 90% leg). */
+/** CLAIM — one compact bar under the wallet summary: total pending + [CLAIM ALL] + an opt-in
+ * SELECT list for per-desk claims. Renders nothing until the wallet has an activated desk, so
+ * raw-only wallets see no claim chrome at all. Per-desk claims also live in the DeskSheet. */
 export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
-  const { connection, program, resolveSigner } = useHub();
-  const qc = useQueryClient();
+  const claim = useClaimRunner(address, state, () => {
+    setSelected(new Set());
+    onClaimed?.();
+  });
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [phase, setPhase] = useState<ClaimPhase | null>(null);
-  const [logs, setLogs] = useState<TxLog[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const otcPot = state.otcPot;
   const otcReady = !!otcPot && otcPot.totalLamportsSpent > 0;
@@ -34,10 +33,11 @@ export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
     .filter((d) => d.tier && !d.tier.voided)
     .map((d) => ({ ...d, pending: pendingYieldLamports(d.tier!, state.config) }))
     .sort((a, b) => b.pending - a.pending);
+  if (rows.length === 0) return null;
+
   const claimable = rows.filter((r) => r.pending > 0);
   const totalPending = claimable.reduce((s, r) => s + r.pending, 0);
   const totalOtcDue = otcDueForLamports(totalPending, otcPot);
-  const signer = resolveSigner(address);
 
   const toggle = (a: string) =>
     setSelected((p) => {
@@ -47,50 +47,39 @@ export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
       return n;
     });
 
-  const run = async () => {
-    setErr(null);
-    if (!signer) return setErr("read-only address — connect the wallet itself to sign claims");
-    if (!otcReady)
-      return setErr(
-        !otcPot
-          ? "$OTC yield vault not provisioned yet — nothing to claim into"
-          : "keeper hasn't recorded an $OTC buy yet — try again shortly",
-      );
-    const targets = (
-      selected.size ? claimable.filter((r) => selected.has(r.asset)) : claimable
-    ).map((r) => r.asset);
-    if (!targets.length) return setErr("nothing to claim — no activated desk has pending yield");
-    setBusy(true);
-    setLogs([]);
-    const res = await executeClaimYield({
-      connection,
-      program,
-      signer,
-      assets: targets,
-      config: state.config,
-      otcPot,
-      onLog: (l) => setLogs((p) => [...p, l]),
-      onPhase: setPhase,
-    });
-    setBusy(false);
-    setPhase(null);
-    if (res.some((r) => r.ok)) {
-      setSelected(new Set());
-      // Stamps moved on-chain: refresh protocol + wallet reads so pending drops to 0.
-      await qc.invalidateQueries({ queryKey: ["hub"] });
-      onClaimed?.();
-    }
-  };
-
   return (
-    <Panel title="CLAIM_PORTAL :: YIELD → WALLET" right={`${fmtNum(claimable.length)} claimable`}>
-      {rows.length === 0 ? (
-        <div className="text-xs text-green-700">
-          no activated desks in this wallet — activate a desk to start accruing pot yield.
-        </div>
-      ) : (
-        <div className="max-h-52 overflow-y-auto border border-green-500/20">
-          {rows.map((r) => (
+    <div className="mt-2 border border-emerald-500/25 bg-emerald-500/5 p-2">
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+          YIELD
+        </span>
+        <span className="text-green-300">
+          {fmtSol(totalPending, 4)}
+          {totalOtcDue != null ? ` ≈ ${fmtUnits(totalOtcDue, OTC_DECIMALS)} OTC` : ""}
+        </span>
+        {claimable.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void claim.run(claimable.map((r) => r.asset))}
+            disabled={claim.busy || !otcReady}
+            className="ml-auto border border-emerald-500/60 px-2.5 py-1 font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
+          >
+            {claim.busy ? `${(claim.phase ?? "prep").toUpperCase()}…` : "[CLAIM ALL]"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setPicking((o) => !o)}
+          disabled={claimable.length === 0}
+          className="border border-green-500/30 px-2 py-1 text-green-500/70 hover:text-green-300 disabled:opacity-30"
+        >
+          [{picking ? "CLOSE" : "SELECT"}]
+        </button>
+      </div>
+
+      {picking && claimable.length > 0 && (
+        <div className="mt-2 max-h-40 overflow-y-auto border border-green-500/20">
+          {claimable.map((r) => (
             <label
               key={r.asset}
               className={`flex cursor-pointer items-center gap-2 border-b border-green-500/10 px-2 py-1.5 text-xs last:border-0 ${
@@ -100,81 +89,47 @@ export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
               <input
                 type="checkbox"
                 checked={selected.has(r.asset)}
-                disabled={busy || r.pending === 0}
+                disabled={claim.busy}
                 onChange={() => toggle(r.asset)}
                 className="accent-emerald-500"
               />
               <span className="min-w-0 flex-1">
                 <AddressLink address={r.asset} />
-                <span className="ml-2 text-cyan-300">
-                  {TIER_NAMES[r.tier!.tier - 1] ?? `T${r.tier!.tier}`}
-                </span>
               </span>
-              <a
-                href={magicEdenItemUrl(r.asset)}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-green-600 hover:text-green-300"
-                title="view this desk on Magic Eden"
-              >
-                [ME ↗]
-              </a>
-              <span
-                className={`w-28 text-right ${r.pending > 0 ? "text-emerald-300" : "text-green-700"}`}
-              >
-                {fmtSol(r.pending, 4)}
+              <span className="text-cyan-300">
+                {TIER_NAMES[r.tier!.tier - 1] ?? `T${r.tier!.tier}`}
               </span>
+              <span className="w-24 text-right text-emerald-300">{fmtSol(r.pending, 4)}</span>
             </label>
           ))}
+          {selected.size > 0 && (
+            <div className="p-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  void claim.run(
+                    claimable.filter((r) => selected.has(r.asset)).map((r) => r.asset),
+                  )
+                }
+                disabled={claim.busy || !otcReady}
+                className="w-full border border-emerald-500/60 py-1 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
+              >
+                [CLAIM SELECTED ({selected.size})]
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={run}
-          disabled={busy || !claimable.length || !otcReady}
-          className={`${btn} border-emerald-500/60 font-bold text-emerald-300 hover:bg-emerald-500/10`}
-        >
-          {busy
-            ? `${(phase ?? "prep").toUpperCase()}…`
-            : selected.size
-              ? `[CLAIM_SELECTED (${selected.size})]`
-              : "[CLAIM_ALL]"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelected(new Set())}
-          disabled={busy || !selected.size}
-          className={`${btn} border-green-500/30 text-green-500/70`}
-        >
-          [CLEAR]
-        </button>
-        <span className="text-[11px] text-green-600">
-          pending total {fmtSol(totalPending, 4)}
-          {totalOtcDue != null ? ` ≈ ${fmtUnits(totalOtcDue, OTC_DECIMALS)} $OTC` : ""} · 1 wallet
-          prompt · ~{Math.ceil(claimable.length / 3) || 0} tx
-        </span>
-      </div>
-      {!signer && (
-        <div className="mt-1 text-[10px] text-amber-400/80">
-          read-only address — connect the wallet itself (WALLET_CONNECT) to sign claims.
-        </div>
-      )}
-      {signer && !otcReady && (
+      {claim.err && <div className="mt-1 text-[11px] text-amber-400">ERR: {claim.err}</div>}
+      <TxLogView logs={claim.logs} />
+      {!otcReady && (
         <div className="mt-1 text-[10px] text-amber-400/80">
           {!otcPot
-            ? "$OTC yield vault not provisioned yet — claim_yield will revert until it is."
-            : "keeper hasn't recorded an $OTC buy yet — claim_yield will revert until it does."}
+            ? "$OTC yield vault not provisioned yet"
+            : "waiting on the keeper's first $OTC buy — claims unlock after"}
         </div>
       )}
-      {err && <div className="mt-2 text-[11px] text-amber-400">ERR: {err}</div>}
-      <TxLogView logs={logs} />
-      <div className="mt-2 text-[10px] text-green-700">
-        pending = ⌊(acc − stamp) × w / 10¹²⌋ lamport-equivalent, paid in $OTC from the keeper-fed
-        vault at the pot's lifetime average buy rate. Each tx is simulated unsigned first; a failing
-        sim is dropped with no fee spent.
-      </div>
-    </Panel>
+    </div>
   );
 }

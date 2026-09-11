@@ -17,7 +17,7 @@ export { WalletPanel } from "./components/WalletPanel";
 export { SwapPanel } from "./components/SwapPanel";
 export { HubBondingDashboard } from "./components/HubBondingDashboard";
 export { ClaimPanel } from "./components/ClaimPanel";
-export { ActivatePanel } from "./components/ActivatePanel";
+export { ActivateFlow } from "./components/ActivateFlow";
 export { useOtcPay } from "./hooks/useOtcPay";
 export { quoteTierChange, buildTierChangeIxs, executeTierChange } from "./lib/activate";
 export type { PayMethod, TierQuote, TierChangePhase, TierChangeResult } from "./lib/activate";

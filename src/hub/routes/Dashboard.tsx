@@ -1,18 +1,18 @@
 import { Link } from "react-router-dom";
+import { DashboardTrends } from "../components/DashboardTrends";
 import { DeskLookupPanel } from "../components/DeskLookupPanel";
 import { Disclaimer } from "../components/Disclaimer";
 import { EarningPreview } from "../components/EarningPreview";
 import { EpochTracker } from "../components/EpochTracker";
-import { DashboardTrends } from "../components/DashboardTrends";
 import { HubBondingDashboard } from "../components/HubBondingDashboard";
 import { HubIntro } from "../components/HubIntro";
 import { MainnetPreviewPanel } from "../components/MainnetPreviewPanel";
 import { MetricsStrip } from "../components/MetricsStrip";
 import { ProtocolGate } from "../components/ProtocolGate";
 import { WalletPanel } from "../components/WalletPanel";
+import { useHub } from "../HubProvider";
 import { useWallet } from "../WalletProvider";
 import { Panel } from "../components/ui/Panel";
-import { FlywheelDiagram } from "../components/ui/FlywheelDiagram";
 
 export type DashboardProps = {
   rawDeskDailyLamports?: number;
@@ -23,6 +23,7 @@ export type DashboardProps = {
 export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProps) {
   const wallet = useWallet();
   const address = walletAddress ?? wallet.address;
+  const { cluster } = useHub();
 
   return (
     <div className="space-y-2 font-mono">
@@ -34,9 +35,9 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
             {/* The eight key numbers as one strip right under the intro. */}
             <MetricsStrip state={state} />
 
-            {/* Two-lane flow: the wallet journey (connect → portfolio → claim → activate →
-                M.I.M ETF) beside the trading surface — side by side on desktop, stacked on
-                mobile, so one screen carries the whole first decision. */}
+            {/* Two-lane flow: the compact wallet surface (connect → balances → desk grid, with
+                every per-desk action in the DeskSheet the grid opens) beside the trading
+                surface — side by side on desktop, stacked on mobile. */}
             <div className="grid items-start gap-2 lg:grid-cols-2">
               <div id="hub-wallet" className="min-w-0">
                 <WalletPanel state={state} walletAddress={walletAddress} />
@@ -48,36 +49,30 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
 
             <EpochTracker state={state} />
             <DashboardTrends state={state} />
-            <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
-
-            <Panel
-              title="THE $HUB FLYWHEEL"
-              right={
-                <Link to="mechanics" className="underline hover:text-green-300">
-                  full mechanics →
-                </Link>
-              }
-            >
-              <p className="mb-2 text-xs leading-relaxed text-green-400/90">
-                Activate a desk, earn every round, buy back &amp; burn $HUB — click any node.
-              </p>
-              <FlywheelDiagram />
-            </Panel>
+            <div id="hub-yield">
+              <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+            </div>
 
             {/* Secondary tooling — collapsed by default to keep the page light. */}
-            <Panel title="DESK LOOKUP" collapsible defaultCollapsed>
-              <DeskLookupPanel state={state} />
-            </Panel>
-            <MainnetPreviewPanel />
+            <div id="hub-desk-lookup">
+              <Panel title="DESK LOOKUP" collapsible defaultCollapsed>
+                <DeskLookupPanel state={state} />
+              </Panel>
+            </div>
+            {/* QA tool — devnet sandbox only; never surfaces on the mainnet dashboard. */}
+            {cluster === "devnet" && <MainnetPreviewPanel />}
 
-            <div className="flex justify-between text-[10px] text-green-700">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] text-green-700">
               <span>last read {new Date(fetchedAt).toLocaleTimeString()}</span>
               <span className="flex gap-3">
+                <Link to="mechanics" className="underline hover:text-green-300">
+                  mechanics →
+                </Link>
                 <Link to="tokenomics" className="underline hover:text-green-300">
                   tokenomics →
                 </Link>
                 <Link to="treasury" className="underline hover:text-green-300">
-                  treasury transparency →
+                  treasury →
                 </Link>
               </span>
             </div>

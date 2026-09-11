@@ -14,7 +14,7 @@ type Props = {
   address: string;
   state: ProtocolState;
   onClear?: () => void;
-  /** Jump straight to ACTIVATE_DESK with this desk preselected — wired by WalletPanel. */
+  /** Jump straight to the activation flow with this desk preselected — unused by the lookup view. */
   onActivate?: (asset: string) => void;
 };
 
@@ -110,7 +110,9 @@ function DeskRow({ desk, onActivate }: { desk: OwnedDesk; onActivate?: (asset: s
   );
 }
 
-/** Read-only wallet view: SOL, $HUB balance, and desks in the configured collection with tier. */
+/** Read-only wallet view for the DESK LOOKUP panel: SOL, $HUB balance, and desks in the
+ * configured collection with tier — used to render a looked-up wallet, so it shows no claim /
+ * activate actions (only the lookup's own read-only links). */
 export function WalletPortfolio({ address, state, onClear, onActivate }: Props) {
   const q = useWalletPortfolio(address, state);
   const balances = usePayerBalances(
@@ -127,14 +129,9 @@ export function WalletPortfolio({ address, state, onClear, onActivate }: Props) 
     ) ?? 0;
   const lifetimeEarningsLamports =
     data?.desks.reduce((s, d) => s + (d.tier?.totalClaimedLamports ?? 0), 0) ?? 0;
-  // Dual view: every desk NFT owned is "native" OTC Desks inventory; only the ones with a live
-  // (non-voided) tier are $HUB-activated earning positions — the two other metric blocks below
-  // (activation/tier list + earnings) are scoped to that activated subset.
   const activatedDesks = data?.desks.filter((d) => d.tier && !d.tier.voided) ?? [];
   const nativeCount = (data?.desks.length ?? 0) - activatedDesks.length;
 
-  // EST_DAILY_YIELD: this wallet's share of Σw against the same round-size + cadence basis as the
-  // EARNING PREVIEW calculator (../lib/yield.ts) — an estimate, not a promise.
   const roundInputs = baseInputs(state.currentEpoch, state.config);
   const distributable = distributableLamports(
     roundInputs.roundInflowLamports,
@@ -204,8 +201,6 @@ export function WalletPortfolio({ address, state, onClear, onActivate }: Props) 
             />
           </div>
 
-          {/* Dual view: raw OTC Desks NFT ownership (native, independent of $HUB) vs. the subset
-              of those desks actually staked into the $HUB protocol and earning yield. */}
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="border border-green-500/20 p-2">
               <div className="mb-1.5 text-[10px] uppercase tracking-widest text-green-500/50">
