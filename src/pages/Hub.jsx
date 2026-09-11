@@ -51,8 +51,16 @@ const hubSwapTransport = {
 // pointed at mainnet (the EnvBadge mismatch seen on otchub.dev/hub — see the
 // same convention in .github/workflows/deploy.yml and HUB_DEVNET_CONFIG
 // below). $HUB is launched on mainnet-beta; requires a code change to move.
+// RPC follows the same mainnet-literal convention as `cluster` below: VITE_HUB_RPC_URL can be
+// missing from a build (preview/local) or still hold the devnet endpoint from QA — the old
+// `?? "https://api.devnet.solana.com"` fallback then silently served a devnet RPC to the
+// mainnet mount, which the EnvBadge caught as "MAINNET ≠ RPC:DEVNET" and every program call
+// would fail against anyway (mainnet program/accounts don't exist on devnet). If the secret
+// is absent or devnet-looking, fall back to Solana's public mainnet RPC instead.
+const MAINNET_PUBLIC_RPC = "https://api.mainnet-beta.solana.com";
+const envRpcUrl = import.meta.env.VITE_HUB_RPC_URL;
 export const HUB_CONFIG = {
-  rpcUrl: import.meta.env.VITE_HUB_RPC_URL ?? "https://api.devnet.solana.com",
+  rpcUrl: envRpcUrl && !/devnet/i.test(envRpcUrl) ? envRpcUrl : MAINNET_PUBLIC_RPC,
   // Defaults to the address baked into the vendored IDL (devnet deploy).
   programId: import.meta.env.VITE_HUB_PROGRAM_ID || undefined,
   cluster: "mainnet-beta",
