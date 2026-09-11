@@ -34,6 +34,13 @@ export default function ClaimPanel({
   const desks = holdings || [];
   const log = (l) => setLogs((prev) => [...prev, { ...l, t: Date.now() }]);
 
+  // Claim rows are dense on mobile — the full "OTC Desk #NNN" name truncates
+  // to almost nothing there, so strip it to just the desk number.
+  const deskShortName = (name) => {
+    const m = /#\s*(\d+)/.exec(name || "");
+    return m ? `#${m[1]}` : name || "";
+  };
+
   // Compact age label for a timestamp ("2h 5m ago").
   const agoLabel = (iso) => {
     if (!iso) return null;
@@ -530,8 +537,8 @@ export default function ClaimPanel({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-[12px] text-green-300">
-                  {d.name}
+                <div className="truncate font-mono text-[12px] text-green-300" title={d.name}>
+                  {deskShortName(d.name)}
                 </div>
                 <div className="font-mono text-[10px] text-green-500/40">
                   {d.asset_id.slice(0, 8)}...
