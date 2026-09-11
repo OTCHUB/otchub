@@ -39,11 +39,10 @@ jobs:
           DEVNET_PROGRAM_ID="${DEVNET_PROGRAM_ID%%\?*}"
           cat <<EOF > .env.production.local
           # Main mount (/hub) — mainnet-beta config.
-          # NOTE: VITE_HUB_MAINNET_PROGRAM_ID currently resolves to the same
-          # address as devnet (7c5oPs9G...7b7i) — the $HUB program has not
-          # been deployed to mainnet-beta yet (see src/hub/lib/deployments.ts,
-          # HUB_MAINNET = null). VITE_HUB_ENABLED=false keeps /hub hidden
-          # until this secret is updated with the real mainnet deploy address.
+          # $HUB program is live + OtterSec-verified on mainnet-beta at the same
+          # address as devnet (7c5oPs9G...7b7i) — see src/hub/lib/deployments.ts.
+          # All 6 initialize_* mainnet transactions have run and Config.hubMint
+          # matches VITE_HUB_MINT below, so /hub is now enabled for production.
           VITE_HUB_RPC_URL=${{ secrets.VITE_HUB_MAINNET_RPC_URL }}
           VITE_HUB_CLUSTER=${{ secrets.VITE_HUB_MAINNET_CLUSTER }}
           VITE_HUB_PROGRAM_ID=$MAINNET_PROGRAM_ID
@@ -54,11 +53,11 @@ jobs:
 
           # Launch control — flip to true only once the real mainnet program
           # (and VITE_HUB_MINT below) are live. Requires a PR to change.
-          VITE_HUB_ENABLED=false
+          VITE_HUB_ENABLED=true
 
           # $HUB token mint — set once minted via the OTC launcher.
           # Empty keeps every mint-gated UI element hidden (see src/lib/hubMint.js).
-          VITE_HUB_MINT=
+          VITE_HUB_MINT=5yrUrzyDBs5NrZdiGtW1BEYUjHyHBLx1L5vTAKUxvo1V
 
           VITE_BASE44_APP_ID=${{ secrets.VITE_BASE44_APP_ID }}
 

@@ -32,13 +32,15 @@ export type Deployment = {
 };
 
 // Mainnet $HUB program: deployed + OtterSec-verified 2026-09-08 at the same id as devnet
-// (see verify.osec.io/status/7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i). `initialize_config`
-// has not run yet — the Config PDA won't exist until the $HUB mint launches — so
-// useProtocolState()/ProtocolGate still render the "uninitialized" state on mainnet-beta until
-// then; this constant only drives the static DEPLOYMENTS registry (DeploymentsPage), which
-// self-detects a live mainnet deploy via a real Config-account read and overrides this the
-// moment one succeeds, so forgetting to update it post-launch can't make the page lie about
-// deploy status. The value that actually decides which chain the whole app talks to is
+// (see verify.osec.io/status/7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i). All 6 init
+// instructions (initialize_config, init_tokenomics, init_treasury_float, init_hub_pot,
+// init_creator_fee_state, update_config) ran live on mainnet-beta with the real $HUB mint
+// (5yrUrzyDBs5NrZdiGtW1BEYUjHyHBLx1L5vTAKUxvo1V) — the Config PDA exists and
+// useProtocolState()/ProtocolGate read it live. This constant only drives the static
+// DEPLOYMENTS registry (DeploymentsPage), which self-detects a live mainnet deploy via a
+// real Config-account read and overrides this the moment one succeeds, so forgetting to
+// update it post-launch can't make the page lie about deploy status. The value that
+// actually decides which chain the whole app talks to is
 // VITE_HUB_CLUSTER + VITE_HUB_PROGRAM_ID (web/.env or otchub/.env.production.local) — see
 // hubconnect-spec.md launch checklist. hub_mint / otc_mint / desk_collection need NO code change
 // at launch: every consumer reads them live off the on-chain Config singleton once
@@ -73,7 +75,7 @@ export const DEPLOYMENTS: Deployment[] = [
     role: "Stake-to-earn core: Config, desk tiers, epochs, pot accounting, treasury sweeps (Anchor).",
     address: { devnet: HUB_PROGRAM_ID, "mainnet-beta": HUB_MAINNET },
     status: { devnet: "live", "mainnet-beta": "live" },
-    note: "Mainnet-beta: deployed + OtterSec-verified; initialize_config pending the $HUB mint.",
+    note: "Mainnet-beta: deployed + OtterSec-verified; initialize_config complete with the real $HUB mint.",
   },
   {
     id: "hub-idl",
