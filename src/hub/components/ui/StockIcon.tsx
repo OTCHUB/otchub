@@ -14,9 +14,11 @@ const BUNDLED_ICONS: Record<string, string> = {
   NVDAx: "/stocks/NVDAx.png",
   SPCXx: "/stocks/SPCXx.png",
   SOL: "/stocks/SOL.png",
-  // $HUB protocol token — the official 3D terminal logo (square source,
-  // cropped to the coin by the component's rounded-full mask).
-  HUB: "/stocks/HUB.jpg",
+  // WSOL shares the bundled wrapped-SOL logo.
+  WSOL: "/stocks/SOL.png",
+  // $HUB protocol token — the official circular mint icon (hub-mint.png,
+  // published from the mint icon studio; transparent outside the circle).
+  HUB: "/hub-mint.png",
 };
 
 const STOCK_NAMES: Record<string, string> = {
@@ -25,6 +27,7 @@ const STOCK_NAMES: Record<string, string> = {
   NVDAx: "NVIDIA",
   SPCXx: "SpaceX",
   SOL: "Solana",
+  WSOL: "Wrapped SOL",
   HUB: "$HUB Protocol",
 };
 

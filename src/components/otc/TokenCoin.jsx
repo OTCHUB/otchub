@@ -8,7 +8,12 @@ import { rewardIconProxyUrl } from "@/lib/rewardIcons";
 // official site) → getRewardIcon proxy by symbol → proxy by mint → the
 // symbol's first letter. SOL has a bundled official wrapped-SOL logo, so the
 // "S" coin never touches the network.
-const BUNDLED_ICONS = { OTC: "/stocks/OTC.png", SOL: "/stocks/SOL.png", HUB: "/stocks/HUB.jpg" };
+const BUNDLED_ICONS = {
+  OTC: "/stocks/OTC.png",
+  SOL: "/stocks/SOL.png",
+  WSOL: "/stocks/SOL.png",
+  HUB: "/hub-mint.png",
+};
 
 export default function TokenCoin({ symbol, mint = null, className = "h-4 w-4" }) {
   const [failed, setFailed] = useState(0);

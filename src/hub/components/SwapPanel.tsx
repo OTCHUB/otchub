@@ -275,7 +275,7 @@ export function SwapPanel({ state, address }: Props) {
             className="min-w-0 flex-1 bg-transparent text-xl font-bold text-green-200 outline-none placeholder:text-green-500/25 disabled:opacity-40"
           />
           <span className="flex shrink-0 items-center gap-1 text-sm font-bold text-green-300">
-            <StockIcon symbol={payToken === "SOL" ? "SOL" : "HUB"} className="h-4 w-4" />
+            <StockIcon symbol={payToken.replace(/^\$/, "")} className="h-4 w-4" />
             {payToken}
           </span>
         </div>
@@ -313,7 +313,7 @@ export function SwapPanel({ state, address }: Props) {
             {quote ? formatRawAmount(BigInt(quote.outAmount), outDec) : quoting ? "…" : "0.0"}
           </span>
           <span className="flex shrink-0 items-center gap-1 text-sm font-bold text-green-300">
-            <StockIcon symbol={ticker === "SOL" ? "SOL" : "HUB"} className="h-4 w-4" />
+            <StockIcon symbol={ticker.replace(/^\$/, "")} className="h-4 w-4" />
             {ticker}
           </span>
         </div>
