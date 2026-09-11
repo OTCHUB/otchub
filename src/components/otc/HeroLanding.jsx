@@ -1,18 +1,19 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowDown, ArrowLeftRight, Check, Coins, Copy, DollarSign, Flame, Gem, HandCoins, LineChart } from "lucide-react";
 import MascotLogo from "@/components/otc/MascotLogo";
 import TokenCoin from "@/components/otc/TokenCoin";
 import HeroRewardStats from "@/components/otc/HeroRewardStats";
-import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
+import { fmtNum, fmtSol, fmtUsd, fmtUsdCompact } from "@/lib/format";
+import { useDexQuotes } from "@/lib/useDexQuotes";
 import { HUB_MINT, HUB_MINT_READY } from "@/lib/hubMint";
 
 const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 const DEX_URL = `https://dexscreener.com/solana/${OTC_MINT}`;
 const DESK_CAP = 5000;
 
-// Headline + feature stats read live from the latest snapshot. $HUB twins
-// for these cards can be added next to the $OTC ones once the HUB mint
-// launches.
+// Headline + feature stats read live from the latest snapshot. $HUB identity
+// + live DEX quote sit next to the $OTC CA bar (side-by-side, see JSX).
 // Latest CLOSED-day per-desk earning — today's row is still in progress.
 const perDesk24hSolOf = (s) => {
   const items = s?.per_desk?.items || [];
@@ -65,6 +66,14 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
   const desksPct = Math.max(0, Math.min(100, (desks / DESK_CAP) * 100));
 
   const [hubCopied, setHubCopied] = useState(false);
+  // Live $HUB DEX quote (browser-side DexScreener poll, ~15s) — the same
+  // quote source the launcher tape uses; only fetches once the official
+  // mint is pinned.
+  const { quotes: hubQuotes } = useDexQuotes(HUB_MINT_READY ? [HUB_MINT] : []);
+  const hub = hubQuotes[HUB_MINT];
+  const hubPrice = hub?.priceUsd != null
+    ? `$${hub.priceUsd < 0.01 ? hub.priceUsd.toFixed(6) : hub.priceUsd.toFixed(4)}`
+    : "—";
   const copyCa = async () => {
     try {
       await navigator.clipboard.writeText(OTC_MINT);
@@ -106,47 +115,70 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
             arbitrage, pot revenue attribution and on-chain claims.
           </p>
 
-          {/* CA copy bar */}
-          <div className="mt-4 flex max-w-xl items-center gap-2">
-            <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
-              <TokenCoin symbol="OTC" className="h-5 w-5 shrink-0" />
-              <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
-              <span className="shrink-0 text-green-500/50">CA</span>
-              <span className="min-w-0 break-all" title={OTC_MINT}>{OTC_MINT}</span>
-            </span>
-            <button
-              onClick={copyCa}
-              title={copied ? "Copied" : "Copy contract address"}
-              aria-label="Copy contract address"
-              className="inline-flex shrink-0 items-center border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-emerald-400 hover:bg-emerald-500/20"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-
-          {/* $HUB CA copy bar — same treatment as $OTC, shown only once the
-              official mint is pinned (VITE_HUB_MINT). */}
-          {HUB_MINT_READY && (
-            <div className="mt-2 flex max-w-xl items-center gap-2">
-              <span className="flex min-w-0 flex-1 items-center gap-2 border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-300">
-                <TokenCoin symbol="HUB" className="h-5 w-5 shrink-0" />
-                <span className="shrink-0 font-bold tracking-wider text-emerald-400">$HUB</span>
-                <span className="shrink-0 text-emerald-500/50">CA</span>
-                <span className="min-w-0 break-all" title={HUB_MINT}>{HUB_MINT}</span>
+          {/* CA copy bars — $OTC and the official $HUB side by side. The
+              $HUB bar renders only once the official mint is pinned
+              (VITE_HUB_MINT) and carries its live DEX quote + M.I.M payout
+              basket on a second line. */}
+          <div className="mt-4 grid max-w-xl items-center gap-2 sm:grid-cols-2">
+            <div className={`flex min-w-0 items-center gap-2 ${HUB_MINT_READY ? "" : "sm:col-span-2"}`}>
+              <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
+                <TokenCoin symbol="OTC" className="h-5 w-5 shrink-0" />
+                <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
+                <span className="shrink-0 text-green-500/50">CA</span>
+                <span className="min-w-0 break-all" title={OTC_MINT}>{OTC_MINT}</span>
               </span>
               <button
-                onClick={copyHubCa}
-                title={hubCopied ? "Copied" : "Copy contract address"}
+                onClick={copyCa}
+                title={copied ? "Copied" : "Copy contract address"}
                 aria-label="Copy contract address"
                 className="inline-flex shrink-0 items-center border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-emerald-400 hover:bg-emerald-500/20"
               >
-                {hubCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
-          )}
+            {HUB_MINT_READY && (
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex min-w-0 flex-1 flex-col border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-300">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <TokenCoin symbol="HUB" className="h-5 w-5 shrink-0" />
+                    <span className="shrink-0 font-bold tracking-wider text-emerald-400">$HUB</span>
+                    <span className="shrink-0 text-emerald-500/50">CA</span>
+                    <span className="min-w-0 break-all" title={HUB_MINT}>{HUB_MINT}</span>
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-emerald-400/80">
+                    <span title="$HUB live DEX price">{hubPrice}</span>
+                    <span title="$HUB live market cap">mc {fmtUsdCompact(hub?.mcap)}</span>
+                    {hub?.change24h != null && (
+                      <span className={hub.change24h >= 0 ? "text-emerald-300" : "text-red-400"}>
+                        {hub.change24h >= 0 ? "+" : ""}{hub.change24h.toFixed(1)}%
+                      </span>
+                    )}
+                    <span className="min-w-0 truncate text-emerald-500/50" title="Magic Internet Money — rotating payout basket paid to activated desks">
+                      M.I.M · OTC · CRCLx · NVDAx · SPCXx
+                    </span>
+                  </span>
+                </span>
+                <button
+                  onClick={copyHubCa}
+                  title={hubCopied ? "Copied" : "Copy contract address"}
+                  aria-label="Copy contract address"
+                  className="inline-flex shrink-0 items-center border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-emerald-400 hover:bg-emerald-500/20"
+                >
+                  {hubCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* CTA row */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              to="/hub"
+              title="$HUB protocol dashboard — treasury, tokenomics, mechanics"
+              className="inline-flex items-center gap-2 border border-emerald-500/60 bg-emerald-500/10 px-4 py-2 text-[12px] font-bold tracking-wider text-emerald-400 hover:bg-emerald-500/20"
+            >
+              <TokenCoin symbol="HUB" className="h-4 w-4" /> $HUB TERMINAL
+            </Link>
             <a
               href={DEX_URL}
               target="_blank"
