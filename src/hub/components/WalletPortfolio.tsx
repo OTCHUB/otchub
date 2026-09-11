@@ -113,7 +113,12 @@ function DeskRow({ desk, onActivate }: { desk: OwnedDesk; onActivate?: (asset: s
 /** Read-only wallet view: SOL, $HUB balance, and desks in the configured collection with tier. */
 export function WalletPortfolio({ address, state, onClear, onActivate }: Props) {
   const q = useWalletPortfolio(address, state);
-  const balances = usePayerBalances(address, state.config.otcMint, state.config.hubMint);
+  const balances = usePayerBalances(
+    address,
+    state.config.otcMint,
+    state.config.hubMint,
+    state.token.hubTokenProgram,
+  );
   const data = q.data;
   const activeWeightBp =
     data?.desks.reduce(

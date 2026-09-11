@@ -9,16 +9,23 @@ export type RawBalances = {
   hubUnits: bigint;
 };
 
-/** Raw SOL + $HUB (standard ATA) balances for the swap panel — bigint, never floats. */
-export function useWalletBalances(address: string | null, hubMint: string | null) {
+/** Raw SOL + $HUB (standard ATA) balances for the swap panel — bigint, never floats.
+ * `hubTokenProgram` must be whichever token program actually owns `hubMint` on this cluster
+ * (`ProtocolState.token.hubTokenProgram`, resolved live) — omit it only for devnet's classic
+ * harness mint call sites, which is what the default falls back to. */
+export function useWalletBalances(
+  address: string | null,
+  hubMint: string | null,
+  hubTokenProgram?: string | null,
+) {
   const { connection } = useHub();
   return useQuery({
-    queryKey: ["hub", "balances", connection.rpcEndpoint, address, hubMint],
+    queryKey: ["hub", "balances", connection.rpcEndpoint, address, hubMint, hubTokenProgram],
     enabled: !!address && !!hubMint,
     refetchInterval: 20_000,
     queryFn: async (): Promise<RawBalances> => {
       const owner = new PublicKey(address!);
-      const [ata] = ataPda(owner, new PublicKey(hubMint!));
+      const [ata] = ataPda(owner, new PublicKey(hubMint!), hubTokenProgram ?? undefined);
       const [sol, tok] = await Promise.all([
         connection.getBalance(owner, "confirmed"),
         connection.getTokenAccountBalance(ata, "confirmed").catch(() => null),

@@ -91,25 +91,37 @@ export type HubTokenState = {
   /** Sum of $HUB held by the treasury multisig + program vault ATAs. */
   lockedUnits: bigint;
   holdings: { owner: string; ata: string; units: bigint }[];
+  /**
+   * The SPL token program that actually owns `hubMint`, resolved live off-chain (never assumed).
+   * Devnet's harness mint is classic `TOKEN_PROGRAM_ID`; the real mainnet $HUB launch mint is
+   * Token-2022 — every $HUB ATA derivation (this module's `holdings` above, and any client-side
+   * `ataPda`/`createAtaIdempotentIx` call for $HUB) must use this value, not a hardcoded default,
+   * or it silently derives a different, empty account and balances read back as zero/missing.
+   */
+  hubTokenProgram: string;
 };
 
 /**
- * One RPC round trip: mint + metadata PDA + treasury-controlled ATAs. Tolerates missing
- * accounts (uninitialized devnet, unlaunched mainnet) by returning nulls / 0n.
+ * Two RPC round trips: (1) the mint account alone, to learn which token program actually owns
+ * it — required because that differs by deployment (see `HubTokenState.hubTokenProgram`'s doc)
+ * and can't be assumed; (2) metadata PDA + treasury-controlled ATAs, derived with that resolved
+ * program. Tolerates missing accounts (uninitialized devnet, unlaunched mainnet) by returning
+ * nulls / 0n.
  */
 export async function fetchHubTokenState(
   connection: Connection,
   hubMint: PublicKey,
   lockedOwners: PublicKey[],
 ): Promise<HubTokenState> {
+  const mintInfo = await connection.getAccountInfo(hubMint);
+  const hubTokenProgram = mintInfo ? mintInfo.owner : new PublicKey(TOKEN_PROGRAM_ID);
   const [metaKey] = tokenMetadataPda(hubMint);
-  const atas = lockedOwners.map((o) => ({ owner: o, ata: ataPda(o, hubMint)[0] }));
+  const atas = lockedOwners.map((o) => ({ owner: o, ata: ataPda(o, hubMint, hubTokenProgram)[0] }));
   const infos: (AccountInfo<Buffer> | null)[] = await connection.getMultipleAccountsInfo([
-    hubMint,
     metaKey,
     ...atas.map((a) => a.ata),
   ]);
-  const [mintInfo, metaInfo, ...ataInfos] = infos;
+  const [metaInfo, ...ataInfos] = infos;
   const holdings = atas.map(({ owner, ata }, i) => ({
     owner: owner.toBase58(),
     ata: ata.toBase58(),
@@ -120,6 +132,7 @@ export async function fetchHubTokenState(
     metadata: metaInfo ? parseTokenMetadata(metaKey, metaInfo.data) : null,
     lockedUnits: holdings.reduce((s, h) => s + h.units, 0n),
     holdings,
+    hubTokenProgram: hubTokenProgram.toBase58(),
   };
 }
 

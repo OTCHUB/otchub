@@ -1,7 +1,7 @@
 // Desk discovery: which Metaplex Core assets in `Config.desk_collection` a wallet owns.
 // Shared by the dashboard portfolio (web/) and the devnet mock-desk script so both use the exact
 // account filter the program enforces in `require_desk` (programs/hub/src/instructions/mpl_core.rs).
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, type GetProgramAccountsFilter } from "@solana/web3.js";
 import { MPL_CORE_PROGRAM_ID } from "./constants";
 
 // Core AssetV1 prefix: [0] key=1 · [1..33] owner · [33] UpdateAuthority tag (2 = Collection) · [34..66] collection
@@ -10,13 +10,84 @@ export const CORE_UA_COLLECTION = 2;
 
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 
+type GpaFilter = { dataSize: number } | { memcmp: { offset: number; bytes: string; encoding?: "base64" } };
+type GpaAccount = { pubkey: PublicKey; account: { data: Buffer } };
+
+/**
+ * `getProgramAccounts` for the Metaplex Core program, preferring Helius's cursor-paginated
+ * `getProgramAccountsV2` and falling back to a single-shot `connection.getProgramAccounts` when
+ * the endpoint doesn't implement it (public devnet/mainnet-beta RPCs, or any non-Helius provider —
+ * see `useMainnetPreview`'s keyless default).
+ *
+ * Core is shared by every collection on the cluster, not just `Config.desk_collection`, so an
+ * unpaginated scan against it can overload the RPC's account-index service even though our memcmp
+ * filters narrow the match set down to a handful of accounts — this is exactly the failure Helius
+ * surfaces as `account index service overloaded ... use getProgramAccountsV2 with pagination`
+ * (see https://www.helius.dev/docs/api-reference/rpc/http/getprogramaccountsv2).
+ */
+async function fetchCoreProgramAccounts(
+  connection: Connection,
+  opts: { filters: GpaFilter[]; dataSlice?: { offset: number; length: number } },
+): Promise<GpaAccount[]> {
+  const programId = new PublicKey(MPL_CORE_PROGRAM_ID);
+  const limit = 2_000;
+  try {
+    const out: GpaAccount[] = [];
+    let paginationKey: string | null = null;
+    do {
+      const res = await fetch(connection.rpcEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "hub-desks-gpa-v2",
+          method: "getProgramAccountsV2",
+          params: [
+            programId.toBase58(),
+            {
+              encoding: "base64",
+              filters: opts.filters,
+              ...(opts.dataSlice ? { dataSlice: opts.dataSlice } : {}),
+              limit,
+              ...(paginationKey ? { paginationKey } : {}),
+            },
+          ],
+        }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message ?? "getProgramAccountsV2 failed");
+      const accounts: { pubkey: string; account: { data: [string, string] } }[] =
+        json.result?.accounts ?? [];
+      for (const a of accounts) {
+        out.push({
+          pubkey: new PublicKey(a.pubkey),
+          account: { data: Buffer.from(a.account.data[0], "base64") },
+        });
+      }
+      paginationKey = json.result?.paginationKey ?? null;
+    } while (paginationKey);
+    return out;
+  } catch {
+    // Endpoint has no V2 support (e.g. api.devnet.solana.com, api.mainnet-beta.solana.com) —
+    // one-shot fallback. Match sets here are small (a wallet's/collection's desks), so an
+    // unpaged call is acceptable on these lower-traffic public RPCs.
+    const accounts = await connection.getProgramAccounts(programId, {
+      dataSlice: opts.dataSlice,
+      // web3.js's own `GetProgramAccountsFilter` type is structurally identical to `GpaFilter`
+      // above (dataSize | memcmp); cast rather than duplicate it for this fallback branch.
+      filters: opts.filters as GetProgramAccountsFilter[],
+    });
+    return accounts.map(({ pubkey, account }) => ({ pubkey, account: { data: account.data as Buffer } }));
+  }
+}
+
 /** Owner + collection `getProgramAccounts` filter (data-less; returns asset pubkeys only). */
 export async function fetchOwnedDesks(
   connection: Connection,
   owner: PublicKey,
   collection: PublicKey,
 ): Promise<PublicKey[]> {
-  const accounts = await connection.getProgramAccounts(new PublicKey(MPL_CORE_PROGRAM_ID), {
+  const accounts = await fetchCoreProgramAccounts(connection, {
     dataSlice: { offset: 0, length: 0 },
     filters: [
       { memcmp: { offset: 0, bytes: b64(Uint8Array.of(CORE_KEY_ASSET_V1)), encoding: "base64" } },
@@ -38,7 +109,7 @@ export async function fetchCollectionAssets(
   connection: Connection,
   collection: PublicKey,
 ): Promise<PublicKey[]> {
-  const accounts = await connection.getProgramAccounts(new PublicKey(MPL_CORE_PROGRAM_ID), {
+  const accounts = await fetchCoreProgramAccounts(connection, {
     dataSlice: { offset: 0, length: 0 },
     filters: [
       { memcmp: { offset: 0, bytes: b64(Uint8Array.of(CORE_KEY_ASSET_V1)), encoding: "base64" } },
@@ -100,7 +171,7 @@ export async function fetchDeskOwners(
   connection: Connection,
   collection: PublicKey,
 ): Promise<DeskOwnerEntry[]> {
-  const accounts = await connection.getProgramAccounts(new PublicKey(MPL_CORE_PROGRAM_ID), {
+  const accounts = await fetchCoreProgramAccounts(connection, {
     dataSlice: { offset: 0, length: 256 },
     filters: [
       { memcmp: { offset: 0, bytes: b64(Uint8Array.of(CORE_KEY_ASSET_V1)), encoding: "base64" } },

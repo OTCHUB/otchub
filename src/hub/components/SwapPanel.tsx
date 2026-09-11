@@ -60,7 +60,7 @@ export function SwapPanel({ state, address }: Props) {
   const [phase, setPhase] = useState<SwapPhase | null>(null);
   const [logs, setLogs] = useState<TxLog[]>([]);
   const gen = useRef(0);
-  const balances = useWalletBalances(address, mint);
+  const balances = useWalletBalances(address, mint, state.token.hubTokenProgram);
 
   const isBuy = mode === "BUY";
   const inputMint = isBuy ? SOL_MINT : mint;

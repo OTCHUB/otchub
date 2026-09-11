@@ -4,6 +4,7 @@ import { Link, NavLink } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
 import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
+import { silentReconnect } from "@/lib/solanaWallets";
 import { HubNavMenu } from "@/hub/components/HubNavMenu";
 import MascotLogo from "@/components/otc/MascotLogo";
 import ThemeToggle from "@/components/otc/ThemeToggle";
@@ -178,6 +179,23 @@ export default function Hub({ devnet = false }) {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  // Landing directly on "/hub" (bookmark, refresh, shared link) never mounts
+  // pages/Home.jsx, so its own silentReconnect-on-mount effect never runs and
+  // walletSigner.js's module-level signer registry stays empty even though
+  // `wallet` (mirrored from otc_wallet_address above) shows a connected
+  // address. That desynced the resolveSigner(address) lookup every panel here
+  // uses from the actually-registered signer, so CLAIM_ALL / activations fell
+  // back to "read-only address — connect the wallet itself" despite the
+  // header showing the wallet as connected. Re-run the same retry-on-mount
+  // silent reconnect Home.jsx does so the signer gets registered regardless
+  // of which route was loaded first.
+  useEffect(() => {
+    if (!wallet) return;
+    const timers = [0, 500, 1500, 3000].map((d) => setTimeout(() => silentReconnect(wallet), d));
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- retry burst keyed on the address itself
+  }, [wallet]);
 
   const config = devnet ? HUB_DEVNET_CONFIG : HUB_CONFIG;
 

@@ -23,7 +23,6 @@ import {
   BPS,
   JUPITER_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
   ataPda,
   configPda,
   createAtaIdempotentIx,
@@ -228,6 +227,12 @@ export async function buildTierChangeIxs(opts: {
   /** Required for `method: "otc"` — a live route from `fetchOtcToHubRoute`, sized to clear this
    *  call's `liveHubCostDeltaUnits`. Unused on the SOL path. */
   otcRoute?: OtcSwapRoute;
+  /** The token program that actually owns `config.hubMint` on this cluster
+   *  (`ProtocolState.token.hubTokenProgram`, resolved live off-chain) — never assume classic:
+   *  devnet's harness mint and mainnet's real launch mint sit on different token programs, and
+   *  the on-chain accounts here (`payerHub`, `tokenProgram`/`hubTokenProgram`) must match
+   *  whichever one truly owns the mint or `burn_checked`/`transfer_checked` reject the tx. */
+  hubTokenProgram: string;
 }): Promise<TransactionInstruction[]> {
   const { program, payer, deskAsset, fromTier, toTier, method, config, otcPay, otcPot } = opts;
   assertTierRange(fromTier, toTier);
@@ -257,7 +262,7 @@ export async function buildTierChangeIxs(opts: {
     opsWallet: new PublicKey(config.opsWallet),
     deskTier: tierPda(id, deskAsset)[0],
     hubMint,
-    payerHub: ataPda(payer, hubMint)[0],
+    payerHub: ataPda(payer, hubMint, opts.hubTokenProgram)[0],
     tokenomics: tokenomicsPda(id)[0],
     treasuryLockVault: new PublicKey(opts.tokenomics.treasuryLockVault),
   };
@@ -266,7 +271,7 @@ export async function buildTierChangeIxs(opts: {
     const accs = {
       ...common,
       systemProgram: SYSTEM_PROGRAM,
-      tokenProgram: new PublicKey(TOKEN_PROGRAM_ID),
+      tokenProgram: new PublicKey(opts.hubTokenProgram),
     };
     if (fromTier === 0)
       ixs.push(await program.methods.activateTier(toTier).accountsStrict(accs).instruction());
@@ -291,7 +296,7 @@ export async function buildTierChangeIxs(opts: {
     otcVault: new PublicKey(otcPot.otcVault),
     // $OTC and $HUB sit on different token programs — see `activateTierOtc`'s IDL docs.
     otcTokenProgram: new PublicKey(TOKEN_2022_PROGRAM_ID),
-    hubTokenProgram: new PublicKey(TOKEN_PROGRAM_ID),
+    hubTokenProgram: new PublicKey(opts.hubTokenProgram),
     jupiterProgram: new PublicKey(JUPITER_PROGRAM_ID),
   };
   const swapAmountBn = new BN(otcSwapAmount.toString());
@@ -336,6 +341,8 @@ export async function executeTierChange(opts: {
   pendingLamports: number;
   /** Required for `method: "otc"` — see `buildTierChangeIxs`. */
   otcRoute?: OtcSwapRoute;
+  /** See `buildTierChangeIxs`'s doc — threaded straight through. */
+  hubTokenProgram: string;
   onLog: (l: TxLog) => void;
   onPhase?: (p: TierChangePhase) => void;
 }): Promise<TierChangeResult> {
@@ -357,6 +364,7 @@ export async function executeTierChange(opts: {
       tokenomics: opts.tokenomics,
       pendingLamports: opts.pendingLamports,
       otcRoute: opts.otcRoute,
+      hubTokenProgram: opts.hubTokenProgram,
     });
     const bh = await connection.getLatestBlockhash("confirmed");
     const tx = new Transaction({ feePayer: payer, recentBlockhash: bh.blockhash });

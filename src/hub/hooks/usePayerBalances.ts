@@ -15,21 +15,34 @@ export type PayerBalances = {
 };
 
 /** Raw SOL + $OTC + $HUB (standard ATAs) balances for the activate/upgrade panel — bigint, never
- * floats. `hubMint` is needed because every tier change burns $HUB regardless of pay method. */
+ * floats. `hubMint` is needed because every tier change burns $HUB regardless of pay method.
+ * `hubTokenProgram` must be whichever token program actually owns `hubMint` on this cluster
+ * (`ProtocolState.token.hubTokenProgram`, resolved live) — it differs between devnet's classic
+ * harness mint and mainnet's real Token-2022 launch mint, so it defaults to classic only as a
+ * last resort when the caller hasn't loaded protocol state yet. */
 export function usePayerBalances(
   address: string | null,
   otcMint: string | null,
   hubMint: string | null,
+  hubTokenProgram?: string | null,
 ) {
   const { connection } = useHub();
   return useQuery({
-    queryKey: ["hub", "payer-balances", connection.rpcEndpoint, address, otcMint, hubMint],
+    queryKey: [
+      "hub",
+      "payer-balances",
+      connection.rpcEndpoint,
+      address,
+      otcMint,
+      hubMint,
+      hubTokenProgram,
+    ],
     enabled: !!address && !!otcMint && !!hubMint,
     refetchInterval: 20_000,
     queryFn: async (): Promise<PayerBalances> => {
       const owner = new PublicKey(address!);
       const [otcAta] = ataPda(owner, new PublicKey(otcMint!), TOKEN_2022_PROGRAM_ID);
-      const [hubAta] = ataPda(owner, new PublicKey(hubMint!));
+      const [hubAta] = ataPda(owner, new PublicKey(hubMint!), hubTokenProgram ?? undefined);
       const [sol, otcTok, hubTok] = await Promise.all([
         connection.getBalance(owner, "confirmed"),
         connection.getTokenAccountBalance(otcAta, "confirmed").catch(() => null),

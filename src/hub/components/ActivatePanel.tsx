@@ -58,7 +58,12 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
   const { connection, program, resolveSigner } = useHub();
   const qc = useQueryClient();
   const otcPayQ = useOtcPay();
-  const balances = usePayerBalances(address, state.config.otcMint, state.config.hubMint);
+  const balances = usePayerBalances(
+    address,
+    state.config.otcMint,
+    state.config.hubMint,
+    state.token.hubTokenProgram,
+  );
   const [asset, setAsset] = useState<string | null>(null);
   const [toTier, setToTier] = useState(1);
   const [method, setMethod] = useState<PayMethod>("sol");
@@ -121,6 +126,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       destinationTokenAccount: ataPda(
         new PublicKey(address),
         new PublicKey(state.config.hubMint),
+        state.token.hubTokenProgram,
       )[0],
       minHubOut: BigInt(quote.hubBurnUnits),
     })
@@ -190,6 +196,7 @@ export function ActivatePanel({ address, state, desks, onChanged, selectedAsset 
       tokenomics: state.tokenomics,
       pendingLamports: pending,
       otcRoute: otcRoute ?? undefined,
+      hubTokenProgram: state.token.hubTokenProgram,
       onLog: (l) => setLogs((p) => [...p, l]),
       onPhase: setPhase,
     });
