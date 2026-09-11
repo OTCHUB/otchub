@@ -1,6 +1,8 @@
 import React from "react";
-import { Crosshair, Rocket, Repeat, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Crosshair, Rocket, Repeat, Sparkles, Wallet } from "lucide-react";
 import RuFomoIcon from "@/components/otc/RuFomoIcon";
+import { HUB_ENABLED } from "@/lib/hubFlag";
 
 // Fixed bottom quick-nav: the dashboard's five primary destinations as
 // one-tap anchors — wallet panel, OTC launcher feed, swap, arbitrage and
@@ -15,6 +17,9 @@ export default function QuickNavBar({ onWallet }) {
     // Snipe: crosshair → arbitrage panel, which lists the live-vault
     // NEAR_FLOOR desks ranked by net cost with direct Magic Eden buy links.
     { id: "otc-arbitrage", label: "Snipe", icon: Crosshair },
+    // $HUB protocol dashboard — in-SPA route (react-router Link, no reload).
+    // Gated by the same launch flag as the /hub route in App.jsx.
+    ...(HUB_ENABLED ? [{ to: "/hub", label: "HUB Protocol", icon: Sparkles }] : []),
     { href: "/fomo", label: "RU_FOMO", icon: RuFomoIcon, external: true },
   ];
 
@@ -41,7 +46,16 @@ export default function QuickNavBar({ onWallet }) {
               </button>
             );
           }
-          return it.external ? (
+          return it.to ? (
+            <Link
+              key={it.label}
+              to={it.to}
+              title={`${it.label} — $HUB treasury · yield · tokenomics`}
+              className={`${base} text-emerald-400 hover:text-emerald-300`}
+            >
+              <it.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </Link>
+          ) : it.external ? (
             <a
               key={it.label}
               href={it.href}
