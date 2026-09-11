@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ArrowDown, ArrowLeftRight, Check, Coins, Copy, DollarSign, Flame, Gem, HandCoins, LineChart } from "lucide-react";
 import MascotLogo from "@/components/otc/MascotLogo";
+import TokenCoin from "@/components/otc/TokenCoin";
 import HeroRewardStats from "@/components/otc/HeroRewardStats";
 import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
 
@@ -97,6 +98,7 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
           {/* CA copy bar */}
           <div className="mt-4 flex max-w-xl items-center gap-2">
             <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
+              <TokenCoin symbol="OTC" className="h-5 w-5 shrink-0" />
               <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>
               <span className="shrink-0 text-green-500/50">CA</span>
               <span className="min-w-0 break-all" title={OTC_MINT}>{OTC_MINT}</span>

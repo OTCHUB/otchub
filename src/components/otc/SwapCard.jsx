@@ -4,6 +4,7 @@ import PriceCandles from "@/components/otc/PriceCandles";
 import RecentSwaps from "@/components/otc/RecentSwaps";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 import HelpNote from "@/components/otc/HelpNote";
+import TokenCoin from "@/components/otc/TokenCoin";
 import { fmtUsd, fmtCompact, fmtPct } from "@/lib/format";
 
 // Uniswap-style swap card for ALL screen sizes: stacked YOU PAY / YOU RECEIVE
@@ -122,6 +123,7 @@ export default function SwapCard({
             className="flex items-center gap-1 font-mono text-[11px] text-green-500/50"
             title={mint}
           >
+            <TokenCoin symbol={tokenLabel.replace(/^\$/, "")} mint={mint} className="h-4 w-4 shrink-0" />
             {tokenLabel} · {mint.slice(0, 4)}…{mint.slice(-4)}
             {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
           </button>
@@ -293,7 +295,14 @@ export default function SwapCard({
             placeholder="0.0"
             className="min-w-0 flex-1 bg-transparent font-mono text-xl font-bold text-green-200 outline-none placeholder:text-green-500/25 disabled:opacity-50 sm:text-2xl"
           />
-          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300 sm:text-base">{payToken}</span>
+          <span className="flex shrink-0 items-center gap-1 font-mono text-[15px] font-bold text-green-300 sm:text-base">
+            <TokenCoin
+              symbol={payToken === "SOL" ? "SOL" : payToken.replace(/^\$/, "")}
+              mint={payToken === "SOL" ? null : mint}
+              className="h-4 w-4"
+            />
+            {payToken}
+          </span>
         </div>
         <div className="mt-0.5 font-mono text-[11px] text-green-500/50">
           ≈ {amountUsd != null ? fmtUsd(amountUsd) : "—"}
@@ -323,7 +332,14 @@ export default function SwapCard({
           <span className="min-w-0 break-all font-mono text-xl font-bold text-green-200 sm:text-2xl">
             {quoteOut ?? (quoting ? "…" : "0.0")}
           </span>
-          <span className="shrink-0 font-mono text-[15px] font-bold text-green-300 sm:text-base">{recvToken}</span>
+          <span className="flex shrink-0 items-center gap-1 font-mono text-[15px] font-bold text-green-300 sm:text-base">
+            <TokenCoin
+              symbol={recvToken === "SOL" ? "SOL" : recvToken.replace(/^\$/, "")}
+              mint={recvToken === "SOL" ? null : mint}
+              className="h-4 w-4"
+            />
+            {recvToken}
+          </span>
         </div>
         <div className="mt-0.5 font-mono text-[11px] text-green-500/50">
           ≈ {quoteUsd != null ? fmtUsd(quoteUsd) : quoting ? "finding route…" : "—"}
