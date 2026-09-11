@@ -4,6 +4,7 @@ import MascotLogo from "@/components/otc/MascotLogo";
 import TokenCoin from "@/components/otc/TokenCoin";
 import HeroRewardStats from "@/components/otc/HeroRewardStats";
 import { fmtNum, fmtSol, fmtUsd } from "@/lib/format";
+import { HUB_MINT, HUB_MINT_READY } from "@/lib/hubMint";
 
 const OTC_MINT = "MukLDtJ8Cx9DxLbeyLRSWPSposTMWuwHANbuaudpump";
 const DEX_URL = `https://dexscreener.com/solana/${OTC_MINT}`;
@@ -63,6 +64,7 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
   const desks = latest?.desks_minted ?? 0;
   const desksPct = Math.max(0, Math.min(100, (desks / DESK_CAP) * 100));
 
+  const [hubCopied, setHubCopied] = useState(false);
   const copyCa = async () => {
     try {
       await navigator.clipboard.writeText(OTC_MINT);
@@ -71,6 +73,15 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+  const copyHubCa = async () => {
+    try {
+      await navigator.clipboard.writeText(HUB_MINT);
+    } catch {
+      /* clipboard unavailable — selection copy still works */
+    }
+    setHubCopied(true);
+    setTimeout(() => setHubCopied(false), 1500);
   };
 
   return (
@@ -112,6 +123,27 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
           </div>
+
+          {/* $HUB CA copy bar — same treatment as $OTC, shown only once the
+              official mint is pinned (VITE_HUB_MINT). */}
+          {HUB_MINT_READY && (
+            <div className="mt-2 flex max-w-xl items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center gap-2 border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-300">
+                <TokenCoin symbol="HUB" className="h-5 w-5 shrink-0" />
+                <span className="shrink-0 font-bold tracking-wider text-emerald-400">$HUB</span>
+                <span className="shrink-0 text-emerald-500/50">CA</span>
+                <span className="min-w-0 break-all" title={HUB_MINT}>{HUB_MINT}</span>
+              </span>
+              <button
+                onClick={copyHubCa}
+                title={hubCopied ? "Copied" : "Copy contract address"}
+                aria-label="Copy contract address"
+                className="inline-flex shrink-0 items-center border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-emerald-400 hover:bg-emerald-500/20"
+              >
+                {hubCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          )}
 
           {/* CTA row */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
