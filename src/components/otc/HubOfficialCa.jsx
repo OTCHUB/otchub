@@ -18,11 +18,12 @@ export default function HubOfficialCa() {
     }
   };
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border border-fuchsia-500/60 bg-fuchsia-500/10 px-2 py-1.5 text-[12px] sm:text-[13px]">
-      <span className="font-bold uppercase tracking-widest text-fuchsia-300">
-        ★ $HUB :: OFFICIAL OTC_HUB TOKEN :: CA
-      </span>
-      <span className="min-w-0 break-all font-mono text-fuchsia-200">{HUB_MINT}</span>
+    <div
+      className="mt-2 flex flex-nowrap items-center gap-x-2 overflow-hidden border border-fuchsia-500/60 bg-fuchsia-500/10 px-2 py-1.5 text-[12px] sm:text-[13px]"
+      title={`Official $HUB CA — verify before trading: ${HUB_MINT}`}
+    >
+      <span className="shrink-0 font-bold uppercase tracking-widest text-fuchsia-300">★ $HUB CA</span>
+      <span className="min-w-0 flex-1 truncate font-mono text-fuchsia-200">{HUB_MINT}</span>
       <button
         type="button"
         onClick={copy}
@@ -32,7 +33,7 @@ export default function HubOfficialCa() {
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         {copied ? "COPIED" : "COPY"}
       </button>
-      <span className="text-fuchsia-400/70">verify this CA before trading — impersonators exist</span>
+      <span className="hidden shrink-0 text-fuchsia-400/70 md:inline">verify before trading — impersonators exist</span>
     </div>
   );
 }
