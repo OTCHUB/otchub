@@ -4,6 +4,7 @@ import { Disclaimer } from "../components/Disclaimer";
 import { EarningPreview } from "../components/EarningPreview";
 import { EpochTracker } from "../components/EpochTracker";
 import { HubBondingDashboard } from "../components/HubBondingDashboard";
+import { HubIntro } from "../components/HubIntro";
 import { MainnetPreviewPanel } from "../components/MainnetPreviewPanel";
 import { MetricsStrip } from "../components/MetricsStrip";
 import { ProtocolGate } from "../components/ProtocolGate";
@@ -24,17 +25,29 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
 
   return (
     <div className="space-y-2 font-mono">
+      {/* The whole $HUB pitch in one glance — above the gate so it renders instantly. */}
+      <HubIntro />
       <ProtocolGate>
         {(state, fetchedAt) => (
           <>
-            {/* Top of the main content area, immediately below the global header — the
-                centralized wallet controller every panel below implicitly depends on.
-                Collapses to a one-line status summary once a wallet is connected. */}
-            <div id="hub-wallet">
-              <WalletPanel state={state} walletAddress={walletAddress} />
-            </div>
-            <HubBondingDashboard state={state} address={address} />
+            {/* The eight key numbers as one strip right under the intro. */}
             <MetricsStrip state={state} />
+
+            {/* Two-lane flow: the wallet journey (connect → portfolio → claim → activate →
+                M.I.M ETF) beside the trading surface — side by side on desktop, stacked on
+                mobile, so one screen carries the whole first decision. */}
+            <div className="grid items-start gap-2 lg:grid-cols-2">
+              <div id="hub-wallet" className="min-w-0">
+                <WalletPanel state={state} walletAddress={walletAddress} />
+              </div>
+              <div className="min-w-0">
+                <HubBondingDashboard state={state} address={address} />
+              </div>
+            </div>
+
+            <EpochTracker state={state} />
+            <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+
             <Panel
               title="THE $HUB FLYWHEEL"
               right={
@@ -44,13 +57,17 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
               }
             >
               <p className="mb-2 text-xs leading-relaxed text-green-400/90">
-                Activate a desk NFT, earn a share of every reward round, and a slice of that same
-                revenue buys back and burns $HUB — click any node below to see how it fits together.
+                Activate a desk, earn every round, buy back &amp; burn $HUB — click any node.
               </p>
               <FlywheelDiagram />
             </Panel>
-            <EpochTracker state={state} />
-            <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />
+
+            {/* Secondary tooling — collapsed by default to keep the page light. */}
+            <Panel title="DESK LOOKUP" collapsible defaultCollapsed>
+              <DeskLookupPanel state={state} />
+            </Panel>
+            <MainnetPreviewPanel />
+
             <div className="flex justify-between text-[10px] text-green-700">
               <span>last read {new Date(fetchedAt).toLocaleTimeString()}</span>
               <span className="flex gap-3">
@@ -62,10 +79,6 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
                 </Link>
               </span>
             </div>
-            <Panel title="DESK LOOKUP">
-              <DeskLookupPanel state={state} />
-            </Panel>
-            <MainnetPreviewPanel />
           </>
         )}
       </ProtocolGate>

@@ -6,7 +6,6 @@ import { useWallet } from "../WalletProvider";
 import { ActivatePanel } from "./ActivatePanel";
 import { ClaimPanel } from "./ClaimPanel";
 import { HubPotPanel } from "./HubPotPanel";
-import { BoltIcon } from "./ui/Icons";
 import { Panel } from "./ui/Panel";
 import { WalletConnect } from "./WalletConnect";
 import { WalletPortfolio } from "./WalletPortfolio";
@@ -59,23 +58,6 @@ export function WalletPanel({ state, walletAddress }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="term-window px-3 py-2.5 font-mono">
-        <div className="flex items-start gap-2">
-          <BoltIcon className="h-4 w-4 shrink-0 text-green-500" />
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-green-600">
-              [ WHAT IS HUB PROTOCOL? ]
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-green-400/90">
-              <span className="font-bold text-green-200">HUB Protocol</span> — the sovereign
-              liquidity layer for the new age of internet finance. Decentralized OTC desks,
-              automated treasury yields, and the home of{" "}
-              <span className="font-bold text-green-300">Magic Internet Money</span>.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <Panel
         title="Wallet Connect"
         collapsible
@@ -84,9 +66,6 @@ export function WalletPanel({ state, walletAddress }: Props) {
       >
         {!address ? (
           <>
-            <p className="mb-2 text-xs text-green-700">
-              Tip: connecting once here works everywhere across the dashboard.
-            </p>
             <WalletConnect onConnected={connect} />
           </>
         ) : (

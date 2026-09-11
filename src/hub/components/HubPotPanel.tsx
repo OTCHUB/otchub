@@ -158,12 +158,9 @@ export function HubPotPanel({ desks, address }: Props) {
 
   return (
     <Panel title="M.I.M ETF">
-      <p className="text-[10px] uppercase tracking-widest text-green-600">
-        Magic Internet Money Basket
-      </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-green-400/90">
-        A tier-weighted basket of $OTC, CRCLx, NVDAx, and SPCXx. Funded by treasury yield
-        rebalancing: 13 stocks consolidated into 4 native tickers. Pure yield, zero cost.
+      <p className="text-xs leading-relaxed text-green-400/90">
+        The Magic Internet Money basket — tier-weighted payouts of $OTC, CRCLx, NVDAx and SPCXx,
+        rebalanced from 13 stocks into 4 native tickers. Pure yield, zero cost.
       </p>
 
       <div className="mt-3">
@@ -292,8 +289,8 @@ export function HubPotPanel({ desks, address }: Props) {
       <div className={disclaimerCls}>
         <span aria-hidden>ⓘ</span>
         <span>
-          NVDAx and SPCXx are tokenized xStock tickers native to the OTC Desks ecosystem — not
-          equity, shares, or any claim on the real companies NVIDIA or SpaceX.
+          NVDAx and SPCXx are OTC-native tickers — not equity in, or any claim on, NVIDIA or
+          SpaceX.
         </span>
       </div>
     </Panel>

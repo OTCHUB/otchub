@@ -289,14 +289,12 @@ function DevnetGraduatedSwapPanel({
       collapsible
     >
       <p className="mb-2 text-[11px] text-green-400/90">
-        Jupiter has no devnet routes, so trades here go straight to the live Raydium CP-Swap pool
-        this curve graduated into.{" "}
         {poolAddress ? (
           <>
             POOL <AddressLink address={poolAddress} label={shortKey(poolAddress, 6)} />
           </>
         ) : (
-          "pool address unavailable"
+          "pool migration in progress…"
         )}
       </p>
       {settingsOpen && (
@@ -451,8 +449,7 @@ function DevnetGraduatedSwapPanel({
       )}
       <TxLogView logs={logs} />
       <div className="mt-2 text-[10px] text-green-700">
-        Quotes are computed live from the pool's own vault reserves (a 0.25% trade fee applies);
-        the tx is simulated first, so a failing sim aborts before signing (no fee spent).
+        Live vault-reserve quotes · 0.25% fee · simulated before signing.
       </div>
     </Panel>
   );
@@ -877,9 +874,7 @@ function BondingCurvePanel({
         )}
         <TxLogView logs={logs} />
         <div className="mt-2 text-[10px] text-green-700">
-          Each leg is a two-step deposit-then-redeem against the curve wallet: your deposit is
-          simulated, signed, sent and confirmed, then the curve API redeems it at the price locked
-          in at quote time.
+          Deposit-then-redeem at the quote-locked price · simulated before signing.
         </div>
       </Panel>
 
