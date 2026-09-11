@@ -78,9 +78,15 @@ function TokenDetails({ token, symbols = {}, catalog = {} }) {
         {logo && <a href={logo} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-300 underline">Open original image ↗</a>}
       </div>
       <div className="min-w-0 space-y-3">
-        <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] text-green-500/70">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 font-mono text-[13px] text-green-500/70">
           <span className="min-w-0 break-all" title={token.mint}>{token.mint}</span>
           <CopyCa mint={token.mint} />
+          {isOfficialHubMint(token.mint) && (
+            <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 text-[10px] font-bold uppercase tracking-wider text-fuchsia-300"
+              title="This mint matches the pinned official $HUB CA — verified against the app's pinned address">
+              ★ $HUB OFFICIAL CA
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-2" aria-label="Token social links">
           {socials.map(({ label, Icon, url }) => <a key={label} href={url} target="_blank" rel="noopener noreferrer"
@@ -432,8 +438,10 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               </button>
               {t.name && <span className="hidden max-w-[22ch] truncate text-[11px] text-green-500/50 lg:inline" title={t.name}>{t.name}</span>}
               {isOfficialHubMint(t.mint) && (
-                <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold text-fuchsia-300"
-                  title="Official OTC_HUB token — mint verified against the official CA">★</span>
+                <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold uppercase tracking-wider text-fuchsia-300"
+                  title={`Official $HUB — this row's mint matches the pinned official CA (${t.mint})`}>
+                  ★ $HUB OFFICIAL CA
+                </span>
               )}
               {t.payoutInfo && (
                 <RowPayout payout={t.payoutInfo} symbols={feed?.rewardSymbols || {}} catalog={feed?.rewardCatalog} />
