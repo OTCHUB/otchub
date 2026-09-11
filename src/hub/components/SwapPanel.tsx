@@ -60,6 +60,14 @@ export function SwapPanel({ state, address }: Props) {
   const [phase, setPhase] = useState<SwapPhase | null>(null);
   const [logs, setLogs] = useState<TxLog[]>([]);
   const gen = useRef(0);
+  // Swap-context validity, tracked separately from `gen` (the quote-poll generation).
+  // `gen` is bumped by the poll effect below, which also depends on `busy` — the very
+  // flag `doSwap` sets to true right as it starts. Sharing one counter for both meant
+  // starting a swap always crossed its own "context changed" guard before the wallet
+  // could ever be asked to sign. `swapGen` only advances when swap-identifying inputs
+  // actually change, at render time, never as a side effect of `busy` toggling.
+  const swapGen = useRef(0);
+  const swapKeyRef = useRef<string | null>(null);
   const balances = useWalletBalances(address, mint, state.token.hubTokenProgram);
 
   const isBuy = mode === "BUY";
@@ -81,6 +89,13 @@ export function SwapPanel({ state, address }: Props) {
     inputError = (e as Error).message;
   }
   const params = raw ? { inputMint, outputMint, amount: raw.toString(), slippageBps } : null;
+  // Render-time invalidation (not effect-time): advances the instant any swap-identifying
+  // input actually changes, and only then — never merely because `busy` flipped.
+  const swapKey = params ? `${inputMint}|${outputMint}|${params.amount}|${slippageBps}|${address ?? ""}` : null;
+  if (swapKeyRef.current !== swapKey) {
+    swapKeyRef.current = swapKey;
+    swapGen.current++;
+  }
   const inBal = balances.data ? (isBuy ? balances.data.solLamports : balances.data.hubUnits) : null;
   const outBal = balances.data
     ? isBuy
@@ -132,7 +147,7 @@ export function SwapPanel({ state, address }: Props) {
     if (!signer) return setErr("Connect a signing wallet above to swap (read-only address)");
     if (inBal == null) return setErr("Balance not loaded yet — retry in a moment");
     if (raw! > inBal) return setErr(`${isBuy ? "SOL" : "$HUB"} balance too low`);
-    const g = gen.current;
+    const g = swapGen.current;
     setBusy(true);
     setLogs([]);
     const res = await executeSwap({
@@ -142,7 +157,7 @@ export function SwapPanel({ state, address }: Props) {
       params,
       onLog: (l) => setLogs((p) => [...p, l]),
       onPhase: setPhase,
-      shouldContinue: () => gen.current === g && resolveSigner(signer.publicKey) !== null,
+      shouldContinue: () => swapGen.current === g && resolveSigner(signer.publicKey) !== null,
     });
     // `in` narrowing works under both strict (hubconnect) and non-strict (otchub jsconfig) TS.
     if ("reason" in res) setErr(`Swap stopped: ${res.reason}`);
