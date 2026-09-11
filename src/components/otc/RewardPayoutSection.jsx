@@ -34,6 +34,13 @@ export function PayoutIcon({ mint, symbol, icon }) {
   );
 }
 
+/**
+ * @param {{
+ *   payout?: any,
+ *   symbols?: Record<string, string>,
+ *   catalog?: { byMint?: Record<string, any>, bySymbol?: Record<string, any> },
+ * }} props
+ */
 export default function RewardPayoutSection({ payout, symbols = {}, catalog = {} }) {
   const byMint = catalog?.byMint || {}, bySymbol = catalog?.bySymbol || {};
   const basket = Array.isArray(payout?.rewardBasket) ? payout.rewardBasket : [];

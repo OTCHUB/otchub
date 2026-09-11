@@ -6,6 +6,13 @@ import { PayoutIcon } from "@/components/otc/RewardPayoutSection";
 // launcher rows dense. Full payout details live in the token profile dialog.
 // Icons come from the feed's rewardCatalog (the exact 1:1 site resolution);
 // the legacy symbols map only names otherwise-unknown basket members.
+/**
+ * @param {{
+ *   payout?: any,
+ *   symbols?: Record<string, string>,
+ *   catalog?: { byMint?: Record<string, any>, bySymbol?: Record<string, any> },
+ * }} props
+ */
 export default function RowPayout({ payout, symbols = {}, catalog = {} }) {
   const byMint = catalog?.byMint || {}, bySymbol = catalog?.bySymbol || {};
   const basket = Array.isArray(payout?.rewardBasket) && payout.rewardBasket.length > 1 ? payout.rewardBasket : [];

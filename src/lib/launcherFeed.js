@@ -6,6 +6,7 @@
 // to the mirrored payload: rows are filtered, sorted and paged locally with
 // the exact same contract the server applies.
 
+/** @type {Record<string, any>} */
 const ENV = (typeof import.meta !== "undefined" && import.meta.env) || {};
 const SUPABASE_URL = (ENV.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_ANON_KEY = ENV.VITE_SUPABASE_ANON_KEY || "";

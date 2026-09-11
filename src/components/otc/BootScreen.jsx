@@ -48,7 +48,7 @@ const BANNER = [
 function FitAscii({ children, className }) {
   const wrapRef = useRef(null);
   const innerRef = useRef(null);
-  const [fit, setFit] = useState({ transform: "none" });
+  const [fit, setFit] = useState({ transform: "none", height: undefined });
 
   useEffect(() => {
     const wrap = wrapRef.current, inner = innerRef.current;

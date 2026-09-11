@@ -61,7 +61,7 @@ export function HubNavMenu() {
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  const sections =
+  const sections: SectionEntry[] =
     cluster === "devnet"
       ? [
           ...SECTIONS,
