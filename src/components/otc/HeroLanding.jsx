@@ -95,24 +95,6 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
 
   return (
     <section className="term-window mt-3 border border-green-500/30 bg-black p-4 sm:p-6">
-      {/* Launch announcement — $HUB live on Solana mainnet. Shown only once
-          the official mint is pinned (stealth-gated like every $HUB badge).
-          Kept to a single sleek line: no wrapping, no second row of copy. */}
-      {HUB_MINT_READY && (
-        <div className="mb-3 flex flex-nowrap items-center gap-2 overflow-hidden border border-fuchsia-500/60 bg-fuchsia-500/10 px-3 py-1.5">
-          <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-fuchsia-400" />
-          <span className="min-w-0 flex-1 truncate text-[11px] font-bold uppercase tracking-widest text-fuchsia-300 sm:text-[12px]">
-            ★ $HUB IS LIVE ON SOLANA MAINNET — stake, earn the M.I.M basket
-          </span>
-          <Link
-            to="/hub"
-            title="Open the $HUB protocol dashboard"
-            className="inline-flex shrink-0 items-center gap-1.5 border border-fuchsia-400/70 bg-fuchsia-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-fuchsia-200 hover:bg-fuchsia-500/25 sm:text-[11px]"
-          >
-            <TokenCoin symbol="HUB" className="h-3.5 w-3.5" /> OPEN $HUB
-          </Link>
-        </div>
-      )}
       <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto]">
         {/* Left: headline, CA copy bar, CTAs, live feature cards */}
         <div className="min-w-0">
@@ -137,8 +119,8 @@ export default function HeroLanding({ latest, onGoPanel, onConnectWallet }) {
               $HUB bar renders only once the official mint is pinned
               (VITE_HUB_MINT) and carries its live DEX quote + M.I.M payout
               basket on a second line. */}
-          <div className="mt-4 grid max-w-xl items-center gap-2 sm:grid-cols-2">
-            <div className={`flex min-w-0 items-center gap-2 ${HUB_MINT_READY ? "" : "sm:col-span-2"}`}>
+          <div className="mt-4 grid max-w-xl items-center gap-2 md:grid-cols-2">
+            <div className={`flex min-w-0 items-center gap-2 ${HUB_MINT_READY ? "" : "md:col-span-2"}`}>
               <span className="flex min-w-0 flex-1 items-center gap-2 border border-green-500/30 bg-green-500/5 px-3 py-2 text-[11px] text-green-300">
                 <TokenCoin symbol="OTC" className="h-5 w-5 shrink-0" />
                 <span className="shrink-0 font-bold tracking-wider text-green-400">$OTC</span>

@@ -44,7 +44,6 @@ import ContractsPanel from "@/components/otc/ContractsPanel";
 import CollapsibleCard from "@/components/otc/CollapsibleCard";
 import FooterBranding from "@/components/otc/FooterBranding";
 import TerminalVisual from "@/components/otc/TerminalVisual";
-import HubOfficialCa from "@/components/otc/HubOfficialCa";
 import HeroLanding from "@/components/otc/HeroLanding";
 
 import { useLiveOtcPrice } from "@/lib/useLiveOtcPrice";
@@ -290,8 +289,6 @@ export default function Home() {
               Syncing live data…
             </div>
           )}
-          {/* Official $HUB CA banner — hidden until the real mint is set */}
-          <HubOfficialCa />
         </header>
 
         {/* Hero landing — scroll straight into the analytics below */}
