@@ -30,6 +30,7 @@ import {
 import { fmtSol, fmtUnits } from "../lib/format";
 import { OFFICIAL_DESKS_URL } from "../lib/marketplace";
 import type { TxLog } from "../lib/swap";
+import { StockIcon } from "./ui/StockIcon";
 import { TxLogView } from "./ui/TxLogView";
 
 /** Fixed by `OTC_PAY_SWAP_BURN_PCT_BP` (currently an even 50/50 swap/pot split) — not a live
@@ -199,7 +200,10 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
   };
 
   const verb = fromTier ? "UPGRADE" : "ACTIVATE";
-  const ticker = method === "sol" ? "SOL" : "$OTC";
+  // The tier cost is paid in $HUB (burned from the payer's wallet) or in $OTC (Jupiter-swapped
+  // into the $HUB burn) — the flat SOL step fee applies to both paths, so the toggle reads
+  // $HUB / $OTC, never "SOL" as a payment method.
+  const ticker = method === "sol" ? "$HUB" : "$OTC";
   const runLabel = busy
     ? `${(phase ?? "prep").toUpperCase()}…`
     : `[${verb} → T${toTier} · ${ticker}]`;
@@ -222,9 +226,10 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
             <span className="font-bold">
               T{t} {TIER_NAMES[t - 1]}
             </span>
-            <span className="text-[9px] opacity-70">
+            <span className="inline-flex items-center gap-1 text-[9px] opacity-70">
               {TIER_USD[t - 1]} ·{" "}
-              {fmtUnits(BigInt(liveHubCostUnits(t, nowTs, state.config)), HUB_DECIMALS, 0)} HUB
+              {fmtUnits(BigInt(liveHubCostUnits(t, nowTs, state.config)), HUB_DECIMALS, 0)}
+              <StockIcon symbol="HUB" className="h-3 w-3" />
             </span>
           </button>
         ))}
@@ -237,7 +242,14 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
             type="button"
             disabled={busy || (m === "otc" && !otcAvailable)}
             onClick={() => setMethod(m)}
-            className={`flex-1 border py-1 text-[11px] font-bold disabled:opacity-25 ${
+            title={
+              m === "sol"
+                ? "burn the tier cost in $HUB from your wallet (plus the flat SOL fee)"
+                : quote?.otcUnavailableReason
+                  ? `$OTC unavailable — ${quote.otcUnavailableReason}`
+                  : "swap $OTC → $HUB on Jupiter for the burn (plus the flat SOL fee)"
+            }
+            className={`flex flex-1 items-center justify-center gap-1.5 border py-1 text-[11px] font-bold disabled:opacity-25 ${
               method === m
                 ? m === "sol"
                   ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
@@ -245,7 +257,8 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
                 : "border-green-500/30 text-green-500/60"
             }`}
           >
-            PAY {m === "sol" ? "SOL" : `$OTC · ${OTC_TOTAL_PREMIUM}×`}
+            <StockIcon symbol={m === "sol" ? "HUB" : "OTC"} className="h-4 w-4" />
+            PAY {m === "sol" ? "$HUB" : `$OTC · ${OTC_TOTAL_PREMIUM}×`}
           </button>
         ))}
       </div>
@@ -253,9 +266,14 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
       {quote && split && (
         <div className="space-y-0.5 border border-green-500/20 p-2 text-[11px]">
           <div className="flex justify-between gap-2">
-            <span className={method === "sol" ? "text-emerald-300" : "text-amber-300"}>
+            <span
+              className={`inline-flex items-center gap-1 ${
+                method === "sol" ? "text-emerald-300" : "text-amber-300"
+              }`}
+            >
+              <StockIcon symbol={method === "sol" ? "HUB" : "OTC"} className="h-3.5 w-3.5" />
               {method === "sol"
-                ? `${fmtSol(quote.solLamports, 2)} SOL`
+                ? `burn ${fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB`
                 : !otcAvailable
                   ? `unavailable — ${quote.otcUnavailableReason}`
                   : otcRouteErr
@@ -264,43 +282,57 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
                       ? "quoting…"
                       : `${fmtUnits(otcTotalUnits, otcDecimals)} OTC`}
             </span>
-            <span className="text-green-700">
+            <span className="text-right text-green-700">
               {method === "sol"
-                ? `${fmtSol(split.toPot, 2)} pot · ${fmtSol(split.toOps, 2)} ops`
+                ? fromTier
+                  ? `T${fromTier} → T${toTier} difference`
+                  : `full T${toTier} cost`
                 : `half → $HUB burn · half → yield vault`}
             </span>
           </div>
-          <div className={`flex justify-between gap-2 ${hubShort ? "text-amber-400" : "text-cyan-300"}`}>
-            <span>burn {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB</span>
+          {method === "otc" && (
+            <div
+              className={`flex justify-between gap-2 ${hubShort ? "text-amber-400" : "text-cyan-300"}`}
+            >
+              <span className="inline-flex items-center gap-1">
+                <StockIcon symbol="HUB" className="h-3.5 w-3.5" />
+                burn {fmtUnits(BigInt(quote.hubBurnUnits), HUB_DECIMALS, 0)} HUB
+              </span>
+              <span className="text-green-700">
+                {fromTier ? `T${fromTier} → T${toTier} difference` : `full T${toTier} cost`}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between gap-2 text-green-500/70">
+            <span className="inline-flex items-center gap-1">
+              <StockIcon symbol="SOL" className="h-3.5 w-3.5" />
+              {fmtSol(quote.solLamports, 2)} SOL flat fee
+            </span>
             <span className="text-green-700">
-              {fromTier ? `T${fromTier} → T${toTier} difference` : `full T${toTier} cost`}
+              {fmtSol(split.toPot, 2)} pot · {fmtSol(split.toOps, 2)} ops
             </span>
           </div>
         </div>
       )}
 
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-green-700">
-        <span>SOL {balances.data ? fmtSol(Number(balances.data.solLamports), 3) : "…"}</span>
-        <span className={otcShort ? "text-amber-400" : ""}>
-          $OTC{" "}
-          {!balances.data
-            ? "…"
-            : otcBal === null
-              ? "—"
-              : fmtUnits(otcBal, otcDecimals)}
+        <span className="inline-flex items-center gap-1">
+          <StockIcon symbol="SOL" className="h-3.5 w-3.5" />
+          {balances.data ? fmtSol(Number(balances.data.solLamports), 3) : "…"}
         </span>
-        <span className={hubShort ? "text-amber-400" : ""}>
-          $HUB{" "}
-          {!balances.data
-            ? "…"
-            : hubBal === null
-              ? "—"
-              : fmtUnits(hubBal, hubDecimals, 0)}
+        <span className={`inline-flex items-center gap-1 ${otcShort ? "text-amber-400" : ""}`}>
+          <StockIcon symbol="OTC" className="h-3.5 w-3.5" />
+          {!balances.data ? "…" : otcBal === null ? "—" : fmtUnits(otcBal, otcDecimals)}
+        </span>
+        <span className={`inline-flex items-center gap-1 ${hubShort ? "text-amber-400" : ""}`}>
+          <StockIcon symbol="HUB" className="h-3.5 w-3.5" />
+          {!balances.data ? "…" : hubBal === null ? "—" : fmtUnits(hubBal, hubDecimals, 0)}
         </span>
       </div>
       {(otcShort || solShort || hubShort) && (
         <div className="text-[10px] text-amber-400">
-          insufficient {hubShort ? "$HUB" : ticker} for this {verb.toLowerCase()}.
+          insufficient {hubShort ? "$HUB" : otcShort ? "$OTC" : "SOL (flat fee)"} for this{" "}
+          {verb.toLowerCase()}.
         </div>
       )}
 
