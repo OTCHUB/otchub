@@ -9,6 +9,7 @@ import { executeClaimHubPotReward, type HubPotClaimPhase } from "../lib/hubPotCl
 import { fmtNum, fmtUnits } from "../lib/format";
 import type { TxLog } from "../lib/swap";
 import { AddressLink } from "./ui/AddressLink";
+import { StockIcon } from "./ui/StockIcon";
 import { Panel, Row, Stat } from "./ui/Panel";
 import { TxLogView } from "./ui/TxLogView";
 
@@ -19,6 +20,20 @@ const BUCKET_LABELS = {
   spcxx: "SPCXX",
 } as const;
 type BucketKey = keyof typeof BUCKET_LABELS;
+// 1:1 catalog stock per bucket (base44/shared/rewardStockCatalog.js) — drives
+// the bundled /stocks icons in the bucket stats and claim rows.
+const BUCKET_SYMBOLS: Record<BucketKey, string> = {
+  otc: "OTC",
+  crclx: "CRCLx",
+  nvdax: "NVDAx",
+  spcxx: "SPCXx",
+};
+const bucketLabel = (b: BucketKey) => (
+  <span className="inline-flex items-center gap-1">
+    <StockIcon symbol={BUCKET_SYMBOLS[b]} className="h-3.5 w-3.5" />
+    {BUCKET_LABELS[b]}
+  </span>
+);
 const BUCKET_KEYS = Object.keys(BUCKET_LABELS) as BucketKey[];
 const RETRO_BTN = "border px-2.5 py-1 text-[12px] disabled:opacity-30";
 const PRIMARY_BTN = `${RETRO_BTN} border-emerald-500/60 font-bold text-emerald-300 hover:bg-emerald-500/10`;
@@ -173,7 +188,7 @@ export function HubPotPanel({ desks, address }: Props) {
         {BUCKET_KEYS.map((b) => (
           <Stat
             key={b}
-            label={BUCKET_LABELS[b]}
+            label={bucketLabel(b)}
             value={fmtUnits(pot[`${b}PendingUnits` as const], decimals[b])}
             sub={`Lifetime ${fmtUnits(pot[`${b}DepositedUnits` as const], decimals[b])}`}
           />
@@ -187,7 +202,7 @@ export function HubPotPanel({ desks, address }: Props) {
             {BUCKET_KEYS.map((b) => (
               <Stat
                 key={b}
-                label={BUCKET_LABELS[b]}
+                label={bucketLabel(b)}
                 value={fmtUnits(round[`${b}Units` as const], decimals[b])}
                 sub={`Paid ${fmtUnits(round[`${b}DistributedUnits` as const], decimals[b])} · ${fmtNum(round.claims)} claims`}
               />
@@ -205,7 +220,7 @@ export function HubPotPanel({ desks, address }: Props) {
             {activeDesks.length === 1 ? "" : "s"})
           </div>
           {BUCKET_KEYS.map((b) => (
-            <Row key={b} k={BUCKET_LABELS[b]} v={fmtUnits(myShare[b], decimals[b])} />
+            <Row key={b} k={bucketLabel(b)} v={fmtUnits(myShare[b], decimals[b])} />
           ))}
         </div>
       )}
@@ -237,10 +252,14 @@ export function HubPotPanel({ desks, address }: Props) {
                   <span className="min-w-0 flex-1">
                     <AddressLink address={r.asset} />
                   </span>
-                  <span className="text-right text-green-300">
-                    {BUCKET_KEYS.filter((b) => r.share[b] > 0n)
-                      .map((b) => `${fmtUnits(r.share[b], decimals[b])} ${BUCKET_LABELS[b]}`)
-                      .join(" · ")}
+                  <span className="flex flex-wrap items-center justify-end gap-x-2 text-right text-green-300">
+                    {BUCKET_KEYS.filter((b) => r.share[b] > 0n).map((b) => (
+                      <span key={b} className="inline-flex items-center gap-1">
+                        <StockIcon symbol={BUCKET_SYMBOLS[b]} className="h-3.5 w-3.5" />
+                        {fmtUnits(r.share[b], decimals[b])}
+                        <span className="text-green-600">{BUCKET_LABELS[b]}</span>
+                      </span>
+                    ))}
                   </span>
                 </label>
               ))}

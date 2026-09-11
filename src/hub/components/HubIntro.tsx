@@ -1,4 +1,5 @@
 import { BoltIcon } from "./ui/Icons";
+import { BasketIcons } from "./ui/StockIcon";
 
 const PILLARS = [
   {
@@ -45,6 +46,12 @@ export function HubIntro() {
             <span className="border border-emerald-500/50 bg-emerald-500/10 px-1.5 py-px font-bold text-emerald-300">
               $HUB protocol
             </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-green-600">
+              m.i.m basket
+            </span>
+            <BasketIcons />
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {PILLARS.map((p) => (

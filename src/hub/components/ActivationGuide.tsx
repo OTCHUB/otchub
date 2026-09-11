@@ -1,4 +1,5 @@
 import { Panel } from "./ui/Panel";
+import { BasketIcons } from "./ui/StockIcon";
 
 const STEPS = [
   {
@@ -67,6 +68,12 @@ export function ActivationGuide() {
           The treasury's initial 2% $HUB stack earns the M.I.M payout basket from $HUB trading
           activity: 10% auto-compounds into locked LP — a fee-earning liquidity layer between $HUB
           and OTC/CRCLx/NVDAx/SPCXx — the rest feeds back into the HUB Pot for activated desks.
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] uppercase tracking-widest text-green-700">
+            m.i.m basket
+          </span>
+          <BasketIcons />
         </div>
       </div>
     </Panel>
