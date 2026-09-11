@@ -4,7 +4,7 @@ import { Link, NavLink } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
 import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
 import { getSignerForAddress } from "@/lib/walletSigner";
-import CommunityMenu from "@/components/otc/CommunityMenu";
+import { HubNavMenu } from "@/hub/components/HubNavMenu";
 import MascotLogo from "@/components/otc/MascotLogo";
 import ThemeToggle from "@/components/otc/ThemeToggle";
 import Footer from "@/components/otc/Footer";
@@ -93,7 +93,7 @@ function HubHeader() {
           >
             OTC_HUB →
           </Link>
-          <CommunityMenu />
+          <HubNavMenu />
           <ThemeToggle />
         </div>
       </div>
