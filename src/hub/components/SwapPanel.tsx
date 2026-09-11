@@ -20,6 +20,7 @@ import {
 import { AddressLink } from "./ui/AddressLink";
 import { CopyButton } from "./ui/CopyButton";
 import { Panel } from "./ui/Panel";
+import { StockIcon } from "./ui/StockIcon";
 import { TxLogView } from "./ui/TxLogView";
 
 type Props = { state: ProtocolState; address: string | null };
@@ -273,7 +274,10 @@ export function SwapPanel({ state, address }: Props) {
             placeholder="0.0"
             className="min-w-0 flex-1 bg-transparent text-xl font-bold text-green-200 outline-none placeholder:text-green-500/25 disabled:opacity-40"
           />
-          <span className="shrink-0 text-sm font-bold text-green-300">{payToken}</span>
+          <span className="flex shrink-0 items-center gap-1 text-sm font-bold text-green-300">
+            <StockIcon symbol={payToken === "SOL" ? "SOL" : "HUB"} className="h-4 w-4" />
+            {payToken}
+          </span>
         </div>
         {isBuy && (
           <div className="mt-1 text-[10px] text-green-700">
@@ -308,7 +312,10 @@ export function SwapPanel({ state, address }: Props) {
           <span className="min-w-0 break-all text-xl font-bold text-emerald-400">
             {quote ? formatRawAmount(BigInt(quote.outAmount), outDec) : quoting ? "…" : "0.0"}
           </span>
-          <span className="shrink-0 text-sm font-bold text-green-300">{ticker}</span>
+          <span className="flex shrink-0 items-center gap-1 text-sm font-bold text-green-300">
+            <StockIcon symbol={ticker === "SOL" ? "SOL" : "HUB"} className="h-4 w-4" />
+            {ticker}
+          </span>
         </div>
       </div>
 

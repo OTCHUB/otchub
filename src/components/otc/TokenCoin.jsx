@@ -6,16 +6,16 @@ import { rewardIconProxyUrl } from "@/lib/rewardIcons";
 // inside a circle with a thin green ring (rounded-full + object-cover).
 // Resolution chain: bundled 1:1 asset (public/stocks, backfilled from the
 // official site) → getRewardIcon proxy by symbol → proxy by mint → the
-// symbol's first letter. SOL has no image asset: it renders as a plain "S"
-// coin with zero network fetches.
-const BUNDLED_ICONS = { OTC: "/stocks/OTC.png" };
+// symbol's first letter. SOL has a bundled official wrapped-SOL logo, so the
+// "S" coin never touches the network.
+const BUNDLED_ICONS = { OTC: "/stocks/OTC.png", SOL: "/stocks/SOL.png" };
 
 export default function TokenCoin({ symbol, mint = null, className = "h-4 w-4" }) {
   const [failed, setFailed] = useState(0);
   const label = String(symbol || (mint ? mint.slice(0, 1) : "?"));
   const candidates =
     label === "SOL"
-      ? []
+      ? [BUNDLED_ICONS.SOL]
       : [
           BUNDLED_ICONS[symbol] ?? null,
           symbol ? rewardIconProxyUrl(symbol) : null,

@@ -13,6 +13,7 @@ const BUNDLED_ICONS: Record<string, string> = {
   CRCLx: "/stocks/CRCLx.png",
   NVDAx: "/stocks/NVDAx.png",
   SPCXx: "/stocks/SPCXx.png",
+  SOL: "/stocks/SOL.png",
 };
 
 const STOCK_NAMES: Record<string, string> = {
@@ -20,6 +21,7 @@ const STOCK_NAMES: Record<string, string> = {
   CRCLx: "Circle",
   NVDAx: "NVIDIA",
   SPCXx: "SpaceX",
+  SOL: "Solana",
 };
 
 export function StockIcon({
