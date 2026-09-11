@@ -38,7 +38,7 @@ export function StockIcon({
     <span
       aria-hidden="true"
       title={STOCK_NAMES[symbol] ?? symbol}
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden bg-green-500/10 text-[8px] font-bold leading-none text-green-400 ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-green-500/30 bg-green-500/10 text-[8px] font-bold leading-none text-green-400 ${className}`}
     >
       {src ? (
         <img
@@ -50,7 +50,7 @@ export function StockIcon({
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed((n) => n + 1)}
-          className="h-full w-full object-contain"
+          className="h-full w-full scale-[1.08] rounded-full object-cover"
         />
       ) : (
         symbol.slice(0, 1)
