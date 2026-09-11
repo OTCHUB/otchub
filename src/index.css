@@ -532,3 +532,32 @@ html.light .term-bar {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------
+   Live $HUB activation ticker (see src/hub/components/HubActivations.tsx):
+   a seamless horizontal conveyor of the latest on-chain activation chips.
+   The track holds two identical copies in a w-max flex row, so the
+   -50% → 0 transform loops rightward forever with no visible wrap — the
+   same seamless-loop trick as .hub-reward-flow. Hovering a chip pauses the
+   conveyor so the Solscan link stays easy to hit; reduced-motion users see
+   the first copy statically.
+   ------------------------------------------------------------------ */
+@keyframes hub-activations-marquee {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+.hub-activations-track {
+  animation: hub-activations-marquee 40s linear infinite;
+  will-change: transform;
+}
+
+.hub-activations-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-activations-track {
+    animation: none;
+  }
+}

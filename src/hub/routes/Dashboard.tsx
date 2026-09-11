@@ -5,6 +5,7 @@ import { Disclaimer } from "../components/Disclaimer";
 import { EarningPreview } from "../components/EarningPreview";
 import { EpochTracker } from "../components/EpochTracker";
 import { HubBondingDashboard } from "../components/HubBondingDashboard";
+import { HubActivations } from "../components/HubActivations";
 import { HubHero } from "../components/HubHero";
 import { MainnetPreviewPanel } from "../components/MainnetPreviewPanel";
 import { MetricsStrip } from "../components/MetricsStrip";
@@ -37,6 +38,11 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
           <>
             {/* The eight key numbers as one strip right under the intro. */}
             <MetricsStrip state={state} />
+
+            {/* Live activation ticker — the last 10 real on-chain activates/
+                upgrades as a moving bar (desk art · tier · desk #), each chip
+                linking to its transaction on Solscan. */}
+            <HubActivations state={state} />
 
             {/* Two packed stacks on desktop — no column ever shows a void beside a taller
                 neighbor, because every panel stacks flush inside its own column instead of
