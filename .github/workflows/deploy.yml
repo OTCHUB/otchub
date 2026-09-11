@@ -43,8 +43,16 @@ jobs:
           # address as devnet (7c5oPs9G...7b7i) — see src/hub/lib/deployments.ts.
           # All 6 initialize_* mainnet transactions have run and Config.hubMint
           # matches VITE_HUB_MINT below, so /hub is now enabled for production.
+          # VITE_HUB_CLUSTER is a literal here (not sourced from a secret) — same
+          # convention as the /devnet sandbox mount below, which hardcodes
+          # cluster: "devnet" in HUB_DEVNET_CONFIG (src/pages/Hub.jsx) rather than
+          # reading VITE_HUB_DEVNET_CLUSTER. Sourcing it from a secret let an
+          # unset/stale VITE_HUB_MAINNET_CLUSTER silently fall back to "devnet"
+          # in Hub.jsx (`CLUSTERS.includes(envCluster) ? envCluster : "devnet"`)
+          # even while VITE_HUB_RPC_URL pointed at mainnet — the EnvBadge cluster
+          # mismatch seen on otchub.dev/hub. Requires a PR to change.
           VITE_HUB_RPC_URL=${{ secrets.VITE_HUB_MAINNET_RPC_URL }}
-          VITE_HUB_CLUSTER=${{ secrets.VITE_HUB_MAINNET_CLUSTER }}
+          VITE_HUB_CLUSTER=mainnet-beta
           VITE_HUB_PROGRAM_ID=$MAINNET_PROGRAM_ID
 
           # Sandbox mount (/devnet) — QA only, always devnet.

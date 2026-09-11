@@ -69,6 +69,8 @@ standalone shell redirect. Launch checklist: also set `VITE_HUB_CLUSTER=mainnet-
 (CA copy, program id, BurnState burn proof, live supply / circulating / burn %, Metaplex
 metadata + socials as indexers read them) for Dexscreener / CoinGecko listing.
 
+Live mainnet $HUB pair: [dexscreener.com/solana/4L45QjLmaKkqtyXgpR28fqcgWaF7cVZnHcDRCCwfy8TH](https://dexscreener.com/solana/4L45QjLmaKkqtyXgpR28fqcgWaF7cVZnHcDRCCwfy8TH).
+
 - `src/hub/` — UI module vendored from `hubconnect/web/src/hub` (TypeScript; Vite compiles it as-is).
 - `src/hub-sdk/` — read-only SDK + IDL vendored from `hubconnect/sdk`, aliased as `@hub-sdk`
   (`vite.config.js`, `jsconfig.json`). Decodes accounts with `@anchor-lang/core` 1.2.0 to match
