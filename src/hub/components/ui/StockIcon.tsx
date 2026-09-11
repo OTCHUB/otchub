@@ -14,6 +14,9 @@ const BUNDLED_ICONS: Record<string, string> = {
   NVDAx: "/stocks/NVDAx.png",
   SPCXx: "/stocks/SPCXx.png",
   SOL: "/stocks/SOL.png",
+  // $HUB protocol token — the official 3D terminal logo (square source,
+  // cropped to the coin by the component's rounded-full mask).
+  HUB: "/stocks/HUB.jpg",
 };
 
 const STOCK_NAMES: Record<string, string> = {
@@ -22,6 +25,7 @@ const STOCK_NAMES: Record<string, string> = {
   NVDAx: "NVIDIA",
   SPCXx: "SpaceX",
   SOL: "Solana",
+  HUB: "$HUB Protocol",
 };
 
 export function StockIcon({
