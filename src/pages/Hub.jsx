@@ -33,13 +33,16 @@ const hubSwapTransport = {
   swapTransaction: async (quote, userPublicKey) =>
     (await getSwapTx(quote, userPublicKey)).swapTransaction,
 };
-const CLUSTERS = ["devnet", "mainnet-beta", "localnet"];
-const envCluster = import.meta.env.VITE_HUB_CLUSTER ?? "devnet";
+// Cluster is a LITERAL, not sourced from VITE_HUB_CLUSTER: a stale/unset
+// secret let /hub silently fall back to "devnet" even while VITE_HUB_RPC_URL
+// pointed at mainnet (the EnvBadge mismatch seen on otchub.dev/hub — see the
+// same convention in .github/workflows/deploy.yml and HUB_DEVNET_CONFIG
+// below). $HUB is launched on mainnet-beta; requires a code change to move.
 export const HUB_CONFIG = {
   rpcUrl: import.meta.env.VITE_HUB_RPC_URL ?? "https://api.devnet.solana.com",
   // Defaults to the address baked into the vendored IDL (devnet deploy).
   programId: import.meta.env.VITE_HUB_PROGRAM_ID || undefined,
-  cluster: CLUSTERS.includes(envCluster) ? envCluster : "devnet",
+  cluster: "mainnet-beta",
 };
 // "/devnet" sandbox — always devnet regardless of VITE_HUB_CLUSTER, so it
 // keeps working as a risk-free QA environment even after HUB_CONFIG above
