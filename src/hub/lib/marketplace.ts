@@ -8,7 +8,7 @@ export const DEFAULT_COLLECTION_URL = `https://magiceden.io/marketplace/${MAGIC_
 /** Official OTC Desks launch-curve mint (mainnet only — no devnet equivalent, see faucet.ts). */
 export const OFFICIAL_MINT_URL = "https://otcdesks.cash/mint";
 /** Official OTC Desks activation platform — the external/official alternative to this dashboard's
- *  native ACTIVATE_DESK flow (ActivatePanel.tsx), for users who prefer otcdesks.cash's own UI. */
+ *  native ACTIVATE_DESK flow (ActivateFlow.tsx), for users who prefer otcdesks.cash's own UI. */
 export const OFFICIAL_DESKS_URL = "https://otcdesks.cash/desks";
 
 export const magicEdenItemUrl = (asset: string) =>
