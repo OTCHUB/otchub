@@ -5,7 +5,7 @@ import { Disclaimer } from "../components/Disclaimer";
 import { EarningPreview } from "../components/EarningPreview";
 import { EpochTracker } from "../components/EpochTracker";
 import { HubBondingDashboard } from "../components/HubBondingDashboard";
-import { HubIntro } from "../components/HubIntro";
+import { HubHero } from "../components/HubHero";
 import { MainnetPreviewPanel } from "../components/MainnetPreviewPanel";
 import { MetricsStrip } from "../components/MetricsStrip";
 import { ProtocolGate } from "../components/ProtocolGate";
@@ -27,8 +27,11 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
 
   return (
     <div className="space-y-2 font-mono">
-      {/* The whole $HUB pitch in one glance — above the gate so it renders instantly. */}
-      <HubIntro />
+      {/* $HUB landing hero (identity, CA bar, CTAs, reward flow, burn progress) —
+          above the gate so it renders instantly; it reads chain state through
+          the same shared-cache query the gate uses, so live numbers fill in the
+          moment state loads. */}
+      <HubHero />
       <ProtocolGate>
         {(state, fetchedAt) => (
           <>

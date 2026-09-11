@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TIER_WEIGHTS_BP, type ProtocolState } from "@hub-sdk";
+import { TIER_NAMES, TIER_WEIGHTS_BP, type ProtocolState } from "@hub-sdk";
 import { usePayerBalances } from "../hooks/usePayerBalances";
 import { useWalletPortfolio, type OwnedDesk } from "../hooks/useWalletPortfolio";
 import { fmtNum, fmtSol, fmtUnits, fmtWeight, shortKey } from "../lib/format";
@@ -56,12 +56,14 @@ function DeskCard({ desk, onOpen }: { desk: OwnedDesk; onOpen: () => void }) {
   const voided = !!desk.tier?.voided;
   const tier = isActive(desk) ? desk.tier!.tier : 0;
   const pending = desk.pendingLamports;
+  const lifetime = desk.tier?.totalClaimedLamports ?? 0;
+  const native = desk.nativeActive;
   return (
     <button
       type="button"
       onClick={onOpen}
       title="Open desk — claim · activate · upgrade"
-      className="flex min-h-[60px] flex-col justify-between gap-1.5 border border-green-500/15 p-1.5 text-left transition-colors hover:border-emerald-400/50 hover:bg-green-500/5"
+      className="flex min-h-[92px] flex-col justify-between gap-1 border border-green-500/15 p-1.5 text-left transition-colors hover:border-emerald-400/50 hover:bg-green-500/5"
     >
       <div className="flex w-full items-center gap-1.5">
         {desk.art?.image ? (
@@ -85,10 +87,56 @@ function DeskCard({ desk, onOpen }: { desk: OwnedDesk; onOpen: () => void }) {
           <span className="text-[9px] font-bold uppercase tracking-widest text-green-700">RAW</span>
         )}
       </div>
+      {/* Activation story at a glance: the $HUB tier (e.g. "HUB ACTIVATED · T1
+          TRADER"), whether the official OTC Desks program recognizes the desk's
+          payout vault on-chain, and the earnings ledger — pending (unclaimed
+          boost accrued right now) + TL CLAIMED (lifetime boost this desk has
+          claimed). */}
+      <div className="flex w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] font-bold uppercase tracking-widest">
+        {voided ? (
+          <span className="text-red-400">TIER VOIDED</span>
+        ) : tier ? (
+          <span className="text-cyan-300">
+            HUB ACTIVATED · T{tier} {TIER_NAMES[tier - 1]}
+          </span>
+        ) : (
+          <span className="text-green-700">HUB INACTIVE</span>
+        )}
+        {native === true && (
+          <span
+            className="text-emerald-400"
+            title="Payout vault exists on-chain in the official OTC Desks program — desk is natively activated"
+          >
+            · OTC ACTIVE
+          </span>
+        )}
+        {native === false && (
+          <span
+            className="text-amber-500/70"
+            title="No OTC Desks program vault found for this desk on-chain"
+          >
+            · OTC UNSEEN
+          </span>
+        )}
+      </div>
       <div className="flex w-full items-center justify-between gap-1">
         <TierLadder tier={tier} voided={voided} />
         <span className={`text-[10px] font-bold ${pending > 0 ? "text-emerald-300" : "text-green-800"}`}>
           {pending > 0 ? fmtSol(pending, 3) : "·"}
+        </span>
+      </div>
+      <div className="flex w-full items-center justify-between gap-1 text-[9px] uppercase tracking-widest text-green-700">
+        <span title="Unclaimed $HUB protocol boost accrued right now">
+          pend{" "}
+          <span className={pending > 0 ? "font-bold text-emerald-300" : ""}>
+            {pending > 0 ? `${fmtSol(pending, 3)} SOL` : "—"}
+          </span>
+        </span>
+        <span title="Lifetime $HUB protocol boost claimed by this desk">
+          tl claimed{" "}
+          <span className="font-bold text-amber-300">
+            {lifetime > 0 ? `${fmtSol(lifetime, 3)} SOL` : "—"}
+          </span>
         </span>
       </div>
     </button>
