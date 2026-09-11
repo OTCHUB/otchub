@@ -23,9 +23,10 @@ const btn =
 
 const SOLANA_FAUCET_URL = "https://faucet.solana.com";
 
-/** devnet.otchub.dev/drip — the only place the faucet Worker is deployed (see wrangler.jsonc's
- * `devnet` env + workers/faucet.ts). Gated on the connected cluster rather than the URL so a
- * dev pointed at devnet from any host sees the same faucet, and mainnet never can. */
+/** otchub.dev/drip — the faucet page (backed by the devnet Worker deployed at otchub.dev/devnet
+ * + otchub.dev/drip, see wrangler.jsonc's `devnet` env + workers/faucet.ts). Gated on the
+ * connected cluster rather than the URL so a dev pointed at devnet from any host sees the same
+ * faucet, and mainnet never can. */
 export function DripPage() {
   const { cluster } = useHub();
   const wallet = useWallet();
@@ -63,7 +64,7 @@ export function DripPage() {
         <BackLink />
         <Panel title="FAUCET :: DEVNET ONLY">
           <p className="text-xs text-green-400/90">
-            This faucet only exists on devnet (devnet.otchub.dev) — it mints test $HUB/$OTC/M.I.M
+            This faucet only exists on devnet (otchub.dev/devnet) — it mints test $HUB/$OTC/M.I.M
             ETF basket tokens and Mock OTC Desk NFTs, and is never deployed for mainnet-beta. This
             app is currently connected to <span className="text-amber-300">{cluster}</span>.
           </p>
@@ -175,7 +176,7 @@ export function DripPage() {
         }
       >
         <p className="mb-2 text-xs text-green-400/90">
-          One request sends 100,000 $HUB, 100,000 $OTC, 10 each of CRCLx / OpenAI / Anthropic (the
+          One request sends 100,000 $HUB, 100,000 $OTC, 10 each of CRCLx / NVDAx / SPCXx (the
           M.I.M ETF basket), and mints 1 unactivated Mock OTC Desk NFT — everything needed to
           activate a desk and test the HUB Pot claim. One request per wallet per 8h.
         </p>
@@ -213,8 +214,8 @@ export function DripPage() {
           <div className="mt-2 space-y-1 text-[11px] text-green-400/90">
             <div>
               {dripResult.amounts.hub} $HUB · {dripResult.amounts.otc} $OTC ·{" "}
-              {dripResult.amounts.crclx} CRCLx · {dripResult.amounts.openai} OPENAI ·{" "}
-              {dripResult.amounts.anthropic} ANTHROPIC
+              {dripResult.amounts.crclx} CRCLx · {dripResult.amounts.nvdax} NVDAX ·{" "}
+              {dripResult.amounts.spcxx} SPCXX
             </div>
             <a
               href={dripResult.explorer}
