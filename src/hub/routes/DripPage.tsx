@@ -17,10 +17,12 @@ import { Turnstile } from "../components/ui/Turnstile";
 import { shortKey } from "../lib/format";
 import {
   FaucetHttpError,
+  dripSol,
   dripTokens,
   fetchFaucetStatus,
   TURNSTILE_SITE_KEY,
   type DripResult,
+  type SolDripResult,
 } from "../lib/faucet";
 
 const btn =
@@ -41,6 +43,10 @@ const DRIP_PREVIEW: { symbol: string; amount: string }[] = [
 ];
 const DRIP_COOLDOWN_LABEL = "1 request / wallet / 8h";
 
+/** Mirrors SOL_DRIP_LAMPORTS in hubconnect/web/workers/faucet-config.ts. */
+const SOL_DRIP_LABEL = "0.005 SOL";
+const SOL_COOLDOWN_LABEL = "1 request / wallet / 8h";
+
 /** Compact "icon + amount" chip shared by the pre-drip preview and the post-drip receipt. */
 function TokenChip({ symbol, amount }: { symbol: string; amount: string }) {
   return (
@@ -56,17 +62,24 @@ function TokenChip({ symbol, amount }: { symbol: string; amount: string }) {
  * connected cluster rather than the URL so a dev pointed at devnet from any host sees the same
  * faucet, and mainnet never can. */
 export function DripPage() {
-  const { cluster } = useHub();
+  const { cluster, connection } = useHub();
   const wallet = useWallet();
   const qc = useQueryClient();
   const [connectOpen, setConnectOpen] = useState(false);
   const [dripBusy, setDripBusy] = useState(false);
   const [dripErr, setDripErr] = useState<string | null>(null);
   const [dripResult, setDripResult] = useState<DripResult | null>(null);
+  const [solBusy, setSolBusy] = useState(false);
+  const [solErr, setSolErr] = useState<string | null>(null);
+  const [solResult, setSolResult] = useState<SolDripResult | null>(null);
   // Manual override: drip to any pasted devnet address without connecting a wallet at all. When
   // empty, falls back to the connected wallet (if any) — see `targetAddress` below.
   const [manualAddress, setManualAddress] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Independent from `turnstileToken` above: Turnstile tokens are single-use, and the SOL claim
+  // and the token drip are two separate server-verified requests, so each needs its own widget
+  // instance + token rather than racing to consume a shared one.
+  const [solTurnstileToken, setSolTurnstileToken] = useState<string | null>(null);
   // True once the post-drip desk poll below (`pollForDesk`) has retried and still can't see the
   // freshly-minted desk — swaps the "locating…" spinner for a manual [RECHECK] so the panel never
   // gets stuck forever if the RPC's Core program-account index is unusually slow.
@@ -84,7 +97,18 @@ export function DripPage() {
   const manualKey = trimmedManual ? parsePubkey(trimmedManual) : null;
   const manualInvalid = trimmedManual !== "" && !manualKey;
   const targetAddress = trimmedManual ? (manualKey?.toBase58() ?? null) : wallet.address;
+  const targetKey = trimmedManual ? manualKey : wallet.address ? parsePubkey(wallet.address) : null;
   const requireTurnstile = !!TURNSTILE_SITE_KEY;
+  // Live SOL balance for whoever /drip would target — drives the "claim gas SOL first" nudge
+  // below (a 0-lamport wallet doesn't exist on-chain yet, so even a token drip's follow-up
+  // activation would fail fee-payer simulation; see ActivateFlow's SIM_FAIL: AccountNotFound).
+  const solBalanceQuery = useQuery({
+    queryKey: ["faucet", "sol-balance", connection.rpcEndpoint, targetAddress],
+    queryFn: () => connection.getBalance(targetKey!, "confirmed"),
+    enabled: !!targetKey,
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
   // Activation needs a real signer — only offer the inline step when the drip actually landed on
   // the wallet connected right here (never for a manually-pasted foreign address; that case keeps
   // pointing at the dashboard below, same as before).
@@ -102,6 +126,9 @@ export function DripPage() {
     setDripErr(null);
     setTurnstileToken(null);
     setDeskPollExhausted(false);
+    setSolResult(null);
+    setSolErr(null);
+    setSolTurnstileToken(null);
   }, [wallet.address, manualAddress]);
 
   // Freshly-minted Metaplex Core desk assets can lag the RPC's program-account index by a few
@@ -169,6 +196,27 @@ export function DripPage() {
     }
   };
 
+  const runSolDrip = async () => {
+    if (!targetAddress) return setSolErr("connect a wallet or paste a valid devnet address first");
+    if (requireTurnstile && !solTurnstileToken) {
+      return setSolErr("complete the verification challenge below first");
+    }
+    setSolBusy(true);
+    setSolErr(null);
+    try {
+      const result = await dripSol(targetAddress, solTurnstileToken ?? undefined);
+      setSolResult(result);
+      void solBalanceQuery.refetch();
+      if (canActivateInline) {
+        void qc.invalidateQueries({ queryKey: ["hub", "payer-balances"] });
+      }
+    } catch (e) {
+      setSolErr(e instanceof FaucetHttpError ? e.message : "gas SOL claim failed — try again");
+    } finally {
+      setSolBusy(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-2 font-mono">
       <div className="flex items-center justify-between">
@@ -204,16 +252,8 @@ export function DripPage() {
             [CONNECT WALLET]
           </button>
         )}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-green-500/10 pt-2 text-[10px] text-green-600">
-          <span>or paste a devnet address below — no connection needed</span>
-          <a
-            href={SOLANA_FAUCET_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-cyan-300 underline hover:text-cyan-100"
-          >
-            need gas SOL? get some free ↗
-          </a>
+        <div className="mt-2 text-[10px] text-green-600">
+          or paste a devnet address below — no connection needed
         </div>
         <input
           value={manualAddress}
@@ -232,7 +272,62 @@ export function DripPage() {
       </Panel>
 
       <Panel
-        title="2 · GET STARTER KIT"
+        title="2 · GET GAS SOL"
+        right={
+          solBalanceQuery.data != null ? `balance ${(solBalanceQuery.data / 1e9).toFixed(4)} SOL` : "…"
+        }
+      >
+        <div className="mb-2 text-[10px] text-green-700">
+          every tx (including the starter kit's follow-up activation) needs devnet SOL to pay its
+          fee — a wallet with 0 SOL doesn't exist on the ledger yet. Claim a small top-up here
+          first; need more than that?{" "}
+          <a
+            href={SOLANA_FAUCET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-cyan-300 underline hover:text-cyan-100"
+          >
+            use the official faucet ↗
+          </a>
+        </div>
+        {targetAddress && (
+          <div className="mb-2 text-[11px] text-green-600">
+            sending to: <AddressLink address={targetAddress} full />
+          </div>
+        )}
+        <Turnstile
+          siteKey={TURNSTILE_SITE_KEY}
+          onVerify={setSolTurnstileToken}
+          onExpire={() => setSolTurnstileToken(null)}
+          className="mb-2"
+        />
+        <button
+          type="button"
+          onClick={runSolDrip}
+          disabled={solBusy || !targetAddress || (requireTurnstile && !solTurnstileToken)}
+          className={btn}
+        >
+          {solBusy ? "[CLAIMING…]" : `[GET ${SOL_DRIP_LABEL}]`}
+        </button>
+        <div className="mt-1 text-[10px] text-green-700">{SOL_COOLDOWN_LABEL}</div>
+        {solErr && <div className="mt-2 text-[11px] text-amber-400">ERR: {solErr}</div>}
+        {solResult && (
+          <div className="mt-2 text-[11px] text-green-400/90">
+            sent {(Number(solResult.lamports) / 1e9).toFixed(3)} SOL ·{" "}
+            <a
+              href={solResult.explorer}
+              target="_blank"
+              rel="noreferrer"
+              className="text-cyan-300 underline hover:text-cyan-100"
+            >
+              {shortKey(solResult.signature, 8)} ↗
+            </a>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title="3 · GET STARTER KIT"
         right={
           status.data
             ? `faucet ${status.data.solLamports / 1e9} SOL`
@@ -352,7 +447,7 @@ export function DripPage() {
       {dripResult && canActivateInline && wallet.address && (
         <div ref={activateRef} className="space-y-2">
           <Panel
-            title="3 · ACTIVATE YOUR DESK"
+            title="4 · ACTIVATE YOUR DESK"
             right={`desk #${dripResult.desk.deskNumber}`}
           >
             {protocol.status.kind === "ready" ? (

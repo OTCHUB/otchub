@@ -44,6 +44,14 @@ export type DripResult = {
   desk: MintDeskResult;
 };
 
+export type SolDripResult = {
+  signature: string;
+  explorer: string;
+  wallet: string;
+  /** Base lamports sent (string — mirrors DripResult's `amounts` convention). */
+  lamports: string;
+};
+
 /** Thrown for any non-2xx response; `status` lets callers branch on 429 (cooldown/rate-limit). */
 export class FaucetHttpError extends Error {
   constructor(
@@ -82,6 +90,15 @@ export const fetchFaucetStatus = () => call<FaucetStatus>("/api/faucet/status");
 
 export const dripTokens = (wallet: string, turnstileToken?: string) =>
   call<DripResult>("/api/faucet/drip", {
+    method: "POST",
+    body: JSON.stringify({ wallet, turnstileToken }),
+  });
+
+/** Minimal native-SOL top-up (see workers/faucet.ts's SOL_DRIP_LAMPORTS) — own cooldown from
+ *  `dripTokens`, meant only to get a brand-new devnet wallet onto the ledger as a real fee-payer.
+ *  Point testers who need more at the official https://faucet.solana.com. */
+export const dripSol = (wallet: string, turnstileToken?: string) =>
+  call<SolDripResult>("/api/faucet/sol", {
     method: "POST",
     body: JSON.stringify({ wallet, turnstileToken }),
   });
