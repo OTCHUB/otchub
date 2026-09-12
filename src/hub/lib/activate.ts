@@ -435,11 +435,32 @@ export async function executeTierChange(opts: {
     onLog({ type: "ok", msg: `SENT ${sig.slice(0, 8)}…`, sig });
 
     onPhase?.("confirm");
-    const conf = await connection.confirmTransaction({ signature: sig, ...bh }, "confirmed");
-    if (conf.value.err) {
-      const reason = JSON.stringify(conf.value.err);
-      onLog({ type: "err", msg: `FAILED_ON_CHAIN: ${reason}`, sig });
-      return { asset: deskAsset, ok: false, sig, reason };
+    try {
+      // Re-fetch the blockhash right before confirming — not the `bh` from before the wallet
+      // sim/sign round-trip above, which may already be stale by now, causing an immediate,
+      // false "expired" the instant `confirmTransaction` is called even though the tx lands
+      // moments later (see curve.ts's `confirmWithRecheck` for the same fix on that flow).
+      const confirmBh = await connection.getLatestBlockhash("confirmed");
+      const conf = await connection.confirmTransaction(
+        { signature: sig, ...confirmBh },
+        "confirmed",
+      );
+      if (conf.value.err) throw new Error(`FAILED_ON_CHAIN: ${JSON.stringify(conf.value.err)}`);
+    } catch (e) {
+      // A confirm error (block-height-exceeded in particular) doesn't guarantee the activation
+      // never landed — client-side height tracking and network confirmation can race. Check the
+      // signature directly before telling the user the desk wasn't upgraded when it actually was.
+      const status = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+      const landed =
+        status.value != null &&
+        status.value.err == null &&
+        (status.value.confirmationStatus === "confirmed" ||
+          status.value.confirmationStatus === "finalized");
+      if (!landed) {
+        const reason = (e as Error).message;
+        onLog({ type: "err", msg: `FAILED_ON_CHAIN: ${reason}`, sig });
+        return { asset: deskAsset, ok: false, sig, reason };
+      }
     }
     onLog({ type: "ok", msg: `DONE :: desk now T${toTier}`, sig });
     return { asset: deskAsset, ok: true, sig };
