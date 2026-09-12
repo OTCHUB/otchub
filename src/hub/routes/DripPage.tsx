@@ -67,6 +67,10 @@ export function DripPage() {
   // empty, falls back to the connected wallet (if any) — see `targetAddress` below.
   const [manualAddress, setManualAddress] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // True once the post-drip desk poll below (`pollForDesk`) has retried and still can't see the
+  // freshly-minted desk — swaps the "locating…" spinner for a manual [RECHECK] so the panel never
+  // gets stuck forever if the RPC's Core program-account index is unusually slow.
+  const [deskPollExhausted, setDeskPollExhausted] = useState(false);
   const activateRef = useRef<HTMLDivElement>(null);
 
   const status = useQuery({
@@ -97,7 +101,24 @@ export function DripPage() {
     setDripResult(null);
     setDripErr(null);
     setTurnstileToken(null);
+    setDeskPollExhausted(false);
   }, [wallet.address, manualAddress]);
+
+  // Freshly-minted Metaplex Core desk assets can lag the RPC's program-account index by a few
+  // seconds — a single `portfolio.refetch()` right after the drip lands often still misses it, so
+  // ACTIVATE_DESK gets stuck on "locating your new desk…" until *something else* happens to
+  // refetch. Poll with backoff (~15s total) instead; give up (and offer a manual recheck) only if
+  // the index is still behind after that.
+  const DESK_POLL_DELAYS_MS = [500, 1000, 1500, 2500, 4000, 6000];
+  const pollForDesk = async (asset: string) => {
+    setDeskPollExhausted(false);
+    for (const delay of DESK_POLL_DELAYS_MS) {
+      await new Promise((r) => setTimeout(r, delay));
+      const { data } = await portfolio.refetch();
+      if (data?.desks.some((d) => d.asset === asset)) return;
+    }
+    setDeskPollExhausted(true);
+  };
 
   // Carry the eye straight down to the activation step once the starter kit (and its desk) lands.
   useEffect(() => {
@@ -134,14 +155,12 @@ export function DripPage() {
     try {
       const result = await dripTokens(targetAddress, turnstileToken ?? undefined);
       setDripResult(result);
-      // Pick up the freshly-minted desk (portfolio) and refreshed $HUB/$OTC/SOL balances
-      // (ActivateFlow's usePayerBalances) before ACTIVATE_DESK renders below — otherwise the
-      // balance strip there stays stale for up to its 20s poll interval.
+      // Refresh $HUB/$OTC/SOL (ActivateFlow's usePayerBalances) right away instead of waiting up
+      // to its 20s poll interval; the desk itself is polled separately (see `pollForDesk`) since
+      // it commonly lags the balance/token-account state by a few extra seconds.
       if (canActivateInline) {
-        await Promise.all([
-          portfolio.refetch(),
-          qc.invalidateQueries({ queryKey: ["hub", "payer-balances"] }),
-        ]);
+        void qc.invalidateQueries({ queryKey: ["hub", "payer-balances"] });
+        void pollForDesk(result.desk.asset);
       }
     } catch (e) {
       setDripErr(e instanceof FaucetHttpError ? e.message : "drip failed — try again");
@@ -347,6 +366,19 @@ export function DripPage() {
                     void qc.invalidateQueries({ queryKey: ["hub", "payer-balances"] });
                   }}
                 />
+              ) : deskPollExhausted ? (
+                <div className="space-y-1.5 text-xs">
+                  <div className="text-amber-400">
+                    still can't see it — the RPC's desk index can occasionally lag past 15s.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void pollForDesk(dripResult.desk.asset)}
+                    className={btn}
+                  >
+                    [RECHECK]
+                  </button>
+                </div>
               ) : (
                 <div className="text-xs text-green-700">locating your new desk…</div>
               )
