@@ -269,6 +269,11 @@ export async function buildTierChangeIxs(opts: {
     ixs.push(await buildClaimYieldIx(program, payer, deskAsset, config, otcPot));
   }
   const hubMint = new PublicKey(config.hubMint);
+  // Idempotent — a no-op if the payer already has the $HUB ATA (the common case, funded by a
+  // prior drip/transfer); required for a wallet activating its very first desk with no $HUB
+  // ATA yet, where `activate_tier`/`upgrade_tier`'s `payer_hub` account would otherwise not
+  // exist on-chain and the simulation fails before the program even runs.
+  ixs.push(createAtaIdempotentIx(payer, payer, hubMint, opts.hubTokenProgram));
   const common = {
     payer,
     deskAsset,

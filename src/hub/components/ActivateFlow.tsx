@@ -168,6 +168,9 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
     if (method === "otc" && !otcRoute)
       return setErr(otcRouteErr ?? "still fetching the $OTC→$HUB route — wait a moment");
     if (hubShort) return setErr("insufficient $HUB balance for this activation's burn cost");
+    if (solShort) return setErr("insufficient SOL for the flat activation fee");
+    if (method === "otc" && otcShort)
+      return setErr("insufficient $OTC balance for this activation's swap cost");
     if (claimBlocked)
       return setErr("pending yield must settle first, but the $OTC yield vault isn't funded yet");
     setBusy(true);
@@ -344,8 +347,9 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
           busy ||
           !hasQuote ||
           hubShort ||
+          solShort ||
           claimBlocked ||
-          (method === "otc" && (!otcAvailable || !otcRoute))
+          (method === "otc" && (!otcAvailable || !otcRoute || otcShort))
         }
         className="w-full border border-emerald-500/60 py-2 text-[13px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
       >
