@@ -9,7 +9,7 @@ import {
 } from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { fetchDeskArtBatch, type DeskAssetArt } from "../lib/das";
-import { fetchOtcNativeActive } from "../lib/otcNative";
+import { fetchNativeActive } from "../lib/otcNative";
 import { yieldBoostPctOverBase } from "../lib/yield";
 
 export type OwnedDesk = {
@@ -22,7 +22,8 @@ export type OwnedDesk = {
   /** Whole-percent yield boost vs the base (T1) tier weight — 0 for raw/voided desks. */
   yieldBoostPct: number;
   /** True when the desk's payout vault exists on-chain in the official OTC Desks program
-   *  (natively activated — see lib/otcNative). null = not checked (off mainnet). */
+   *  (natively activated — see lib/otcNative), or (devnet) its `NativeYieldMock` stand-in.
+   *  null = not checked (unsupported cluster, e.g. localnet). */
   nativeActive: boolean | null;
 };
 
@@ -65,11 +66,9 @@ export function useWalletPortfolio(address: string | null, state: ProtocolState 
       const [tiers, artByAsset, otcNative] = await Promise.all([
         Promise.all(assets.map((a) => fetchDeskTier(program, a))),
         fetchDeskArtBatch(connection.rpcEndpoint, assetKeys),
-        // Native OTC Desks activation check — mainnet only (the OTC program has
-        // no devnet deployment); off mainnet the desk cards hide the badge.
-        cluster === "mainnet-beta"
-          ? fetchOtcNativeActive(connection, assetKeys)
-          : Promise.resolve(null),
+        // Native OTC Desks activation check — the real program on mainnet, the
+        // `NativeYieldMock` stand-in on devnet (see lib/otcNative); null elsewhere.
+        fetchNativeActive(connection, programId, cluster, assetKeys),
       ]);
       const desks: OwnedDesk[] = assetKeys.map((asset, i) => {
         const tier = tiers[i];

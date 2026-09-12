@@ -10,6 +10,7 @@
 // plus this native OTC check.
 
 import { PublicKey, type Connection } from "@solana/web3.js";
+import { nativeYieldMockPda } from "@hub-sdk";
 
 export const OTC_DESKS_PROGRAM_ID = new PublicKey(
   "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW",
@@ -49,4 +50,54 @@ export async function fetchOtcNativeActive(
     for (let j = 0; j < accounts.length; j++) out.set(ids[i + j], !!accounts[j]);
   }
   return out;
+}
+
+/**
+ * Devnet-only stand-in for `fetchOtcNativeActive` above — the real OTC Desks program has no
+ * devnet deployment, so devnet reads `NativeYieldMock` (see hubconnect's `sdk/src/pda.ts`)
+ * instead: a plain system-owned lamport PDA per desk, provisioned by
+ * `scripts/devnet-native-yield-init.ts` and topped up by `scripts/devnet-native-yield-drip.ts`
+ * to simulate ongoing native yield accrual. Same batching/never-throws contract as the mainnet
+ * check. `hubProgramId` is `Config`'s program id (the mock PDA is derived under it, not
+ * `OTC_DESKS_PROGRAM_ID`).
+ */
+export async function fetchDevnetNativeYieldMock(
+  connection: Connection,
+  hubProgramId: PublicKey,
+  assetIds: string[],
+): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  const ids = [...new Set(assetIds)].filter((a) => {
+    try {
+      new PublicKey(a);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  for (let i = 0; i < ids.length; i += 100) {
+    const slice = ids.slice(i, i + 100).map((id) => nativeYieldMockPda(hubProgramId, new PublicKey(id))[0]);
+    const accounts = await connection
+      .getMultipleAccountsInfo(slice)
+      .catch(() => slice.map(() => null));
+    for (let j = 0; j < accounts.length; j++) out.set(ids[i + j], !!accounts[j]);
+  }
+  return out;
+}
+
+/**
+ * Cluster-dispatching "native active" check: the real check on mainnet-beta, the
+ * `NativeYieldMock` devnet stand-in on devnet, `null` (not checked) on any other cluster
+ * (localnet/testnet) — mirrors the `cluster === "mainnet-beta"` gate `useWalletPortfolio`
+ * previously applied inline.
+ */
+export async function fetchNativeActive(
+  connection: Connection,
+  hubProgramId: PublicKey,
+  cluster: string,
+  assetIds: string[],
+): Promise<Map<string, boolean> | null> {
+  if (cluster === "mainnet-beta") return fetchOtcNativeActive(connection, assetIds);
+  if (cluster === "devnet") return fetchDevnetNativeYieldMock(connection, hubProgramId, assetIds);
+  return null;
 }
