@@ -65,7 +65,7 @@ export function HubNavMenu() {
     cluster === "devnet"
       ? [
           ...SECTIONS,
-          { id: "drip", label: "Faucet", hint: "devnet starter kit", icon: Droplets, to: "drip" },
+          { id: "drip", label: "Drip", hint: "devnet starter kit", icon: Droplets, to: "drip" },
         ]
       : SECTIONS;
 

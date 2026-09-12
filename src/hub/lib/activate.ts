@@ -32,12 +32,14 @@ import {
   otcPayable,
   otcPotPda,
   potPda,
+  tierFeePda,
   tierPda,
   tokenomicsPda,
   type ConfigView,
   type HubProgram,
   type OtcPayView,
   type OtcPotView,
+  type TierFeeView,
   type TokenomicsView,
 } from "@hub-sdk";
 import { buildClaimYieldIx } from "./claim";
@@ -101,22 +103,30 @@ export function otcUnavailableReason(p: OtcPayView | null): string | undefined {
  *  burn is the *live* USD-pegged cost (`liveHubCostDeltaUnits` — tracks `config`'s price cache,
  *  falling back to the genesis/ceiling table only when stale), matching what `Config::hub_cost_
  *  delta` will actually charge on-chain right now. The $OTC amount itself isn't known until
- *  `fetchOtcToHubRoute` returns a live quote. */
+ *  `fetchOtcToHubRoute` returns a live quote.
+ *
+ *  `tierFee` must be `ProtocolState.tierFee` — the live, admin-retunable ascending per-tier SOL
+ *  fee (`TierFeeConfig`, T1 0.2 / T2 0.3 / T3 0.4 / T4 0.5 SOL genesis default). `config.
+ *  stepFeeLamports` is a dead legacy field the program no longer reads for this charge; falling
+ *  back to it here only covers the pre-`init_tier_fee_config` edge case (the on-chain accounts
+ *  actually require `TierFeeConfig` to exist, so `tierFee` should never be null once a cluster
+ *  is fully provisioned). */
 export function quoteTierChange(opts: {
   config: ConfigView;
+  tierFee: TierFeeView | null;
   otcPay: OtcPayView | null;
   fromTier: number;
   toTier: number;
 }): TierQuote {
-  const { config, otcPay, fromTier, toTier } = opts;
+  const { config, tierFee, otcPay, fromTier, toTier } = opts;
   assertTierRange(fromTier, toTier);
   const steps = toTier - fromTier;
   const reason = otcUnavailableReason(otcPay);
   return {
     steps,
-    // Flat: one `activate_tier`/`upgrade_tier` call always costs one step fee, regardless of
-    // how many tiers it crosses.
-    solLamports: config.stepFeeLamports,
+    // Ascending, indexed by the *target* tier reached (never `fromTier` nor the step count) —
+    // one `activate_tier`/`upgrade_tier` call always costs exactly `tierFee[toTier - 1]`.
+    solLamports: tierFee?.tierStepFeeLamports[toTier - 1] ?? config.stepFeeLamports,
     otcAvailable: !reason && otcPayable(otcPay),
     otcUnavailableReason: reason,
     hubBurnUnits: liveHubCostDeltaUnits(fromTier, toTier, Math.floor(Date.now() / 1000), config),
@@ -233,12 +243,20 @@ export async function buildTierChangeIxs(opts: {
    *  the on-chain accounts here (`payerHub`, `tokenProgram`/`hubTokenProgram`) must match
    *  whichever one truly owns the mint or `burn_checked`/`transfer_checked` reject the tx. */
   hubTokenProgram: string;
+  /** The token program that actually owns `config.otcMint` on this cluster (`PayerBalances.
+   *  otcTokenProgram`, resolved live off-chain) — never assume Token-2022: mainnet's real $OTC
+   *  launch mint is Token-2022, but devnet's mock $OTC mint is classic Token. Used for every
+   *  $OTC ATA derivation and the `otcTokenProgram` account on the $OTC-pay path, plus the
+   *  pre-upgrade claim-yield ATA (claim_yield always pays out in $OTC). Defaults to Token-2022
+   *  only as a last resort when the caller hasn't resolved it yet. */
+  otcTokenProgram?: string;
 }): Promise<TransactionInstruction[]> {
   const { program, payer, deskAsset, fromTier, toTier, method, config, otcPay, otcPot } = opts;
   assertTierRange(fromTier, toTier);
   if (!opts.tokenomics)
     throw new Error("TokenomicsConfig isn't initialized on this cluster (init_tokenomics)");
   const id = program.programId;
+  const otcTokenProgram = opts.otcTokenProgram ?? TOKEN_2022_PROGRAM_ID;
   const ixs: TransactionInstruction[] = [];
   if (fromTier > 0 && opts.pendingLamports > 0) {
     if (!otcPot || otcPot.totalLamportsSpent <= 0)
@@ -246,10 +264,8 @@ export async function buildTierChangeIxs(opts: {
         "pending yield must be claimed before upgrading, but the $OTC yield vault isn't funded yet",
       );
     // Idempotent — a no-op if the payer already has the ATA; the settle-claim below pays into it.
-    // $OTC is Token-2022 — the ATA (and its owner-program derivation) must match.
-    ixs.push(
-      createAtaIdempotentIx(payer, payer, new PublicKey(config.otcMint), TOKEN_2022_PROGRAM_ID),
-    );
+    // The ATA's owner-program derivation must match whichever program truly owns $OTC.
+    ixs.push(createAtaIdempotentIx(payer, payer, new PublicKey(config.otcMint), otcTokenProgram));
     ixs.push(await buildClaimYieldIx(program, payer, deskAsset, config, otcPot));
   }
   const hubMint = new PublicKey(config.hubMint);
@@ -263,6 +279,9 @@ export async function buildTierChangeIxs(opts: {
     deskTier: tierPda(id, deskAsset)[0],
     hubMint,
     payerHub: ataPda(payer, hubMint, opts.hubTokenProgram)[0],
+    // Ascending per-tier SOL fee — required by the on-chain `activate_tier`/`upgrade_tier`
+    // (and $OTC-path equivalents) accounts; see `quoteTierChange`'s doc for the display side.
+    tierFee: tierFeePda(id)[0],
     tokenomics: tokenomicsPda(id)[0],
     treasuryLockVault: new PublicKey(opts.tokenomics.treasuryLockVault),
   };
@@ -291,11 +310,12 @@ export async function buildTierChangeIxs(opts: {
     systemProgram: SYSTEM_PROGRAM,
     otcPay: otcPayPda(id)[0],
     otcMint,
-    payerOtc: ataPda(payer, otcMint, TOKEN_2022_PROGRAM_ID)[0],
+    payerOtc: ataPda(payer, otcMint, otcTokenProgram)[0],
     otcPot: otcPotPda(id)[0],
     otcVault: new PublicKey(otcPot.otcVault),
-    // $OTC and $HUB sit on different token programs — see `activateTierOtc`'s IDL docs.
-    otcTokenProgram: new PublicKey(TOKEN_2022_PROGRAM_ID),
+    // $OTC and $HUB sit on different token programs — see `activateTierOtc`'s IDL docs. Resolved
+    // live (never hardcoded) since devnet's mock $OTC mint sits on classic Token, not Token-2022.
+    otcTokenProgram: new PublicKey(otcTokenProgram),
     hubTokenProgram: new PublicKey(opts.hubTokenProgram),
     jupiterProgram: new PublicKey(JUPITER_PROGRAM_ID),
   };
@@ -343,6 +363,8 @@ export async function executeTierChange(opts: {
   otcRoute?: OtcSwapRoute;
   /** See `buildTierChangeIxs`'s doc — threaded straight through. */
   hubTokenProgram: string;
+  /** See `buildTierChangeIxs`'s doc — threaded straight through. */
+  otcTokenProgram?: string;
   onLog: (l: TxLog) => void;
   onPhase?: (p: TierChangePhase) => void;
 }): Promise<TierChangeResult> {
@@ -365,6 +387,7 @@ export async function executeTierChange(opts: {
       pendingLamports: opts.pendingLamports,
       otcRoute: opts.otcRoute,
       hubTokenProgram: opts.hubTokenProgram,
+      otcTokenProgram: opts.otcTokenProgram,
     });
     const bh = await connection.getLatestBlockhash("confirmed");
     const tx = new Transaction({ feePayer: payer, recentBlockhash: bh.blockhash });

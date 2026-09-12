@@ -58,7 +58,7 @@ export function ActivationGuide() {
         ))}
       </div>
       <div className="mt-1.5 text-center text-[10px] uppercase tracking-widest text-green-700">
-        + 0.5 SOL flat per call · upgrades burn only the difference
+        + SOL fee scales by target tier (T1–T4) · upgrades burn only the $HUB difference
       </div>
       <div className="mt-2 border-l border-cyan-500/30 pl-2">
         <div className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">

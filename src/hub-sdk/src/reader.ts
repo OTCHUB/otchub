@@ -23,6 +23,7 @@ import {
   hubPotPda,
   hubPotRoundPda,
   hubPotClaimPda,
+  tierFeePda,
 } from "./pda";
 import {
   ACC_SCALE,
@@ -368,12 +369,22 @@ export type SupplyView = SupplyBreakdown & {
   ledgerDrift: boolean;
 };
 
+/** §A4 revised — live, admin-retunable ascending per-tier `activate_tier`/`upgrade_tier` SOL fee
+ *  (`TierFeeConfig`, `["tier_fee"]`). Indexed `[T1, T2, T3, T4]`; genesis default is
+ *  `TIER_STEP_FEE_LAMPORTS` (`./constants`). */
+export type TierFeeView = {
+  tierStepFeeLamports: number[];
+};
+
 export type ProtocolState = {
   config: ConfigView;
   currentEpoch: EpochView;
   previousEpoch: EpochView | null;
   potLamports: number;
   burn: { totalHubBurned: number };
+  /** `null` until the authority calls `init_tier_fee_config` — `activate_tier`/`upgrade_tier`
+   *  (and their $OTC-path equivalents) all require this PDA to exist. */
+  tierFee: TierFeeView | null;
   treasury: {
     desksOwned: number;
     totalExits: number;
@@ -491,6 +502,14 @@ export function toDeskTierView(
   };
 }
 
+export function toTierFeeView(
+  f: Awaited<ReturnType<HubProgram["account"]["tierFeeConfig"]["fetch"]>>,
+): TierFeeView {
+  return {
+    tierStepFeeLamports: f.tierStepFeeLamports.map((v: { toNumber(): number } | number) => n(v)),
+  };
+}
+
 export async function fetchProtocolState(program: HubProgram): Promise<ProtocolState> {
   const id = program.programId;
   const [configKey] = configPda(id);
@@ -504,10 +523,11 @@ export async function fetchProtocolState(program: HubProgram): Promise<ProtocolS
   const [tresKey] = treasuryPda(id);
   const [vaultKey] = vaultPda(id);
   const [tokenomicsKey] = tokenomicsPda(id);
+  const [tierFeeKey] = tierFeePda(id);
   const connection = program.provider.connection;
 
-  const [cur, prev, potInfo, burn, otcPot, creatorFee, tres, token, tokenomics] = await Promise.all(
-    [
+  const [cur, prev, potInfo, burn, otcPot, creatorFee, tres, token, tokenomics, tierFee] =
+    await Promise.all([
       program.account.epoch.fetch(curKey),
       config.currentEpoch > 0
         ? program.account.epoch.fetchNullable(prevKey)
@@ -522,8 +542,8 @@ export async function fetchProtocolState(program: HubProgram): Promise<ProtocolS
         vaultKey,
       ]),
       program.account.tokenomicsConfig.fetchNullable(tokenomicsKey),
-    ],
-  );
+      program.account.tierFeeConfig.fetchNullable(tierFeeKey),
+    ]);
 
   const ledgerBurned = big(burn.totalHubBurned);
   const lpHubDepositedUnits = big(tres.lpHubDeposited);
@@ -539,6 +559,7 @@ export async function fetchProtocolState(program: HubProgram): Promise<ProtocolS
     otcPot: otcPot ? toOtcPotView(otcPot) : null,
     creatorFee: creatorFee ? toCreatorFeeView(creatorFee) : null,
     tokenomics: tokenomics ? toTokenomicsView(tokenomics) : null,
+    tierFee: tierFee ? toTierFeeView(tierFee) : null,
     treasury: {
       desksOwned: tres.desksOwned,
       totalExits: tres.totalExits,

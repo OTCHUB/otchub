@@ -141,7 +141,7 @@ function HubHeader() {
         </NavLink>
         {cluster === "devnet" && (
           <NavLink to="drip" className={navCls}>
-            [FAUCET]
+            [DRIP]
           </NavLink>
         )}
       </nav>

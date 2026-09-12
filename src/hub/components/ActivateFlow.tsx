@@ -91,7 +91,7 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
 
   const quote: TierQuote | null =
     toTier > fromTier && toTier <= MAX_TIER
-      ? quoteTierChange({ config: state.config, otcPay, fromTier, toTier })
+      ? quoteTierChange({ config: state.config, tierFee: state.tierFee, otcPay, fromTier, toTier })
       : null;
   const hasQuote = quote !== null;
   const otcAvailable = quote?.otcAvailable ?? false;
@@ -187,6 +187,7 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
       pendingLamports: pending,
       otcRoute: otcRoute ?? undefined,
       hubTokenProgram: state.token.hubTokenProgram,
+      otcTokenProgram: balances.data?.otcTokenProgram ?? undefined,
       onLog: (l) => setLogs((p) => [...p, l]),
       onPhase: setPhase,
     });
@@ -365,8 +366,8 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
       {err && <div className="text-[11px] text-amber-400">ERR: {err}</div>}
       <TxLogView logs={logs} />
       <div className="text-[10px] text-green-700">
-        0.5 SOL flat per call · upgrades burn only the difference · simulated before signing · or
-        use the{" "}
+        SOL fee scales by target tier (T1–T4) · upgrades burn only the $HUB difference ·
+        simulated before signing · or use the{" "}
         <a
           href={OFFICIAL_DESKS_URL}
           target="_blank"

@@ -10,7 +10,7 @@ import { VerificationPanel } from "./VerificationPanel";
 /** §C6 — treasury transparency: what the protocol holds, has swept, and has burned. */
 export function TreasuryPanel({ state }: { state: ProtocolState }) {
   const { programId } = useHub();
-  const { config, treasury, burn, potLamports, supply, token } = state;
+  const { config, treasury, burn, potLamports, supply, token, tierFee } = state;
   const d = supply.decimals;
   const pdas = {
     pot: potPda(programId)[0].toBase58(),
@@ -20,6 +20,11 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
   };
   const split = `${fmtBp(config.opsPctBp, 0)} / ${fmtBp(config.burnPctBp, 0)}`;
   const potVsLiability = `${fmtSol(potLamports)} / ${fmtSol(config.potLiabilityLamports)}`;
+  // Ascending per-tier SOL fee (`TierFeeConfig`, live) — `config.stepFeeLamports` is a dead
+  // legacy field the program no longer charges; fall back to it only pre-`init_tier_fee_config`.
+  const tierFeeSchedule = tierFee
+    ? tierFee.tierStepFeeLamports.map((l, i) => `T${i + 1} ${fmtSol(l, 2)}`).join(" · ")
+    : `${fmtSol(config.stepFeeLamports, 2)} (legacy flat, uninitialized)`;
 
   return (
     <div className="space-y-2">
@@ -121,7 +126,7 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
         </CollapsibleCard>
 
         <CollapsibleCard title="PARAMETERS" defaultOpen>
-          <Row k="step fee" v={fmtSol(config.stepFeeLamports, 2)} />
+          <Row k="tier activation fee" v={tierFeeSchedule} />
           <Row k="ops / burn slice" v={split} />
           <Row k="tier weights" v={config.tierWeightsBp.map((w) => `${w / 100}%`).join(" · ")} />
           <Row k="round threshold" v={fmtSol(config.minPotThresholdLamports, 2)} />

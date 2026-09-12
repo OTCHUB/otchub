@@ -209,7 +209,8 @@ export function MechanicsPanel({ state }: { state: ProtocolState }) {
                 is hotter. Both pages show live pricing.
               </li>
               <li className={li}>
-                Either way, activating what you bought costs a flat 0.5 SOL on top — see section 2.
+                Either way, activating what you bought costs a SOL fee on top — ascending by
+                target tier (T1 lowest, T4 highest) — see section 2.
               </li>
             </>
           )}

@@ -17,7 +17,7 @@ export type Hub = {
       "name": "activateTier",
       "docs": [
         "§B3 #2 — fresh activation (or re-activation of a voided tier) straight into `target_tier`;",
-        "flat `step_fee` SOL + the full $HUB cost of `target_tier`, burned."
+        "ascending per-tier `TierFeeConfig.step_fee` SOL + the full $HUB cost of `target_tier`, burned."
       ],
       "discriminator": [
         2,
@@ -128,6 +128,29 @@ export type Hub = {
               {
                 "kind": "account",
                 "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tierFee",
+          "docs": [
+            "Ascending per-tier SOL fee (§A4, revised) — see `TierFeeConfig`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
               }
             ]
           }
@@ -364,6 +387,29 @@ export type Hub = {
               {
                 "kind": "account",
                 "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tierFee",
+          "docs": [
+            "Ascending per-tier SOL fee (§A4, revised) — see `TierFeeConfig`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
               }
             ]
           }
@@ -2452,12 +2498,14 @@ export type Hub = {
       "docs": [
         "§B3 #4 / §A5 4-way split — 90% distributed to desks (unchanged mechanic); the other 10%",
         "(5% burn / 2.5% LP / 2.5% treasury float) is swapped SOL→$HUB via a two-hop synchronous",
-        "Jupiter CPI executed inside this instruction: hop1 WSOL→USDC, hop2 USDC→$HUB. `ctx",
-        ".remaining_accounts[..hop1_account_count]`/`hop1_data` are hop1's caller-assembled route;",
-        "the remainder of `remaining_accounts`/`hop2_data` are hop2's (see",
-        "`jupiter_swap::swap_exact_in`). `min_usdc_out`/`min_hub_out` floor each hop's output. The",
-        "realized USDC/HUB rate this observes also refreshes `Config.tier_hub_cost_units_cached`",
-        "when `sol_swapped_lamports` clears `PRICE_UPDATE_MIN_SOL_LAMPORTS` (see `epochs.rs`)."
+        "CPI executed inside this instruction: hop1 WSOL→USDC via Jupiter, hop2 USDC→$HUB via a",
+        "direct Raydium CP-Swap `swap_base_input` CPI (see `raydium_cpswap::swap_base_input`). `ctx",
+        ".remaining_accounts[..hop1_account_count]`/`hop1_data` are hop1's caller-assembled Jupiter",
+        "route; the remainder of `remaining_accounts` is hop2's fixed 13-account Raydium CP-Swap",
+        "list (no off-chain instruction data needed — it's a direct CPI, not a routed one).",
+        "`min_usdc_out`/`min_hub_out` floor each hop's output. The realized USDC/HUB rate this",
+        "observes also refreshes `Config.tier_hub_cost_units_cached` when `sol_swapped_lamports`",
+        "clears `PRICE_UPDATE_MIN_SOL_LAMPORTS` (see `epochs.rs`)."
       ],
       "discriminator": [
         159,
@@ -2642,10 +2690,34 @@ export type Hub = {
           "writable": true
         },
         {
-          "name": "tokenProgram"
+          "name": "tokenProgram",
+          "docs": [
+            "`$HUB`'s own burn/transfer legs use `hub_token_program` instead (see its doc comment):",
+            "this instruction is the one place that touches both a classic-Token mint (WSOL) and",
+            "$HUB in the same call, so a single shared `token_program` field can't serve both."
+          ]
         },
         {
-          "name": "jupiterProgram"
+          "name": "hubTokenProgram",
+          "docs": [
+            "`hub_mint.owner` inside `burn_checked`/`transfer_checked`. Already present in",
+            "`HUB_EPOCH_ALT` (see `scripts/mainnet-create-epoch-alt.ts`) alongside hop2's other fixed",
+            "accounts, so passing it here doesn't add to the ALT-compiled tx's static key count."
+          ]
+        },
+        {
+          "name": "jupiterProgram",
+          "docs": [
+            "(WSOL→USDC) only — hop2 (USDC→$HUB) calls Raydium CP-Swap directly, see",
+            "`raydium_cpswap::swap_base_input`."
+          ]
+        },
+        {
+          "name": "raydiumProgram",
+          "docs": [
+            "for hop2 (USDC→$HUB). Must be a distinct account from `jupiter_program` on real",
+            "(non-`mock-jupiter`) builds so the runtime can resolve the hop2 CPI's target program."
+          ]
         },
         {
           "name": "systemProgram",
@@ -2671,10 +2743,6 @@ export type Hub = {
         },
         {
           "name": "hop1Data",
-          "type": "bytes"
-        },
-        {
-          "name": "hop2Data",
           "type": "bytes"
         }
       ]
@@ -3474,6 +3542,79 @@ export type Hub = {
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "initTierFeeConfig",
+      "docs": [
+        "§A4 revised #23b — authority creates the ascending per-tier SOL fee PDA (one-time,",
+        "post-`initialize_config`), seeded from `TIER_STEP_FEE_LAMPORTS` (T1 0.2 / T2 0.3 / T3 0.4",
+        "/ T4 0.5 SOL). Required before any `activate_tier` / `upgrade_tier` / `activate_tier_otc`",
+        "/ `upgrade_tier_otc` call."
+      ],
+      "discriminator": [
+        176,
+        93,
+        30,
+        47,
+        132,
+        248,
+        202,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tierFee",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "initTokenomics",
@@ -4673,6 +4814,113 @@ export type Hub = {
       ]
     },
     {
+      "name": "repointTreasuryVaults",
+      "docs": [
+        "§A6.3/§A7.1 bridge migration — treasury multisig repoints `vault_wsol`/`vault_usdc` at",
+        "canonical Associated Token Accounts of the vault PDA, since Jupiter's `/swap/v2/build`",
+        "always debits the canonical ATA of `(taker, inputMint)` for hop1's SOL/USDC source legs.",
+        "One-time (per repoint); requires the currently-recorded vault to be drained first."
+      ],
+      "discriminator": [
+        241,
+        237,
+        68,
+        127,
+        187,
+        237,
+        44,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasuryState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "oldVaultWsol",
+          "docs": [
+            "it is drained before being superseded."
+          ]
+        },
+        {
+          "name": "oldVaultUsdc"
+        },
+        {
+          "name": "newVaultWsol",
+          "docs": [
+            "must be the canonical ATA of (vault, WSOL_MINT), which the migration script derives",
+            "off-chain; on-chain this only checks mint/owner, same as `init_treasury_float`."
+          ]
+        },
+        {
+          "name": "newVaultUsdc",
+          "docs": [
+            "handler) — must be the canonical ATA of (vault, config.usdc_mint)."
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setAirdropRoot",
       "docs": [
         "§A7.1 #19 — authority publishes the desk-snapshot Merkle root and opens/closes claims."
@@ -4824,6 +5072,233 @@ export type Hub = {
         {
           "name": "enabled",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "setOtcPotKeeper",
+      "docs": [
+        "§A5 #23 — `Config.authority` rotates `OtcPotState.authority` to a new keeper key (e.g.",
+        "onboarding a dedicated low-privilege `otc-buy` hot wallet in place of the master",
+        "deployer key `init_otc_pot` originally set)."
+      ],
+      "discriminator": [
+        109,
+        203,
+        110,
+        0,
+        247,
+        30,
+        131,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`Config.authority` (admin), not `otc_pot.authority` itself — a compromised or retired",
+            "keeper key can never rotate itself out from under the admin, and the admin can always",
+            "move the pot to a fresh dedicated hot key without touching `Config`."
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "newKeeper",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "setOtcVault",
+      "docs": [
+        "§A5 admin recovery lever — `Config.authority` repoints `OtcPotState.otc_vault` to a fresh",
+        "token account for the *current* `Config.otc_mint`. Only ever needed if `otc_vault`'s mint",
+        "(fixed forever at `init_otc_pot` time) drifts from a later `Config.otc_mint` change; see",
+        "`set_otc_vault`'s doc comment."
+      ],
+      "discriminator": [
+        173,
+        175,
+        129,
+        129,
+        2,
+        125,
+        206,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`Config.authority` (admin) — same rationale as `SetOtcPotKeeper`: a migration lever that",
+            "never depends on the (possibly compromised/retired) `otc_pot.authority` keeper key."
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "otcPot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  116,
+                  99,
+                  95,
+                  112,
+                  111,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "newOtcVault",
+          "docs": [
+            "shape/validation to `init_otc_pot`'s `otc_vault` (see `require_token_account` below)."
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setTierStepFee",
+      "docs": [
+        "§A4 revised #23c — authority retunes one tier's flat SOL fee without a program upgrade."
+      ],
+      "discriminator": [
+        123,
+        137,
+        121,
+        115,
+        42,
+        63,
+        219,
+        21
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "tierFee",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "tier",
+          "type": "u8"
+        },
+        {
+          "name": "lamports",
+          "type": "u64"
         }
       ]
     },
@@ -5165,8 +5640,8 @@ export type Hub = {
     {
       "name": "upgradeTier",
       "docs": [
-        "§B3 #3 — flat `step_fee` SOL (never scales with the step size) + the $HUB cost",
-        "difference for `current → target_tier`, burned."
+        "§B3 #3 — ascending per-tier `TierFeeConfig.step_fee` SOL, indexed by the target tier",
+        "reached (never the step size) + the $HUB cost difference for `current → target_tier`, burned."
       ],
       "discriminator": [
         122,
@@ -5277,6 +5752,29 @@ export type Hub = {
               {
                 "kind": "account",
                 "path": "deskAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tierFee",
+          "docs": [
+            "Ascending per-tier SOL fee (§A4, revised) — see `TierFeeConfig`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
               }
             ]
           }
@@ -5515,6 +6013,29 @@ export type Hub = {
           }
         },
         {
+          "name": "tierFee",
+          "docs": [
+            "Ascending per-tier SOL fee (§A4, revised) — see `TierFeeConfig`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  101,
+                  114,
+                  95,
+                  102,
+                  101,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "tokenomics",
           "writable": true,
           "pda": {
@@ -5733,6 +6254,19 @@ export type Hub = {
         208,
         47,
         98
+      ]
+    },
+    {
+      "name": "tierFeeConfig",
+      "discriminator": [
+        71,
+        97,
+        149,
+        64,
+        250,
+        119,
+        2,
+        163
       ]
     },
     {
@@ -6076,6 +6610,32 @@ export type Hub = {
       ]
     },
     {
+      "name": "otcPotKeeperUpdated",
+      "discriminator": [
+        254,
+        154,
+        38,
+        47,
+        80,
+        97,
+        20,
+        73
+      ]
+    },
+    {
+      "name": "otcVaultUpdated",
+      "discriminator": [
+        136,
+        61,
+        166,
+        120,
+        54,
+        161,
+        183,
+        128
+      ]
+    },
+    {
       "name": "tierActivated",
       "discriminator": [
         197,
@@ -6099,6 +6659,19 @@ export type Hub = {
         116,
         255,
         145
+      ]
+    },
+    {
+      "name": "tierStepFeeUpdated",
+      "discriminator": [
+        67,
+        153,
+        154,
+        136,
+        30,
+        242,
+        125,
+        162
       ]
     },
     {
@@ -6190,6 +6763,19 @@ export type Hub = {
         41,
         77,
         87
+      ]
+    },
+    {
+      "name": "treasuryVaultsRepointed",
+      "discriminator": [
+        123,
+        85,
+        242,
+        101,
+        62,
+        165,
+        125,
+        244
       ]
     },
     {
@@ -6501,6 +7087,11 @@ export type Hub = {
       "code": 6058,
       "name": "hopAccountSplitOutOfRange",
       "msg": "hop1_account_count exceeds the number of accounts supplied in remaining_accounts"
+    },
+    {
+      "code": 6059,
+      "name": "vaultNotDrained",
+      "msg": "Vault scratch token account must be drained to zero before it can be repointed"
     }
   ],
   "types": [
@@ -6743,6 +7334,11 @@ export type Hub = {
           },
           {
             "name": "stepFeeLamports",
+            "docs": [
+              "Legacy flat activation/upgrade SOL fee — no longer read (see `TierFeeConfig` /",
+              "`TIER_STEP_FEE_LAMPORTS`, a separate PDA holding the live ascending per-tier fee). Kept in",
+              "place, unused, so this already-initialized account's byte layout never shifts."
+            ],
             "type": "u64"
           },
           {
@@ -8363,6 +8959,26 @@ export type Hub = {
       }
     },
     {
+      "name": "otcPotKeeperUpdated",
+      "docs": [
+        "`Config.authority` rotated `OtcPotState.authority` (`set_otc_pot_keeper`) — e.g. moving the",
+        "pot from the master deployer key to a dedicated `otc-buy` keeper hot wallet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oldKeeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "newKeeper",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "otcPotState",
       "docs": [
         "§A5 90% leg — `[\"otc_pot\"]`. Created by the authority after `initialize_config` (same",
@@ -8420,6 +9036,26 @@ export type Hub = {
           {
             "name": "bump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "otcVaultUpdated",
+      "docs": [
+        "`Config.authority` repointed `OtcPotState.otc_vault` (`set_otc_vault`) — the recovery path",
+        "when the vault's mint (fixed at `init_otc_pot` time) drifts from a later `Config.otc_mint`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oldVault",
+            "type": "pubkey"
+          },
+          {
+            "name": "newVault",
+            "type": "pubkey"
           }
         ]
       }
@@ -8555,10 +9191,40 @@ export type Hub = {
       }
     },
     {
+      "name": "tierFeeConfig",
+      "docs": [
+        "§A4 revised — `[\"tier_fee\"]`. Ascending per-tier flat SOL activation/upgrade fee, admin-",
+        "retunable via `set_tier_step_fee`. Lives on its own PDA rather than a `Config` field: `Config`",
+        "is the already-initialized mainnet genesis account, and appending or resizing a field there",
+        "would require an in-place layout migration (Borsh reads the account's exact current byte",
+        "length); a brand-new PDA needs none — same no-migration pattern as `OtcPotState`/",
+        "`OtcPayConfig`. Created once by the authority after `initialize_config` (`init_tier_fee_config`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tierStepFeeLamports",
+            "type": {
+              "array": [
+                "u64",
+                4
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "tierPaidOtc",
       "docs": [
-        "§A4.1 (revised) — step(s) paid in $OTC: the flat 0.5 SOL activation fee (90% pot / 10% ops,",
-        "same as the SOL path — `fee_lamports`/`to_pot`/`to_ops`) plus the $OTC 2× premium, split into",
+        "§A4.1 (revised) — step(s) paid in $OTC: the target tier's ascending SOL fee (T1 0.2 / T2 0.3 /",
+        "T3 0.4 / T4 0.5 SOL; 90% pot / 10% ops, same as the SOL path — `fee_lamports`/`to_pot`/",
+        "`to_ops`) plus the $OTC 2× premium, split into",
         "a swap-burn leg (real on-chain Jupiter OTC→$HUB, burned in full — this *is* the tier's $HUB",
         "cost burn, no separate direct debit from the payer's own $HUB wallet) and an equal-sized",
         "desk-pot leg (raises `OtcPotState`'s lifetime average buy rate). `from_tier == 0` is a fresh",
@@ -8633,6 +9299,30 @@ export type Hub = {
             "docs": [
               "Total $OTC charged (`otc_swap_amount + to_otc_pot`), i.e. the \"2× premium\"."
             ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "tierStepFeeUpdated",
+      "docs": [
+        "`Config.authority` retuned one tier's `TierFeeConfig.tier_step_fee_lamports` entry",
+        "(`set_tier_step_fee`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "oldLamports",
+            "type": "u64"
+          },
+          {
+            "name": "newLamports",
             "type": "u64"
           }
         ]
@@ -9188,6 +9878,36 @@ export type Hub = {
           {
             "name": "vaultBump",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasuryVaultsRepointed",
+      "docs": [
+        "Treasury multisig repoints `vault_wsol`/`vault_usdc` at new vault-PDA-owned token accounts",
+        "(migration to canonical ATAs — Jupiter's `/swap/v2/build` always debits the canonical ATA of",
+        "(taker, inputMint), so `finalize_epoch`'s hop1 source accounts must be ATAs, not arbitrary",
+        "plain spl-token accounts). One-time-per-call, replaces the values `init_treasury_float` set."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oldVaultWsol",
+            "type": "pubkey"
+          },
+          {
+            "name": "newVaultWsol",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldVaultUsdc",
+            "type": "pubkey"
+          },
+          {
+            "name": "newVaultUsdc",
+            "type": "pubkey"
           }
         ]
       }
