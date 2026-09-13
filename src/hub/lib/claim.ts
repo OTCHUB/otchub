@@ -37,13 +37,21 @@ const MAX_IXS_PER_TX = 3;
 const SYSTEM_PROGRAM = new PublicKey("11111111111111111111111111111111");
 
 /** Unsigned `claim_yield` instruction — built through the read-only Anchor reader (no provider
- * wallet). `otcPot` must be provisioned (§A5 90% leg) — the caller should guard on this first. */
+ * wallet). `otcPot` must be provisioned (§A5 90% leg) — the caller should guard on this first.
+ * `otcTokenProgram` must be whichever token program actually owns `config.otcMint` on this
+ * cluster (resolved live off-chain, e.g. via `resolveOtcTokenProgram` below) — never assume
+ * Token-2022: mainnet's real $OTC launch mint is Token-2022, but devnet's mock $OTC mint (see
+ * `devnet-otc-mint.ts`) is classic Token. Getting this wrong derives the wrong `claimerOtc` ATA
+ * address and passes the wrong `tokenProgram`, which the on-chain `transfer_checked` CPI rejects
+ * at the SPL Token layer with `IncorrectProgramId` — defaults to Token-2022 only as a last resort
+ * when the caller hasn't resolved it yet. */
 export async function buildClaimYieldIx(
   program: HubProgram,
   claimer: PublicKey,
   deskAsset: PublicKey,
   config: ConfigView,
   otcPot: OtcPotView,
+  otcTokenProgram: PublicKey | string = TOKEN_2022_PROGRAM_ID,
 ): Promise<TransactionInstruction> {
   const id = program.programId;
   const otcMint = new PublicKey(config.otcMint);
@@ -58,11 +66,24 @@ export async function buildClaimYieldIx(
       otcPot: otcPotPda(id)[0],
       otcMint,
       otcVault: new PublicKey(otcPot.otcVault),
-      claimerOtc: ataPda(claimer, otcMint, TOKEN_2022_PROGRAM_ID)[0],
-      tokenProgram: new PublicKey(TOKEN_2022_PROGRAM_ID),
+      claimerOtc: ataPda(claimer, otcMint, otcTokenProgram)[0],
+      tokenProgram: new PublicKey(otcTokenProgram),
       systemProgram: SYSTEM_PROGRAM,
     })
     .instruction();
+}
+
+/** Resolves the SPL token program that actually owns `otcMint` on this cluster, live off the
+ * mint account itself (falls back to Token-2022 if the mint can't be fetched). Mirrors
+ * `usePayerBalances`'s identical resolution so every `claim_yield`/`upgrade_tier` caller derives
+ * the same ATA the on-chain program expects, on both devnet (classic mock mint) and mainnet
+ * (real Token-2022 launch mint). */
+export async function resolveOtcTokenProgram(
+  connection: Connection,
+  otcMint: PublicKey,
+): Promise<PublicKey> {
+  const info = await connection.getAccountInfo(otcMint, "confirmed").catch(() => null);
+  return info ? info.owner : new PublicKey(TOKEN_2022_PROGRAM_ID);
 }
 
 /** Splits `assets`/`ixs` into fixed-size groups — the first group shrinks to make room for the
@@ -162,13 +183,16 @@ export async function executeClaimYield(opts: {
 
   onPhase?.("build");
   const otcMint = new PublicKey(config.otcMint);
-  const [claimerOtc] = ataPda(claimer, otcMint, TOKEN_2022_PROGRAM_ID);
+  const otcTokenProgram = await resolveOtcTokenProgram(connection, otcMint);
+  const [claimerOtc] = ataPda(claimer, otcMint, otcTokenProgram);
   const otcAtaInfo = await connection.getAccountInfo(claimerOtc, "confirmed");
   const preamble = otcAtaInfo
     ? []
-    : [createAtaIdempotentIx(claimer, claimer, otcMint, TOKEN_2022_PROGRAM_ID)];
+    : [createAtaIdempotentIx(claimer, claimer, otcMint, otcTokenProgram)];
   const ixs = await Promise.all(
-    assets.map((a) => buildClaimYieldIx(program, claimer, new PublicKey(a), config, otcPot)),
+    assets.map((a) =>
+      buildClaimYieldIx(program, claimer, new PublicKey(a), config, otcPot, otcTokenProgram),
+    ),
   );
   const bh = await connection.getLatestBlockhash("confirmed");
   const ixGroups = groupBatches(ixs, preamble.length);

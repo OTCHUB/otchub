@@ -322,7 +322,7 @@ export async function buildTierChangeIxs(opts: {
     // Idempotent — a no-op if the payer already has the ATA; the settle-claim below pays into it.
     // The ATA's owner-program derivation must match whichever program truly owns $OTC.
     ixs.push(createAtaIdempotentIx(payer, payer, new PublicKey(config.otcMint), otcTokenProgram));
-    ixs.push(await buildClaimYieldIx(program, payer, deskAsset, config, otcPot));
+    ixs.push(await buildClaimYieldIx(program, payer, deskAsset, config, otcPot, otcTokenProgram));
   }
   const hubMint = new PublicKey(config.hubMint);
   // Idempotent — a no-op if the payer already has the $HUB ATA (the common case, funded by a

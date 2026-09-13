@@ -6,11 +6,11 @@ import {
   fetchOwnedDesks,
   fetchTokenomics,
   pendingYieldLamports,
-  TOKEN_2022_PROGRAM_ID,
   vaultPda,
   type DeskTierView,
   type ProtocolState,
 } from "@hub-sdk";
+import { resolveOtcTokenProgram } from "../lib/claim";
 import { useHub } from "../HubProvider";
 import { baseInputs, roundsPerDay, tierPayoutLamports } from "../lib/yield";
 
@@ -63,7 +63,8 @@ export function useTreasuryPortfolio(state: ProtocolState | null) {
       const [vault] = vaultPda(programId);
       const collection = new PublicKey(config.deskCollection);
       const otcMint = new PublicKey(config.otcMint);
-      const [otcAta] = ataPda(treasury, otcMint, TOKEN_2022_PROGRAM_ID);
+      const otcTokenProgram = await resolveOtcTokenProgram(connection, otcMint);
+      const [otcAta] = ataPda(treasury, otcMint, otcTokenProgram);
 
       const [owned, solLamports, otc, tokenomics] = await Promise.all([
         fetchOwnedDesks(connection, treasury, collection),
