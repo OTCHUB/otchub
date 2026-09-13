@@ -6,6 +6,7 @@ import { useHub } from "../HubProvider";
 import type { OwnedDesk } from "../hooks/useWalletPortfolio";
 import { useHubPot, type HubPotDecimals } from "../hooks/useHubPot";
 import { executeClaimHubPotReward, type HubPotClaimPhase } from "../lib/hubPotClaim";
+import { executeSyncHubPot, type HubPotSyncPhase } from "../lib/hubPotSync";
 import { fmtNum, fmtUnits } from "../lib/format";
 import type { TxLog } from "../lib/swap";
 import { AddressLink } from "./ui/AddressLink";
@@ -77,6 +78,9 @@ export function HubPotPanel({ desks, address }: Props) {
   const [phase, setPhase] = useState<HubPotClaimPhase | null>(null);
   const [logs, setLogs] = useState<TxLog[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncPhase, setSyncPhase] = useState<HubPotSyncPhase | null>(null);
+  const [syncLogs, setSyncLogs] = useState<TxLog[]>([]);
 
   const activeDesks = (desks ?? []).filter((d) => d.tier && !d.tier.voided);
   const claimStatus = useQuery({
@@ -124,6 +128,24 @@ export function HubPotPanel({ desks, address }: Props) {
       (d) => d.share.otc > 0n || d.share.crclx > 0n || d.share.nvdax > 0n || d.share.spcxx > 0n,
     );
   const signer = address ? resolveSigner(address) : null;
+
+  const runSync = async () => {
+    if (!signer) return;
+    setSyncBusy(true);
+    setSyncLogs([]);
+    const res = await executeSyncHubPot({
+      connection,
+      program,
+      signer,
+      onLog: (l) => setSyncLogs((p) => [...p, l]),
+      onPhase: setSyncPhase,
+    });
+    setSyncBusy(false);
+    setSyncPhase(null);
+    if (res.ok && !res.skipped) {
+      await qc.invalidateQueries({ queryKey: ["hub"] });
+    }
+  };
 
   const toggle = (a: string) =>
     setSelected((p) => {
@@ -182,11 +204,25 @@ export function HubPotPanel({ desks, address }: Props) {
         <RewardFlow />
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className={pillCls}>
           Round {fmtNum(pot.roundCount)} · {round ? "Live" : "Pending Fund"}
         </span>
+        <button
+          type="button"
+          onClick={runSync}
+          disabled={syncBusy || !signer}
+          title={
+            signer
+              ? "Reconcile new vault inflow and open a round if anything is pending — permissionless, anyone can trigger this when the keeper is behind."
+              : "connect the wallet itself to sync"
+          }
+          className={GHOST_BTN}
+        >
+          {syncBusy ? `${syncPhase ?? "sync"}…` : "Sync now"}
+        </button>
       </div>
+      {syncLogs.length > 0 && <TxLogView logs={syncLogs} />}
 
       <div className="mt-4">
         {round && (
