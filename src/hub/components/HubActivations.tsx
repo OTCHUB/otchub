@@ -14,13 +14,23 @@ type ActivationRow = {
   desk: string | null;
 };
 
+// Spelled-out units ("23 mins ago", not "23m ago") so each milestone reads as a plain-English
+// sentence at a glance — this is the social-proof copy, not a dense stat, so it should scan like
+// one ("OTC Desk #123 T2 activated 23 mins ago").
 const timeAgo = (t: number | null) => {
   if (!t) return "";
   const s = Math.max(0, Math.floor(Date.now() / 1000 - t));
   if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 3600) {
+    const m = Math.floor(s / 60);
+    return `${m} min${m === 1 ? "" : "s"} ago`;
+  }
+  if (s < 86400) {
+    const h = Math.floor(s / 3600);
+    return `${h} hr${h === 1 ? "" : "s"} ago`;
+  }
+  const d = Math.floor(s / 86400);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
 };
 
 /**
@@ -87,14 +97,16 @@ export function HubActivations({ state }: { state: ProtocolState }) {
         ) : (
           <span className="inline-block h-5 w-5 border border-green-500/15 bg-black" />
         )}
+        {/* Reads as one plain-English milestone — "desk #123 T2 activated 23 mins ago" — instead
+            of a dense stat, so the ticker doubles as social proof at a glance. */}
+        <span className="text-[10px] font-bold text-green-300">desk {deskLabel}</span>
         <span
           className={`text-[10px] font-bold uppercase tracking-widest ${
             it.kind === "activate" ? "text-cyan-300" : "text-amber-300"
           }`}
         >
-          {it.kind === "activate" ? "ACT" : "UPG"} T{it.tier}
+          T{it.tier} {it.kind === "activate" ? "activated" : "upgraded"}
         </span>
-        <span className="text-[10px] font-bold text-green-300">{deskLabel}</span>
         <span className="text-[9px] text-green-600">{timeAgo(it.blockTime)}</span>
       </a>
     );
@@ -104,6 +116,12 @@ export function HubActivations({ state }: { state: ProtocolState }) {
     <section className="term-window flex items-center gap-2 border border-green-500/30 px-3 py-2 font-mono">
       <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> live activations
+      </span>
+      {/* This ticker only ever shows one network at a time — whichever cluster this mount is
+          on (see HubProvider's `cluster`, wired independently for /hub vs /devnet) — so visitors
+          can immediately tell real mainnet activity apart from the devnet sandbox's mock desks. */}
+      <span className="hidden shrink-0 border border-green-500/20 px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-green-500 sm:inline">
+        {cluster === "devnet" ? "devnet" : "mainnet"}
       </span>
       <span className="hidden shrink-0 text-[9px] uppercase tracking-widest text-green-700 md:inline">
         click → solscan
