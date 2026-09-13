@@ -57,7 +57,7 @@ type Props = {
  * executeTierChange + the live $OTC→$HUB Jupiter route), minus the desk list, the balance boxes
  * and the verbose footnotes — the sheet that hosts it carries the desk context. */
 export function ActivateFlow({ address, state, desk, onChanged }: Props) {
-  const { connection, program, resolveSigner } = useHub();
+  const { connection, program, resolveSigner, cluster } = useHub();
   const qc = useQueryClient();
   const otcPayQ = useOtcPay();
   const balances = usePayerBalances(
@@ -91,7 +91,14 @@ export function ActivateFlow({ address, state, desk, onChanged }: Props) {
 
   const quote: TierQuote | null =
     toTier > fromTier && toTier <= MAX_TIER
-      ? quoteTierChange({ config: state.config, tierFee: state.tierFee, otcPay, fromTier, toTier })
+      ? quoteTierChange({
+          config: state.config,
+          tierFee: state.tierFee,
+          otcPay,
+          fromTier,
+          toTier,
+          cluster,
+        })
       : null;
   const hasQuote = quote !== null;
   const otcAvailable = quote?.otcAvailable ?? false;
