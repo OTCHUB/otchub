@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { clearConnectedWallet, silentReconnect } from "./lib/wallets";
+import { clearConnectedWallet, silentReconnect, subscribeConnectionChanges } from "./lib/wallets";
 
 const STORAGE_KEY = "hub:wallet";
 
@@ -74,6 +74,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
+
+  // Follow the wallet extension's own state, not just this page's buttons: switching accounts or
+  // disconnecting from inside Phantom/Solflare/Backpack updates `address` here too, so the wallet
+  // stays "connected until the user explicitly disconnects or switches" everywhere — including
+  // switches made outside this tab's UI.
+  useEffect(
+    () =>
+      subscribeConnectionChanges((pk) => {
+        setAddress(pk);
+        writeStored(pk);
+      }),
+    [],
+  );
 
   const connect = useCallback((pk: string) => {
     setAddress(pk);

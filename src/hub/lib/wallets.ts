@@ -15,6 +15,10 @@ type InjectedProvider = {
   publicKey?: unknown;
   signTransaction?: (tx: Transaction | VersionedTransaction) => Promise<SignedTx>;
   signAllTransactions?: (txs: (Transaction | VersionedTransaction)[]) => Promise<SignedTx[]>;
+  /** Phantom/Solflare/Backpack all expose this EventEmitter-style pair so the app can follow an
+   * account switch or an extension-side disconnect without the user touching this page at all. */
+  on?: (event: "accountChanged" | "disconnect", handler: (arg?: unknown) => void) => void;
+  off?: (event: "accountChanged" | "disconnect", handler: (arg?: unknown) => void) => void;
 };
 
 type StandardAccount = { address?: string; publicKey?: unknown; chains?: readonly string[] };
@@ -134,7 +138,52 @@ export function detectWallets(): WalletEntry[] {
 type Connected = { entry: WalletEntry; publicKey: string; account?: StandardAccount };
 let connected: Connected | null = null;
 
+// Fired whenever the *provider itself* changes who's connected — an extension-side account
+// switch or disconnect — as opposed to the app's own connect()/disconnect() calls, which callers
+// already know about synchronously. `null` means "no longer connected here."
+type ConnectionChangeListener = (address: string | null) => void;
+const connectionListeners = new Set<ConnectionChangeListener>();
+const notifyConnectionChange = (address: string | null) =>
+  connectionListeners.forEach((cb) => cb(address));
+
+/** Subscribe to out-of-band connection changes (wallet-initiated account switch/disconnect).
+ * Returns an unsubscribe function. See `WalletProvider` for the one place this is consumed. */
+export function subscribeConnectionChanges(cb: ConnectionChangeListener): () => void {
+  connectionListeners.add(cb);
+  return () => {
+    connectionListeners.delete(cb);
+  };
+}
+
+// Listeners currently attached to whichever injected provider is connected, so a later
+// connect/disconnect can cleanly detach the previous pair before attaching a new one.
+let detachProviderListeners: (() => void) | null = null;
+
+function attachProviderListeners(entry: WalletEntry) {
+  detachProviderListeners?.();
+  detachProviderListeners = null;
+  if (entry.kind !== "injected" || !entry.provider.on) return;
+  const provider = entry.provider;
+  const onAccountChanged = (arg?: unknown) => {
+    const next = pkString(arg) ?? pkString(provider.publicKey);
+    connected = next ? { entry, publicKey: next } : null;
+    notifyConnectionChange(next);
+  };
+  const onDisconnect = () => {
+    connected = null;
+    notifyConnectionChange(null);
+  };
+  provider.on?.("accountChanged", onAccountChanged);
+  provider.on?.("disconnect", onDisconnect);
+  detachProviderListeners = () => {
+    provider.off?.("accountChanged", onAccountChanged);
+    provider.off?.("disconnect", onDisconnect);
+  };
+}
+
 export function clearConnectedWallet() {
+  detachProviderListeners?.();
+  detachProviderListeners = null;
   connected = null;
 }
 
@@ -151,7 +200,10 @@ export async function connectWallet(entry: WalletEntry): Promise<string | null> 
   }
   const res = await entry.provider.connect();
   const pk = pkString(res?.publicKey) ?? pkString(entry.provider.publicKey);
-  if (pk) connected = { entry, publicKey: pk };
+  if (pk) {
+    connected = { entry, publicKey: pk };
+    attachProviderListeners(entry);
+  }
   return pk;
 }
 
@@ -166,6 +218,7 @@ export async function silentReconnect(stored: string): Promise<string | null> {
             : await entry.provider.connect({ onlyIfTrusted: true });
         if ((pkString(res?.publicKey) ?? pkString(entry.provider.publicKey)) === stored) {
           connected = { entry, publicKey: stored };
+          attachProviderListeners(entry);
           return stored;
         }
       } else if ((await connectWallet(entry)) === stored) return stored;
