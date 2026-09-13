@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
-import type { ProtocolState } from "@hub-sdk";
+import { otcDueForLamports, type ProtocolState } from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import type { OwnedDesk } from "../hooks/useWalletPortfolio";
 import { useClaimRunner } from "../hooks/useClaimRunner";
 import { useOtcActivate } from "../hooks/useOtcActivate";
 import { OTC_TICKERS } from "../lib/otcActivate";
 import { MAX_TIER } from "../lib/activate";
-import { fmtSol, shortKey } from "../lib/format";
+import { fmtSol, fmtUnits, shortKey } from "../lib/format";
 import { magicEdenItemUrl, OFFICIAL_DESKS_URL } from "../lib/marketplace";
 import { ActivateFlow } from "./ActivateFlow";
 import { AddressLink } from "./ui/AddressLink";
@@ -24,6 +24,9 @@ type Props = {
 
 const deskNumber = (d: OwnedDesk) => d.art?.name?.match(/#\s*(\d+)/)?.[1] ?? shortKey(d.asset, 4);
 
+/** $OTC mint decimals fallback when no ATA balance has been fetched to read the real value from. */
+const OTC_DECIMALS = 6;
+
 /** Per-desk action sheet — the ONE place a desk's actions live (claim · activate · upgrade ·
  * links), so the wallet panel stays a compact grid no matter how many desks a wallet holds.
  * Bottom sheet on mobile, centered modal on desktop (see ui/Sheet). */
@@ -35,6 +38,10 @@ export function DeskSheet({ desk, state, address, onClose, onChanged }: Props) {
   const tier = desk.tier && !voided ? desk.tier.tier : 0;
   const pending = desk.pendingLamports;
   const canAdvance = !voided && tier < MAX_TIER;
+  // `pending` is the lamport-equivalent yield accrual; claim_yield actually pays out $OTC bought
+  // by the keeper at the pot's lifetime average rate (see OtcPotView/otcDueForLamports) — surface
+  // that conversion here so the SOL figure isn't mistaken for a literal SOL payout.
+  const otcDue = otcDueForLamports(pending, state.otcPot);
 
   return (
     <Sheet open onClose={onClose} title={`DESK #${deskNumber(desk)}`}>
@@ -53,7 +60,7 @@ export function DeskSheet({ desk, state, address, onClose, onChanged }: Props) {
           <TierBadge tier={tier} voided={voided} />
           <div className="mt-1 text-[11px] text-green-500/70">
             {pending > 0
-              ? `${fmtSol(pending, 4)} claimable`
+              ? `${fmtSol(pending, 4)} claimable${otcDue != null ? ` ≈ ${fmtUnits(otcDue, OTC_DECIMALS)} $OTC` : ""}`
               : tier
                 ? "no pending yield yet"
                 : "raw desk — activate to earn"}
@@ -69,14 +76,18 @@ export function DeskSheet({ desk, state, address, onClose, onChanged }: Props) {
         <div className="mt-3">
           <button
             type="button"
-            onClick={() => void claim.run([desk.asset])}
+            onClick={() => void claim.run([desk.asset], pending)}
             disabled={claim.busy}
             className="w-full border border-emerald-500/60 py-2 text-[12px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
           >
             {claim.busy
               ? `${(claim.phase ?? "prep").toUpperCase()}…`
-              : `[CLAIM ${fmtSol(pending, 4)}]`}
+              : `[CLAIM ${fmtSol(pending, 4)}${otcDue != null ? ` ≈ ${fmtUnits(otcDue, OTC_DECIMALS)} $OTC` : ""}]`}
           </button>
+          <div className="mt-1 text-[10px] text-green-700">
+            yield accrues in SOL-equivalent value but is paid out entirely in $OTC, bought by the
+            keeper at the pot&apos;s lifetime average rate — not a native SOL transfer.
+          </div>
           {claim.err && <div className="mt-1 text-[11px] text-amber-400">ERR: {claim.err}</div>}
           <TxLogView logs={claim.logs} />
         </div>

@@ -60,7 +60,7 @@ export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
         {claimable.length > 0 && (
           <button
             type="button"
-            onClick={() => void claim.run(claimable.map((r) => r.asset))}
+            onClick={() => void claim.run(claimable.map((r) => r.asset), totalPending)}
             disabled={claim.busy || !otcReady}
             className="ml-auto border border-emerald-500/60 px-2.5 py-1 font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
           >
@@ -99,18 +99,30 @@ export function ClaimPanel({ address, state, desks, onClaimed }: Props) {
               <span className="text-cyan-300">
                 {TIER_NAMES[r.tier!.tier - 1] ?? `T${r.tier!.tier}`}
               </span>
-              <span className="w-24 text-right text-emerald-300">{fmtSol(r.pending, 4)}</span>
+              <span className="w-24 text-right text-emerald-300">
+                {fmtSol(r.pending, 4)}
+                {(() => {
+                  const due = otcDueForLamports(r.pending, otcPot);
+                  return due != null ? (
+                    <span className="block text-[9px] text-green-600">
+                      ≈{fmtUnits(due, OTC_DECIMALS)} OTC
+                    </span>
+                  ) : null;
+                })()}
+              </span>
             </label>
           ))}
           {selected.size > 0 && (
             <div className="p-1.5">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  const rows = claimable.filter((r) => selected.has(r.asset));
                   void claim.run(
-                    claimable.filter((r) => selected.has(r.asset)).map((r) => r.asset),
-                  )
-                }
+                    rows.map((r) => r.asset),
+                    rows.reduce((s, r) => s + r.pending, 0),
+                  );
+                }}
                 disabled={claim.busy || !otcReady}
                 className="w-full border border-emerald-500/60 py-1 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-30"
               >
