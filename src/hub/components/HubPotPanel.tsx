@@ -188,40 +188,37 @@ export function HubPotPanel({ desks, address }: Props) {
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {BUCKET_KEYS.map((b) => (
-          <Stat
-            key={b}
-            label={bucketLabel(b)}
-            value={fmtUnits(pot[`${b}PendingUnits` as const], decimals[b])}
-            sub={`Lifetime ${fmtUnits(pot[`${b}DepositedUnits` as const], decimals[b])}`}
-          />
-        ))}
-      </div>
-
-      {round ? (
-        <div className="mt-4">
-          <div className={sectionLabelCls}>Round #{fmtNum(round.index)}</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {BUCKET_KEYS.map((b) => (
+      <div className="mt-4">
+        {round && (
+          <div className={sectionLabelCls}>
+            This round · {fmtNum(round.claims)} claim{round.claims === 1 ? "" : "s"} paid
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {BUCKET_KEYS.map((b) =>
+            round ? (
               <Stat
                 key={b}
                 label={bucketLabel(b)}
                 value={fmtUnits(round[`${b}Units` as const], decimals[b])}
-                sub={`Paid ${fmtUnits(round[`${b}DistributedUnits` as const], decimals[b])} · ${fmtNum(round.claims)} claims`}
+                sub={`Paid ${fmtUnits(round[`${b}DistributedUnits` as const], decimals[b])} · next ${fmtUnits(pot[`${b}PendingUnits` as const], decimals[b])}`}
               />
-            ))}
-          </div>
+            ) : (
+              <Stat
+                key={b}
+                label={bucketLabel(b)}
+                value={fmtUnits(pot[`${b}PendingUnits` as const], decimals[b])}
+                sub={`Lifetime ${fmtUnits(pot[`${b}DepositedUnits` as const], decimals[b])}`}
+              />
+            ),
+          )}
         </div>
-      ) : (
-        <div className={`mt-4 text-xs ${mutedCls}`}>No active round — snapshots pending.</div>
-      )}
+      </div>
 
       {myShare && round && (
         <div className="mt-4">
           <div className={sectionLabelCls}>
-            Your share · round #{fmtNum(round.index)} ({fmtNum(activeDesks.length)} desk
-            {activeDesks.length === 1 ? "" : "s"})
+            Your share ({fmtNum(activeDesks.length)} desk{activeDesks.length === 1 ? "" : "s"})
           </div>
           {BUCKET_KEYS.map((b) => (
             <Row key={b} k={bucketLabel(b)} v={fmtUnits(myShare[b], decimals[b])} />
