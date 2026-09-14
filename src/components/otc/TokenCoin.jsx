@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useHubLogo } from "@/lib/hubLogo";
 import { rewardIconProxyUrl } from "@/lib/rewardIcons";
 
 // Coin-shaped token icon for the main OTC_HUB terminal — the same crop/ring
@@ -18,10 +19,14 @@ const BUNDLED_ICONS = {
 export default function TokenCoin({ symbol, mint = null, className = "h-4 w-4" }) {
   const [failed, setFailed] = useState(0);
   const label = String(symbol || (mint ? mint.slice(0, 1) : "?"));
+  // $HUB tracks the Dexscreener token-profile logo (live-resolved, cached); bundled asset and
+  // proxies stay as fallbacks. Same chain as the $HUB terminal's StockIcon.
+  const hubLogo = useHubLogo();
   const candidates =
     label === "SOL"
       ? [BUNDLED_ICONS.SOL]
       : [
+          symbol === "HUB" ? hubLogo : null,
           BUNDLED_ICONS[symbol] ?? null,
           symbol ? rewardIconProxyUrl(symbol) : null,
           mint ? rewardIconProxyUrl(mint) : null,

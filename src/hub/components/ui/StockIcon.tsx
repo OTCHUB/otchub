@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useHubLogo } from "@/lib/hubLogo";
 import { rewardIconProxyUrl } from "@/lib/rewardIcons";
 
 // Stock token icon for $HUB surfaces. The pot's four buckets are fixed by the
@@ -16,8 +17,8 @@ const BUNDLED_ICONS: Record<string, string> = {
   SOL: "/stocks/SOL.png",
   // WSOL shares the bundled wrapped-SOL logo.
   WSOL: "/stocks/SOL.png",
-  // $HUB protocol token — the official gold "OH" coin (hub-mint.png, refreshed
-  // 2026-09-13 to match the Dexscreener token-profile logo).
+  // $HUB protocol token — hub-mint.png is the offline fallback; the live source of truth is the
+  // Dexscreener token profile, resolved at runtime in the component (see src/lib/hubLogo.js).
   HUB: "/hub-mint.png",
 };
 
@@ -39,8 +40,17 @@ export function StockIcon({
   className?: string;
 }) {
   const [failed, setFailed] = useState(0);
+  // $HUB tracks the Dexscreener token-profile logo (resolved live, 10-min cache); the bundled
+  // asset and the proxy remain the offline/outage fallbacks, in that order.
+  const hubLogo = useHubLogo();
   const candidates = [
-    ...new Set([BUNDLED_ICONS[symbol] ?? null, rewardIconProxyUrl(symbol)].filter(Boolean)),
+    ...new Set(
+      [
+        symbol === "HUB" ? hubLogo : null,
+        BUNDLED_ICONS[symbol] ?? null,
+        rewardIconProxyUrl(symbol),
+      ].filter(Boolean),
+    ),
   ];
   const src = candidates[failed] || "";
   return (
