@@ -4,7 +4,7 @@
 //   parent = sha256(min(a,b) ‖ max(a,b))          (sorted pair → order-independent proofs)
 //   odd node at a level is promoted unchanged (no duplication).
 // sha256 via WebCrypto so the SDK stays dependency-free in both Node and the browser.
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, type Connection } from "@solana/web3.js";
 import { AIRDROP_LEAF_TAG, AIRDROP_PER_DESK_UNITS } from "./constants";
 
 export type AirdropEntry = { asset: PublicKey; amountUnits: bigint };
@@ -105,3 +105,64 @@ export async function verifyAirdropProof(
 
 /** Anchor arg shape for `claim_airdrop(amount_units, proof)`: `number[][]` of 32-byte arrays. */
 export const proofToArgs = (proof: Uint8Array[]) => proof.map((p) => Array.from(p));
+
+// ---------------------------------------------------------------------------
+// Post-distribution reads: every `AirdropClaim` PDA (["airdrop", asset]) is a receipt —
+// one per desk, recording who was actually paid. Scanned on demand for the tokenomics
+// "distribution by address" table; ~2.2k accounts, trimmed by dataSlice to the fields read.
+// Layout: disc(8) · asset(32) · claimant(32) · amount_units(u64) · claimed_ts(i64) · bump(1).
+
+export type AirdropClaimView = {
+  /** The claim-receipt PDA itself — its first on-chain signature is the payment tx. */
+  claim: string;
+  asset: string;
+  /** The desk's owner at payment time — who received the $HUB. */
+  claimant: string;
+  amountUnits: bigint;
+  claimedTs: number;
+};
+
+/** Anchor discriminator of `AirdropClaim` — sha256("account:AirdropClaim")[..8], base64 for the
+ *  RPC memcmp filter. Computed once (WebCrypto is async), cached at module scope. */
+const claimDiscB64 = sha256(new TextEncoder().encode("account:AirdropClaim")).then((h) =>
+  btoa(String.fromCharCode(...h.slice(0, 8))),
+);
+
+const toClaimView = (pubkey: PublicKey, raw: Uint8Array): AirdropClaimView => {
+  const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+  return {
+    claim: pubkey.toBase58(),
+    asset: new PublicKey(raw.subarray(0, 32)).toBase58(),
+    claimant: new PublicKey(raw.subarray(32, 64)).toBase58(),
+    amountUnits: dv.getBigUint64(64, true),
+    claimedTs: Number(dv.getBigInt64(72, true)),
+  };
+};
+
+export async function listAirdropClaims(
+  connection: Connection,
+  programId: PublicKey,
+): Promise<AirdropClaimView[]> {
+  const accounts = await connection.getProgramAccounts(programId, {
+    filters: [{ memcmp: { offset: 0, bytes: await claimDiscB64, encoding: "base64" } }],
+    dataSlice: { offset: 8, length: 80 },
+  });
+  return accounts.map((a) => toClaimView(a.pubkey, a.account.data as Uint8Array));
+}
+
+/** One wallet's receipts only (claimant sits at offset 40: disc 8 + asset 32). Powers the
+ *  connected-wallet "you received X $HUB" card without scanning the whole set client-side. */
+export async function listAirdropClaimsByOwner(
+  connection: Connection,
+  programId: PublicKey,
+  owner: PublicKey,
+): Promise<AirdropClaimView[]> {
+  const accounts = await connection.getProgramAccounts(programId, {
+    filters: [
+      { memcmp: { offset: 0, bytes: await claimDiscB64, encoding: "base64" } },
+      { memcmp: { offset: 40, bytes: owner.toBase58() } },
+    ],
+    dataSlice: { offset: 8, length: 80 },
+  });
+  return accounts.map((a) => toClaimView(a.pubkey, a.account.data as Uint8Array));
+}

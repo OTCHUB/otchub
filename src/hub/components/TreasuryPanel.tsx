@@ -1,8 +1,18 @@
-import { burnPda, potPda, treasuryPda, vaultPda, type ProtocolState } from "@hub-sdk";
+import {
+  LP_LOCKS,
+  SQUADS_MULTISIG,
+  TEAM_VESTING,
+  burnPda,
+  potPda,
+  treasuryPda,
+  vaultPda,
+  type ProtocolState,
+} from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { fmtBp, fmtBpPct, fmtHub, fmtNum, fmtSol, fmtUtc } from "../lib/format";
 import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
+import { CommitmentsPanel } from "./CommitmentsPanel";
 import { CollapsibleCard, Flag, Panel, Row, Stat } from "./ui/Panel";
 import { TreasuryPortfolio } from "./TreasuryPortfolio";
 import { VerificationPanel } from "./VerificationPanel";
@@ -52,14 +62,24 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
       <Panel title="TREASURY LOCKS" right="what the treasury's holdings are earmarked for">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Stat
-            label="LP provisioning"
-            value={config.lpEnabled ? "ACTIVE" : "PENDING"}
-            sub="liquidity for the $HUB / $OTC pair — seeded from treasury OTC + $HUB once price holds ≥14 days"
+            label="LP positions"
+            value="100% LOCKED"
+            sub={`${LP_LOCKS.map((l) => l.pair).join(" · ")} — LP burned via Raydium Burn & Earn, fee-claim NFTs only; protocol earmark (${fmtNum(state.treasury.lpPendingHubUnits / 1e6)} $HUB) builds HUB/OTC on top`}
+          />
+          <Stat
+            label="team vesting"
+            value={`${fmtNum(TEAM_VESTING.amountHub)} $HUB`}
+            sub={`${TEAM_VESTING.months}mo monthly · cliff ${TEAM_VESTING.cliffDate} · immutable Streamflow → multisig`}
           />
           <Stat
             label="yield buffer"
             value={fmtHub(supply.lockedUnits, d)}
             sub="treasury-held $HUB + swept desks that keep tier payouts sustainable as Σw grows"
+          />
+          <Stat
+            label="treasury custody"
+            value={SQUADS_MULTISIG.threshold}
+            sub="Squads multisig vault — no single key moves treasury funds"
           />
         </div>
       </Panel>
@@ -107,6 +127,8 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
         </div>
       </Panel>
 
+      <CommitmentsPanel state={state} />
+
       <TreasuryPortfolio state={state} />
 
       <VerificationPanel state={state} />
@@ -119,7 +141,19 @@ export function TreasuryPanel({ state }: { state: ProtocolState }) {
           <Row k="burn state" v={<AddressLink address={pdas.burn} />} />
           <Row k="treasury state" v={<AddressLink address={pdas.treasury} />} />
           <Row k="vault (LP custody)" v={<AddressLink address={pdas.vault} />} />
-          <Row k="treasury multisig" v={<AddressLink address={config.treasury} />} />
+          <Row k="treasury (config)" v={<AddressLink address={config.treasury} />} />
+          <Row
+            k="squads vault (treasury custody)"
+            v={<AddressLink address={SQUADS_MULTISIG.vault} cluster="mainnet-beta" />}
+          />
+          <Row
+            k="squads multisig"
+            v={<AddressLink address={SQUADS_MULTISIG.account} cluster="mainnet-beta" />}
+          />
+          <Row
+            k="team vesting (streamflow)"
+            v={<AddressLink address={TEAM_VESTING.contract} cluster="mainnet-beta" />}
+          />
           <Row k="ops wallet" v={<AddressLink address={config.opsWallet} />} />
           <Row k="authority" v={<AddressLink address={config.authority} />} />
           <Row k="desk collection" v={<AddressLink address={config.deskCollection} />} />

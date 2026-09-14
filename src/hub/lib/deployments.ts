@@ -48,6 +48,10 @@ export type Deployment = {
 const HUB_MAINNET: string | null = "7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i";
 /** Anchor 1.x writes the IDL to a Program Metadata account — written at devnet deploy. */
 const HUB_IDL_DEVNET = "GSw7mRX3gsHEYsEvH8Gr8vWoDYkabT3PzAUsznqx7dxi";
+/** Mainnet IDL metadata account — written post-launch 2026-09-13 via `anchor idl init`
+ *  (sdk/idl/hub.json, the 51-instruction build matching the deployed binary; the mock-gated
+ *  devnet_* instructions in target/idl/hub.json are never shipped to mainnet). */
+const HUB_IDL_MAINNET = "FoQNr4kLqwpfEf6fiaf1y1BL7YYfRi7aADJRtytyGVC4";
 const OTC_PROGRAM_MAINNET = "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW";
 /** OTC Desks pot wallet — read from otcdesks.cash/docs on-chain links, 2026-09-08. This is the
  *  `otc_desk_pot` value `initialize_config` needs on mainnet (Config.otcDeskPot mirrors it once
@@ -82,8 +86,9 @@ export const DEPLOYMENTS: Deployment[] = [
     name: "IDL / PROGRAM METADATA",
     group: "hub",
     role: "On-chain Anchor IDL so explorers and wallets decode $HUB instructions.",
-    address: { devnet: HUB_IDL_DEVNET, "mainnet-beta": null },
-    status: { devnet: "live", "mainnet-beta": "pending" },
+    address: { devnet: HUB_IDL_DEVNET, "mainnet-beta": HUB_IDL_MAINNET },
+    status: { devnet: "live", "mainnet-beta": "live" },
+    note: "Mainnet IDL written 2026-09-13 (anchor idl init); matches the deployed binary.",
   },
   {
     ...both(MPL_CORE_PROGRAM_ID),

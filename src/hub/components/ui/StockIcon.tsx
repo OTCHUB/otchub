@@ -16,8 +16,8 @@ const BUNDLED_ICONS: Record<string, string> = {
   SOL: "/stocks/SOL.png",
   // WSOL shares the bundled wrapped-SOL logo.
   WSOL: "/stocks/SOL.png",
-  // $HUB protocol token — the official circular mint icon (hub-mint.png,
-  // published from the mint icon studio; transparent outside the circle).
+  // $HUB protocol token — the official gold "OH" coin (hub-mint.png, refreshed
+  // 2026-09-13 to match the Dexscreener token-profile logo).
   HUB: "/hub-mint.png",
 };
 

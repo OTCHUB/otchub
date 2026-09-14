@@ -5,6 +5,8 @@ import { useTokenomics } from "../hooks/useTokenomics";
 import { fmtBpPct, fmtHub, fmtNum, fmtTokens, fmtUtc, unitsToTokens } from "../lib/format";
 import { TREASURY_DESK_TARGET, treasuryDeskProgressPct } from "../lib/yield";
 import { AddressLink } from "./ui/AddressLink";
+import { AirdropDistributionCard } from "./AirdropDistributionCard";
+import { CommitmentsPanel } from "./CommitmentsPanel";
 import { HubSupplyChart } from "./HubSupplyChart";
 import { PieChart, type PieSlice } from "./ui/PieChart";
 import { CollapsibleCard, Flag, Panel, Row, Stat } from "./ui/Panel";
@@ -66,12 +68,13 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
 
   return (
     <div className="space-y-2">
+      <CommitmentsPanel state={state} />
       <Panel title="TOKENOMICS" right={source} collapsible>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
           <Stat
             label="max supply"
             value={fmtHub(plan.maxUnits, d, 0)}
-            sub="minted once · authority revoked"
+            sub={`minted once · authority revoked · ${fmtHub(state.supply.burnedUnits, d, 0)} burned since`}
           />
           <Stat
             label="desks (plan basis)"
@@ -119,7 +122,8 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
           <Flag on={!!onChain} label="PLAN RECORDED" />
           <Flag on={!!onChain?.airdropRootSet} label="SNAPSHOT" />
           <Flag on={!!onChain?.airdropOpen} label="CLAIMS OPEN" />
-          <Flag on={plan.teamUnits === 0n} label="0% TEAM" />
+          <Flag on={!!onChain && onChain.airdropClaims > 0} label="DISTRIBUTED" />
+          <Flag on={plan.teamUnits === 0n} label="0% TEAM AT GENESIS" />
         </div>
       </Panel>
 
@@ -131,7 +135,7 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
       <Panel title="AIRDROP" collapsible>
         <Row
           k="mechanism"
-          v="Merkle claim · one claim per desk asset · paid to the desk's current owner"
+          v="Merkle-verified · one allocation per desk asset · distributed directly to each desk's live owner (no claim tx) · genesis snapshot slot 446811667"
         />
         <Row
           k="eligibility"
@@ -177,6 +181,15 @@ export function TokenomicsPanel({ state }: { state: ProtocolState }) {
           k="tokenomics PDA"
           v={<AddressLink address={tokenomicsPda(programId)[0].toBase58()} />}
         />
+        {onChain && (
+          <div className="mt-2">
+            <AirdropDistributionCard
+              decimals={d}
+              claimedUnits={onChain.airdropClaimedUnits}
+              claims={onChain.airdropClaims}
+            />
+          </div>
+        )}
       </Panel>
 
       <Panel title="TREASURY LOCK" collapsible>

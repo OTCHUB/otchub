@@ -6,6 +6,7 @@ import { fmtNum, fmtSol, fmtUnits, fmtWeight, shortKey } from "../lib/format";
 import { baseInputs, distributableLamports, roundsPerDay } from "../lib/yield";
 import { useWallet } from "../WalletProvider";
 import { ActivationGuide } from "./ActivationGuide";
+import { AirdropReceipt } from "./AirdropReceipt";
 import { ClaimPanel } from "./ClaimPanel";
 import { DeskSheet } from "./DeskSheet";
 import { HubPotPanel } from "./HubPotPanel";
@@ -292,6 +293,8 @@ export function WalletPanel({ state, walletAddress }: Props) {
                   : ""}
               </span>
             </div>
+
+            <AirdropReceipt address={address} decimals={state.supply.decimals} />
 
             <ClaimPanel
               address={address}
