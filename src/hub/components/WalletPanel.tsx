@@ -5,6 +5,7 @@ import { useWalletPortfolio, type OwnedDesk } from "../hooks/useWalletPortfolio"
 import { fmtNum, fmtSol, fmtUnits, fmtWeight, shortKey } from "../lib/format";
 import { baseInputs, distributableLamports, roundsPerDay } from "../lib/yield";
 import { useWallet } from "../WalletProvider";
+import { useHub } from "../HubProvider";
 import { ActivationGuide } from "./ActivationGuide";
 import { AirdropReceipt } from "./AirdropReceipt";
 import { ClaimPanel } from "./ClaimPanel";
@@ -17,8 +18,10 @@ import { WalletConnect } from "./WalletConnect";
 
 type Props = {
   state: ProtocolState;
-  /** Host-supplied address (otchub passes its connected wallet); hides the connect UI. */
+  /** Host-supplied address (otchub passes its connected wallet). */
   walletAddress?: string;
+  /** Host wallet write path — switch/disconnect target the host's stored connection too. */
+  onWalletChanged?: (address?: string) => void;
 };
 
 /** $OTC mint decimals; the payer ATA's reported decimals take precedence once loaded. */
@@ -148,9 +151,22 @@ function DeskCard({ desk, onOpen }: { desk: OwnedDesk; onOpen: () => void }) {
  * header → balance chips → yield/earnings summary strip → claim bar → filterable desk grid.
  * Per-desk actions (claim · activate · upgrade) live in the DeskSheet the grid opens, so the
  * page never grows with the number of desks a wallet holds. */
-export function WalletPanel({ state, walletAddress }: Props) {
+export function WalletPanel({ state, walletAddress, onWalletChanged }: Props) {
   const wallet = useWallet();
+  const { resolveSigner } = useHub();
   const address = walletAddress ?? wallet.address;
+  // A mirrored/stale address with no live signer behind it is the "read-only" trap: signing
+  // panels refuse to act while the wallet row looks connected. Surface it, with the way out.
+  const readOnly = !!address && !resolveSigner(address);
+  const disconnect = () => {
+    if (walletAddress && onWalletChanged) onWalletChanged(undefined);
+    else wallet.disconnect();
+  };
+  const connect = (pk: string) => {
+    if (walletAddress && onWalletChanged) onWalletChanged(pk);
+    else wallet.connect(pk);
+    setSwitchOpen(false);
+  };
   const [switchOpen, setSwitchOpen] = useState(false);
   const [openAsset, setOpenAsset] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "idle">("all");
@@ -211,33 +227,36 @@ export function WalletPanel({ state, walletAddress }: Props) {
       <Panel title="WALLET :: PORTFOLIO">
         <div className="flex flex-wrap items-center gap-2">
           <AddressLink address={address} label={shortKey(address, 6)} />
-          {!walletAddress && (
-            <span className="ml-auto flex gap-2 text-[10px] uppercase tracking-widest">
-              <button
-                type="button"
-                onClick={() => setSwitchOpen((o) => !o)}
-                className="text-green-500 underline hover:text-green-300"
-              >
-                {switchOpen ? "cancel" : "switch"}
-              </button>
-              <button
-                type="button"
-                onClick={() => wallet.disconnect()}
-                className="text-amber-400 underline hover:text-amber-200"
-              >
-                disconnect
-              </button>
-            </span>
-          )}
+          {/* Always available — even when the address is host-supplied (mirrored from the OTC
+              dashboard's stored connection). A dead mirrored session otherwise reads as
+              "connected" while every signing panel reports read-only, with no way out of /hub. */}
+          <span className="ml-auto flex gap-2 text-[10px] uppercase tracking-widest">
+            <button
+              type="button"
+              onClick={() => setSwitchOpen((o) => !o)}
+              className="text-green-500 underline hover:text-green-300"
+            >
+              {switchOpen ? "cancel" : "switch"}
+            </button>
+            <button
+              type="button"
+              onClick={disconnect}
+              className="text-amber-400 underline hover:text-amber-200"
+            >
+              disconnect
+            </button>
+          </span>
         </div>
+        {readOnly && (
+          <div className="mt-2 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[10px] leading-relaxed text-amber-300">
+            READ-ONLY VIEW — this wallet's signing session isn't live (stale or unauthorized).
+            Hit <span className="font-bold">disconnect</span> and reconnect with the wallet itself
+            to enable activate / claim / swap.
+          </div>
+        )}
         {switchOpen && (
           <div className="mt-2">
-            <WalletConnect
-              onConnected={(pk) => {
-                wallet.connect(pk);
-                setSwitchOpen(false);
-              }}
-            />
+            <WalletConnect onConnected={connect} />
           </div>
         )}
 

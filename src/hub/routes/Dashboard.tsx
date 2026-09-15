@@ -19,9 +19,12 @@ export type DashboardProps = {
   rawDeskDailyLamports?: number;
   /** Host-connected wallet (otchub); when set the module skips its own connect UI. */
   walletAddress?: string;
+  /** Host wallet write path (otchub's Hub.jsx owns the `otc_wallet_address` key) — lets the
+   *  wallet panel offer switch/disconnect even when the address is host-supplied. */
+  onWalletChanged?: (address?: string) => void;
 };
 
-export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProps) {
+export function Dashboard({ rawDeskDailyLamports, walletAddress, onWalletChanged }: DashboardProps) {
   const wallet = useWallet();
   const address = walletAddress ?? wallet.address;
   const { cluster } = useHub();
@@ -52,7 +55,11 @@ export function Dashboard({ rawDeskDailyLamports, walletAddress }: DashboardProp
             <div className="grid items-start gap-2 lg:grid-cols-2">
               <div className="min-w-0 space-y-2">
                 <div id="hub-wallet">
-                  <WalletPanel state={state} walletAddress={walletAddress} />
+                  <WalletPanel
+                    state={state}
+                    walletAddress={walletAddress}
+                    onWalletChanged={onWalletChanged}
+                  />
                 </div>
                 <div id="hub-yield">
                   <EarningPreview state={state} rawDeskDailyLamports={rawDeskDailyLamports} />

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { queryClientInstance } from "@/lib/query-client";
 import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
-import { getSignerForAddress } from "@/lib/walletSigner";
+import { clearConnectedWallet, getSignerForAddress } from "@/lib/walletSigner";
 import { silentReconnect } from "@/lib/solanaWallets";
 import { HubNavMenu } from "@/hub/components/HubNavMenu";
 import MascotLogo from "@/components/otc/MascotLogo";
@@ -160,7 +160,7 @@ function HubHeader() {
 // own WalletProvider context, so panels that read useWallet() directly (faucet, airdrop checker,
 // mock-desk mint) stay in sync with whatever the rest of otchub treats as "your" wallet, exactly
 // like every panel that still takes the walletAddress prop.
-function HubShell({ wallet }) {
+function HubShell({ wallet, onWalletChanged }) {
   const { cluster } = useHub();
   const hubWallet = useWallet();
   useEffect(() => {
@@ -175,7 +175,7 @@ function HubShell({ wallet }) {
       <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-[1500px]">
         <HubHeader />
         <main className="mt-3">
-          <HubRoutes walletAddress={wallet} />
+          <HubRoutes walletAddress={wallet} onWalletChanged={onWalletChanged} />
         </main>
         <Footer />
       </div>
@@ -221,6 +221,23 @@ export default function Hub({ devnet = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- retry burst keyed on the address itself
   }, [wallet]);
 
+  // The ONLY write path for the host wallet key from inside /hub. A stale localStorage address
+  // previously became an unrecoverable "connected but read-only" state: panels hide their
+  // connect UI when the host supplies an address (WalletPanel), so a dead session could never be
+  // disconnected or switched from /hub. WalletPanel now surfaces switch/disconnect always and
+  // routes them here: clear the key + the host signer registry, then let HubShell's mirror
+  // effect sync the hub module's own wallet context.
+  const handleWalletChanged = (pk) => {
+    try {
+      if (pk) window.localStorage.setItem(WALLET_STORAGE_KEY, pk);
+      else window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    } catch {
+      /* storage unavailable (private mode) — state still updates for this tab */
+    }
+    if (!pk) clearConnectedWallet();
+    setWallet(pk || undefined);
+  };
+
   const config = devnet ? HUB_DEVNET_CONFIG : HUB_CONFIG;
 
   return (
@@ -233,7 +250,7 @@ export default function Hub({ devnet = false }) {
       swapTransport={hubSwapTransport}
     >
       <WalletProvider>
-        <HubShell wallet={wallet} />
+        <HubShell wallet={wallet} onWalletChanged={handleWalletChanged} />
       </WalletProvider>
     </HubProvider>
   );
