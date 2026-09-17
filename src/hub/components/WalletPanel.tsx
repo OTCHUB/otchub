@@ -9,6 +9,7 @@ import { useHub } from "../HubProvider";
 import { ActivationGuide } from "./ActivationGuide";
 import { AirdropReceipt } from "./AirdropReceipt";
 import { ClaimPanel } from "./ClaimPanel";
+import { ConsolidatePanel } from "./ConsolidatePanel";
 import { DeskSheet } from "./DeskSheet";
 import { HubPotPanel } from "./HubPotPanel";
 import { AddressLink } from "./ui/AddressLink";
@@ -320,6 +321,13 @@ export function WalletPanel({ state, walletAddress, onWalletChanged }: Props) {
               state={state}
               desks={desks}
               onClaimed={() => void portfolio.refetch()}
+            />
+
+            <ConsolidatePanel
+              state={state}
+              address={address}
+              desks={desks}
+              onDone={() => void portfolio.refetch()}
             />
 
             <div className="mt-2 flex items-center gap-1">

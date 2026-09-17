@@ -158,6 +158,32 @@ export type SwapPhase = "quote" | "build" | "sim" | "sign" | "send" | "confirm";
 export type SwapResult = { ok: true; sig: string } | { ok: false; reason: string };
 
 /**
+ * Structural validation of a relay/Jupiter-built swap tx before it may be simulated or signed:
+ * the connected wallet must be the fee payer, and a token output must land in the user's ATA
+ * (either token program — the mint's owner decides which exists). Returns the serialized
+ * message snapshot so callers can verify post-sign equality (no wallet-side substitution).
+ * Shared by `executeSwap` (single swap) and `consolidate.ts`'s batched claim-and-swap path.
+ */
+export function validateBuiltSwapTx(
+  unsigned: VersionedTransaction,
+  user: string,
+  outputMint: string,
+): { ok: true; message: Buffer } | { ok: false; reason: string } {
+  const message = Buffer.from(unsigned.message.serialize());
+  const feePayer = unsigned.message.staticAccountKeys[0]?.toBase58();
+  if (feePayer !== user) return { ok: false, reason: "fee_payer_mismatch" };
+  if (outputMint !== SOL_MINT) {
+    const keys = new Set(unsigned.message.staticAccountKeys.map((k) => k.toBase58()));
+    const outMint = new PublicKey(outputMint);
+    const destinations = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID].map(
+      (tp) => ataPda(new PublicKey(user), outMint, tp)[0].toBase58(),
+    );
+    if (!destinations.some((a) => keys.has(a))) return { ok: false, reason: "destination_mismatch" };
+  }
+  return { ok: true, message };
+}
+
+/**
  * Full lifecycle for one Jupiter swap: quote → build → fee-payer check → simulate → sign →
  * send → confirm. `shouldContinue` is consulted only BEFORE signing (context guards must never
  * drop an approved tx).
@@ -189,31 +215,14 @@ export async function executeSwap(opts: {
     if (!live()) return abort();
 
     const unsigned = VersionedTransaction.deserialize(new Uint8Array(Buffer.from(b64, "base64")));
-    const simulatedMsg = Buffer.from(unsigned.message.serialize());
-    const feePayer = unsigned.message.staticAccountKeys[0]?.toBase58();
-    if (feePayer !== user) {
-      onLog({ type: "err", msg: "ABORT: tx fee payer != connected wallet" });
-      return { ok: false, reason: "fee_payer_mismatch" };
+    // Relay-tamper defense lives in validateBuiltSwapTx (shared with consolidate.ts): the
+    // connected wallet must be the fee payer, and a token output must land in the user's ATA.
+    const builtCheck = validateBuiltSwapTx(unsigned, user, params.outputMint);
+    if ("reason" in builtCheck) {
+      onLog({ type: "err", msg: `ABORT: built tx failed validation (${builtCheck.reason})` });
+      return { ok: false, reason: builtCheck.reason };
     }
-    // Relay-tamper defense: quote/build calls may transit a host proxy, so the returned tx must
-    // provably pay the *user*. For a token output, that means the user's ATA for the output mint
-    // appears in the message (either token program — the mint's owner decides which exists; we
-    // accept both rather than assume). SOL output unwraps natively to the fee payer — already
-    // proven above — so nothing more to check there.
-    if (params.outputMint !== SOL_MINT) {
-      const keys = new Set(unsigned.message.staticAccountKeys.map((k) => k.toBase58()));
-      const outMint = new PublicKey(params.outputMint);
-      const destinations = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID].map(
-        (tp) => ataPda(new PublicKey(user), outMint, tp)[0].toBase58(),
-      );
-      if (!destinations.some((a) => keys.has(a))) {
-        onLog({
-          type: "err",
-          msg: "ABORT: built tx does not pay the connected wallet's token account (destination mismatch)",
-        });
-        return { ok: false, reason: "destination_mismatch" };
-      }
-    }
+    const simulatedMsg = builtCheck.message;
 
     onPhase?.("sim");
     onLog({ type: "info", msg: "Simulating swap tx…" });
