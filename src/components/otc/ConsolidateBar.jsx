@@ -8,11 +8,13 @@ import React, { useMemo, useState } from "react";
 import { Buffer } from "buffer";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getQuote, getSwapTx } from "@/lib/jupiterSwap";
-import { getSignerForAddress } from "@/lib/walletSigner";
+import { abortPendingSigns, getSignerForAddress } from "@/lib/walletSigner";
 import { LINEUP_STOCKS } from "@/lib/otcClaim";
 import { validateBuiltSwapTx } from "@/hub/lib/swap";
 import { blowfishScanTx } from "@/hub/lib/blowfish";
 import TokenCoin from "@/components/otc/TokenCoin";
+import StepTracker from "@/components/otc/StepTracker";
+import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
 import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 const HUB_MINT = "5yrUrzyDBs5NrZdiGtW1BEYUjHyHBLx1L5vTAKUxvo1V";
@@ -66,14 +68,27 @@ export function diffLineupBalances(before, after) {
   return out;
 }
 
+/** Pipeline order for the step tracker (quote+sim+preflight per token → one sign prompt →
+ *  send → confirm). */
+const STEPS = [
+  { id: "quote", label: "QUOTE+SIM" },
+  { id: "sign", label: "SIGN" },
+  { id: "send", label: "SEND" },
+  { id: "confirm", label: "CONFIRM" },
+];
+
 export default function ConsolidateBar({ address, deltas, onDone, onDismiss }) {
   const targets = useMemo(consolidateTargets, []);
   const [targetSymbol, setTargetSymbol] = useState("SOL");
   const [slippageBps, setSlippageBps] = useState(100);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState(null);
+  const [stepDetail, setStepDetail] = useState(null);
+  const [failedStep, setFailedStep] = useState(null);
   const [logs, setLogs] = useState([]);
   const [done, setDone] = useState(null);
+  const stepRef = React.useRef(null);
+  stepRef.current = phase;
   const target = targets.find((t) => t.symbol === targetSymbol) ?? targets[1];
   // Accept bare {mint, units} deltas from the claim panel and enrich from the lineup catalog.
   const swappable = deltas
@@ -87,11 +102,15 @@ export default function ConsolidateBar({ address, deltas, onDone, onDismiss }) {
     setBusy(true);
     setLogs([]);
     setDone(null);
+    setFailedStep(null);
     const built = [];
     const outcomes = [];
     try {
+      let qi = 0;
       for (const d of swappable) {
-        setPhase(`quote ${d.symbol}`);
+        qi += 1;
+        setPhase("quote");
+        setStepDetail(`${qi}/${swappable.length} · ${d.symbol}`);
         try {
           const quote = await getQuote(d.mint, target.mint, d.units.toString(), slippageBps);
           const builtTx = await getSwapTx(quote, address);
@@ -117,17 +136,20 @@ export default function ConsolidateBar({ address, deltas, onDone, onDismiss }) {
         }
       }
       if (built.length) {
+        setStepDetail(null);
         setPhase("sign");
         const signed = await signer.signAllTransactionsRaw(built.map((b) => b.tx));
-        setPhase("send");
         for (const [i, b] of built.entries()) {
           try {
+            setPhase("send");
+            setStepDetail(`${i + 1}/${built.length} · ${b.d.symbol}`);
             const bytes = signed[i];
             if (!bytes) throw new Error("wallet returned fewer signatures than transactions");
             const signedTx = VersionedTransaction.deserialize(new Uint8Array(bytes));
             if (!Buffer.from(signedTx.message.serialize()).equals(b.msg))
               throw new Error("wallet returned a changed transaction");
             const sig = await conn().sendRawTransaction(bytes, { skipPreflight: true, maxRetries: 3 });
+            setPhase("confirm");
             try {
               const bh = await conn().getLatestBlockhash("confirmed");
               const conf = await conn().confirmTransaction({ signature: sig, ...bh }, "confirmed");
@@ -154,9 +176,11 @@ export default function ConsolidateBar({ address, deltas, onDone, onDismiss }) {
       onDone?.();
     } catch (e) {
       log(`ABORT: ${e.message}`);
+      setFailedStep(stepRef.current || "quote");
     } finally {
       setBusy(false);
       setPhase(null);
+      setStepDetail(null);
     }
   };
 
@@ -220,6 +244,32 @@ export default function ConsolidateBar({ address, deltas, onDone, onDismiss }) {
           </span>
         ))}
       </div>
+      {(busy || done || failedStep) && (
+        <div className="mt-2">
+          <StepTracker
+            title="CONSOLIDATE PIPELINE"
+            steps={STEPS}
+            current={phase}
+            done={!!done && !failedStep}
+            failed={failedStep}
+            detail={stepDetail}
+            onDismiss={
+              !busy
+                ? () => {
+                    setDone(null);
+                    setFailedStep(null);
+                    if (!done) onDismiss?.();
+                  }
+                : null
+            }
+          />
+        </div>
+      )}
+      <TxStatusOverlay
+        phase={busy ? phase || "quote" : null}
+        detail={stepDetail}
+        onCancel={phase === "sign" ? () => abortPendingSigns() : null}
+      />
       {logs.length > 0 && (
         <div className="mt-1.5 max-h-28 space-y-0.5 overflow-y-auto border-t border-cyan-500/20 pt-1 text-[10px] text-green-500">
           {logs.map((l, i) => (

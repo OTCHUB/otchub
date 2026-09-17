@@ -1,18 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim, probeOwed } from "@/lib/otcClaim";
 import ConsolidateBar, { snapshotLineupBalances, diffLineupBalances } from "./ConsolidateBar";
-
-// Survives this panel's unmount/remount on the post-claim portfolio reload (see the comment at
-// the `onClaimed` call site): the conversion offer would otherwise vanish the instant the
-// portfolio refreshes. 15-minute freshness guard so a stale stash never resurfaces.
-let pendingConsolidation = null;
+import StepTracker from "./StepTracker";
 import { getSignerForAddress, abortPendingSigns } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
 import { base44 } from "@/api/base44Client";
 import HelpNote from "@/components/otc/HelpNote";
 import TxStatusOverlay from "@/components/otc/TxStatusOverlay";
+
+// Survives this panel's unmount/remount on the post-claim portfolio reload (see the comment at
+// the `onClaimed` call site): the conversion offer would otherwise vanish the instant the
+// portfolio refreshes. 15-minute freshness guard so a stale stash never resurfaces.
+let pendingConsolidation = null;
+
+/** Fixed claim-pipeline order for the step tracker — the executors emit `resolve/start/sim/
+ *  sign/send/confirm` via onProgress; we map resolve/start onto PREP. */
+const CLAIM_STEPS = [
+  { id: "prep", label: "PREP" },
+  { id: "sim", label: "SIMULATE" },
+  { id: "sign", label: "SIGN" },
+  { id: "send", label: "SEND" },
+  { id: "confirm", label: "CONFIRM" },
+];
 
 export default function ClaimPanel({
   address,
@@ -37,6 +48,10 @@ export default function ClaimPanel({
     pendingConsolidation = null;
     return v && Date.now() - v.at < 15 * 60 * 1000 ? v.arrived : null;
   });
+  // Step-tracker state for the claim pipeline — `current` is derived live from the executors'
+  // progress events; terminal states persist until dismissed or the next run starts.
+  const [runDone, setRunDone] = useState(null);
+  const [runFailedAt, setRunFailedAt] = useState(null);
   const [pullOwed, setPullOwed] = useState(false); // OFF = atomic distribute+claim pairs (fast); ON = also activate + distribute ALL owed backlog first
   const [progress, setProgress] = useState(null); // { group, totalGroups, phase } live chunk progress
   const [owed, setOwed] = useState(null); // PULL_OWED probe: asset_id -> { items: [{symbol, mint, decimals, amount}] }
@@ -236,6 +251,8 @@ export default function ClaimPanel({
     setBusy(true);
     setConsolidation(null);
     pendingConsolidation = null;
+    setRunDone(null);
+    setRunFailedAt(null);
     try {
       // Baseline for the post-claim conversion offer — only tokens that GROW during this run
       // are offered for swap; pre-existing balances are never swept.
@@ -305,6 +322,7 @@ export default function ClaimPanel({
       const ok = results.filter((r) => r.ok).length;
       const fail = results.length - ok;
       log({ type: fail ? "err" : "ok", msg: `DONE :: ${ok} confirmed, ${fail} failed (of ${results.length} tx).` });
+      setRunDone({ ok, fail });
 
       if (ok > 0) {
         setCleared((prev) => {
@@ -349,6 +367,7 @@ export default function ClaimPanel({
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
+      setRunFailedAt(trackerStepRef.current);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -381,6 +400,8 @@ export default function ClaimPanel({
     }
     setBusy(true);
     setProgress(null);
+    setRunDone(null);
+    setRunFailedAt(null);
     try {
       const actIxs = await buildActivateInstructions(targets, address, tpMap);
       log({ type: "info", msg: `ACTIVATE :: opening ${actIxs.length} ticker account(s) for ${targets.length} desk(s).` });
@@ -390,11 +411,13 @@ export default function ClaimPanel({
         type: results.length - ok ? "err" : "ok",
         msg: `DONE :: ${ok} confirmed, ${results.length - ok} failed (of ${results.length} tx).`,
       });
+      setRunDone({ ok, fail: results.length - ok });
       const rescanned = await scan({ force: true, silent: true });
       if (rescanned) log({ type: "ok", msg: "Vault scan refreshed — activation state updated." });
       if (ok > 0 && onClaimed) onClaimed();
     } catch (e) {
       log({ type: "err", msg: `ACTIVATE_ABORT: ${e.message}` });
+      setRunFailedAt(trackerStepRef.current);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -466,6 +489,18 @@ export default function ClaimPanel({
       ? `GROUP ${progress.group}/${progress.totalGroups}`
       : null
     : null;
+
+  // Derived step for the pipeline tracker: the executors' progress phase mapped onto the fixed
+  // CLAIM_STEPS order; "prep" covers the pre-progress window right after the button is hit.
+  const trackerStep = busy
+    ? progress && progress.phase !== "start"
+      ? progress.phase === "resolve"
+        ? "prep"
+        : progress.phase
+      : "prep"
+    : null;
+  const trackerStepRef = useRef("prep");
+  trackerStepRef.current = trackerStep ?? "prep";
 
   return (
     <div className="border border-emerald-500/30 bg-black p-3">
@@ -767,6 +802,26 @@ export default function ClaimPanel({
       )}
 
       {/* Log */}
+      {(busy || runDone || runFailedAt) && (
+        <div className="mt-2">
+          <StepTracker
+            title="CLAIM PIPELINE"
+            steps={CLAIM_STEPS}
+            current={trackerStep}
+            done={!!runDone && !runFailedAt}
+            failed={runFailedAt}
+            detail={overlayDetail}
+            onDismiss={
+              !busy && (runDone || runFailedAt)
+                ? () => {
+                    setRunDone(null);
+                    setRunFailedAt(null);
+                  }
+                : null
+            }
+          />
+        </div>
+      )}
       {consolidation && consolidation.length > 0 && (
         <ConsolidateBar
           address={address}
