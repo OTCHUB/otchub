@@ -22,6 +22,7 @@ import {
   type OtcPotView,
 } from "@hub-sdk";
 import { executeClaimYield } from "./claim";
+import { blowfishScanTx } from "./blowfish";
 import { executeClaimHubPotReward } from "./hubPotClaim";
 import {
   SOL_DECIMALS,
@@ -193,6 +194,16 @@ export async function executeConsolidation(opts: {
       if ("reason" in v) throw new Error(v.reason);
       const sim = await connection.simulateTransaction(unsigned, { sigVerify: false });
       if (sim.value.err) throw new Error(`sim: ${JSON.stringify(sim.value.err)}`);
+      // Same pre-flight as executeSwap / the claim executors (env-gated; no key = no opinion).
+      const verdict = await blowfishScanTx({
+        tx: unsigned,
+        userAccount: signer.publicKey,
+        rpcEndpoint: connection.rpcEndpoint,
+      });
+      if (verdict?.action === "BLOCK")
+        throw new Error(`Blowfish BLOCK: ${verdict.messages.join("; ") || "flagged as unsafe"}`);
+      if (verdict?.action === "WARN")
+        onLog({ type: "info", msg: `${d.symbol} BLOWFISH WARN: ${verdict.messages.join("; ")}` });
       built.push({ d, tx: unsigned, msg: v.message, estOut: BigInt(quote.outAmount) });
       onLog({
         type: "sim",
