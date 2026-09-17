@@ -44,6 +44,7 @@ import {
   type TokenomicsView,
 } from "@hub-sdk";
 import { buildClaimYieldIx } from "./claim";
+import { blowfishScanTx } from "./blowfish";
 import type { HubCluster } from "./explorer";
 import type { TxLog } from "./swap";
 import type { WalletSigner } from "./wallets";
@@ -486,6 +487,21 @@ export async function executeTierChange(opts: {
       return fail(reason);
     }
     onLog({ type: "sim", msg: `sim OK (${sim.value.unitsConsumed ?? "?"} CU)` });
+
+    // Blowfish pre-flight (optional, env-gated — see blowfish.ts): BLOCK aborts before the
+    // wallet prompt; WARN is surfaced in the log; no API key / unreachable = no opinion.
+    const verdict = await blowfishScanTx({
+      tx,
+      userAccount: payer.toBase58(),
+      rpcEndpoint: connection.rpcEndpoint,
+    });
+    if (verdict?.action === "BLOCK") {
+      const reason = `Blowfish BLOCK: ${verdict.messages.join("; ") || "flagged as unsafe"}`;
+      onLog({ type: "err", msg: `ABORT: ${reason}` });
+      return fail(reason);
+    }
+    if (verdict?.action === "WARN")
+      onLog({ type: "info", msg: `BLOWFISH WARN: ${verdict.messages.join("; ")}` });
 
     onPhase?.("sign");
     onLog({ type: "info", msg: "SIGN :: 1 prompt for 1 tx…" });

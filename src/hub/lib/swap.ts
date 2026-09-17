@@ -9,6 +9,7 @@
 import { Buffer } from "buffer";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, ataPda } from "@hub-sdk";
+import { blowfishScanTx } from "./blowfish";
 import type { WalletSigner } from "./wallets";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -223,6 +224,22 @@ export async function executeSwap(opts: {
       onLog({ type: "err", msg: `SIM_FAIL: ${reason}` });
       return { ok: false, reason };
     }
+    // Blowfish pre-flight (optional, env-gated — see blowfish.ts): catches what a validity-only
+    // RPC sim can't — phishing/maliciousness verdicts. BLOCK aborts before the wallet prompt;
+    // WARN is surfaced in the log; disabled/unreachable = no opinion, the sim gate stands.
+    const verdict = await blowfishScanTx({
+      tx: unsigned,
+      userAccount: user,
+      rpcEndpoint: connection.rpcEndpoint,
+    });
+    if (verdict?.action === "BLOCK") {
+      const reason = `Blowfish BLOCK: ${verdict.messages.join("; ") || "flagged as unsafe"}`;
+      onLog({ type: "err", msg: `ABORT: ${reason}` });
+      return { ok: false, reason };
+    }
+    if (verdict?.action === "WARN")
+      onLog({ type: "info", msg: `BLOWFISH WARN: ${verdict.messages.join("; ")}` });
+
     onPhase?.("sign");
     onLog({
       type: "sim",

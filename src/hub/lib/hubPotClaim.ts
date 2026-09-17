@@ -33,6 +33,7 @@ import {
   type HubProgram,
 } from "@hub-sdk";
 import type { TxLog } from "./swap";
+import { blowfishScanTx } from "./blowfish";
 import type { WalletSigner } from "./wallets";
 
 export type HubPotClaimPhase = "build" | "sim" | "sign" | "send" | "confirm";
@@ -166,17 +167,31 @@ export async function executeClaimHubPotReward(opts: {
     txs.map((tx) => connection.simulateTransaction(tx, undefined, false)),
   );
   const passing: { tx: Transaction; i: number }[] = [];
-  sims.forEach((s, i) => {
+  for (const [i, s] of sims.entries()) {
     if (s.value.err) {
       const line = s.value.logs?.find((l) => /Error Message|Error Code/.test(l));
       const reason = line?.replace("Program log: ", "") ?? JSON.stringify(s.value.err);
       onLog({ type: "err", msg: `TX ${i + 1} SIM_FAIL: ${reason}` });
       results.push({ asset: assets[i], ok: false, reason });
-    } else {
-      onLog({ type: "sim", msg: `TX ${i + 1} sim OK (${s.value.unitsConsumed ?? "?"} CU)` });
-      passing.push({ tx: txs[i], i });
+      continue;
     }
-  });
+    onLog({ type: "sim", msg: `TX ${i + 1} sim OK (${s.value.unitsConsumed ?? "?"} CU)` });
+    // Blowfish pre-flight (optional, env-gated): BLOCK drops the tx like a failed sim.
+    const verdict = await blowfishScanTx({
+      tx: txs[i],
+      userAccount: claimant.toBase58(),
+      rpcEndpoint: connection.rpcEndpoint,
+    });
+    if (verdict?.action === "BLOCK") {
+      const reason = `Blowfish BLOCK: ${verdict.messages.join("; ") || "flagged as unsafe"}`;
+      onLog({ type: "err", msg: `TX ${i + 1} ${reason}` });
+      results.push({ asset: assets[i], ok: false, reason });
+      continue;
+    }
+    if (verdict?.action === "WARN")
+      onLog({ type: "info", msg: `TX ${i + 1} BLOWFISH WARN: ${verdict.messages.join("; ")}` });
+    passing.push({ tx: txs[i], i });
+  }
   if (!passing.length) {
     onLog({ type: "err", msg: "All simulations failed — nothing to sign." });
     return results;
