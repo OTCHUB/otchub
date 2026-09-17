@@ -112,7 +112,7 @@ export const proofToArgs = (proof: Uint8Array[]) => proof.map((p) => Array.from(
 // "distribution by address" table; ~2.2k accounts, trimmed by dataSlice to the fields read.
 // Layout: disc(8) · asset(32) · claimant(32) · amount_units(u64) · claimed_ts(i64) · bump(1).
 
-export type AirdropClaimView = {
+export type AirdropReceiptView = {
   /** The claim-receipt PDA itself — its first on-chain signature is the payment tx. */
   claim: string;
   asset: string;
@@ -128,7 +128,7 @@ const claimDiscB64 = sha256(new TextEncoder().encode("account:AirdropClaim")).th
   btoa(String.fromCharCode(...h.slice(0, 8))),
 );
 
-const toClaimView = (pubkey: PublicKey, raw: Uint8Array): AirdropClaimView => {
+const toClaimView = (pubkey: PublicKey, raw: Uint8Array): AirdropReceiptView => {
   const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
   return {
     claim: pubkey.toBase58(),
@@ -142,7 +142,7 @@ const toClaimView = (pubkey: PublicKey, raw: Uint8Array): AirdropClaimView => {
 export async function listAirdropClaims(
   connection: Connection,
   programId: PublicKey,
-): Promise<AirdropClaimView[]> {
+): Promise<AirdropReceiptView[]> {
   const accounts = await connection.getProgramAccounts(programId, {
     filters: [{ memcmp: { offset: 0, bytes: await claimDiscB64, encoding: "base64" } }],
     dataSlice: { offset: 8, length: 80 },
@@ -156,7 +156,7 @@ export async function listAirdropClaimsByOwner(
   connection: Connection,
   programId: PublicKey,
   owner: PublicKey,
-): Promise<AirdropClaimView[]> {
+): Promise<AirdropReceiptView[]> {
   const accounts = await connection.getProgramAccounts(programId, {
     filters: [
       { memcmp: { offset: 0, bytes: await claimDiscB64, encoding: "base64" } },

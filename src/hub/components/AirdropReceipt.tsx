@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { PublicKey } from "@solana/web3.js";
-import { listAirdropClaimsByOwner, type AirdropClaimView } from "@hub-sdk";
+import { listAirdropClaimsByOwner, type AirdropReceiptView } from "@hub-sdk";
 import { useHub } from "../HubProvider";
 import { fmtHub, fmtNum, fmtUtc, shortKey } from "../lib/format";
 import { AddressLink } from "./ui/AddressLink";
 
 const MAX_TX_LINKS = 6;
 
-type Row = AirdropClaimView & { tx: string | null };
+type Row = AirdropReceiptView & { tx: string | null };
 
 /**
  * Connected wallet's genesis-airdrop receipts: "you received X $HUB across N desks" plus the
