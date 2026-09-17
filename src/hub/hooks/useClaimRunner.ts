@@ -35,23 +35,30 @@ export function useClaimRunner(address: string, state: ProtocolState, onClaimed?
     if (!assets.length) return setErr("nothing to claim — no activated desk has pending yield");
     setBusy(true);
     setLogs([]);
-    const res = await executeClaimYield({
-      connection,
-      program,
-      signer,
-      assets,
-      config: state.config,
-      otcPot,
-      estimatedOtcDueUnits:
-        pendingLamports != null ? (otcDueForLamports(pendingLamports, otcPot) ?? undefined) : undefined,
-      onLog: (l) => setLogs((p) => [...p, l]),
-      onPhase: setPhase,
-    });
-    setBusy(false);
-    setPhase(null);
-    if (res.some((r) => r.ok)) {
-      await qc.invalidateQueries({ queryKey: ["hub"] });
-      onClaimed?.();
+    // try/finally: a claim that throws anywhere must still clear busy/phase — a stuck spinner
+    // with a dead claim behind it is the worst possible failure mode for a money-moving button.
+    try {
+      const res = await executeClaimYield({
+        connection,
+        program,
+        signer,
+        assets,
+        config: state.config,
+        otcPot,
+        estimatedOtcDueUnits:
+          pendingLamports != null ? (otcDueForLamports(pendingLamports, otcPot) ?? undefined) : undefined,
+        onLog: (l) => setLogs((p) => [...p, l]),
+        onPhase: setPhase,
+      });
+      if (res.some((r) => r.ok)) {
+        await qc.invalidateQueries({ queryKey: ["hub"] });
+        onClaimed?.();
+      }
+    } catch (e) {
+      setErr((e as Error).message ?? "claim failed unexpectedly");
+    } finally {
+      setBusy(false);
+      setPhase(null);
     }
   };
 

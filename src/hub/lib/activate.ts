@@ -251,6 +251,16 @@ export async function fetchOtcToHubRoute(opts: {
   const ix = bBody.swapInstruction;
   if (ix.programId !== JUPITER_PROGRAM_ID)
     throw new Error(`Jupiter build returned unexpected programId ${ix.programId}`);
+  if (!Array.isArray(ix.accounts) || ix.accounts.length === 0)
+    throw new Error("Jupiter build returned a route with no accounts");
+  // The route must actually spend from the caller and pay the protocol's destination account —
+  // the on-chain min_out balance-delta enforces the *amount*, but a route missing either account
+  // would fail there with an opaque CPI error instead of this clear client-side one.
+  const routeKeys = new Set(ix.accounts.map((a) => a.pubkey));
+  if (!routeKeys.has(taker.toBase58()))
+    throw new Error("Jupiter route does not spend from the caller's wallet");
+  if (!routeKeys.has(destinationTokenAccount.toBase58()))
+    throw new Error("Jupiter route does not pay the protocol's destination account");
   const minOut = BigInt(bBody.otherAmountThreshold ?? "0");
   if (minOut < minHubOut)
     throw new Error("Jupiter route can't clear the required $HUB output right now — try again");

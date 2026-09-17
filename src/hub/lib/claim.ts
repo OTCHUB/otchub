@@ -157,6 +157,14 @@ export async function executeClaimYield(opts: {
   } = opts;
   const claimer = new PublicKey(signer.publicKey);
   const results: ClaimResult[] = [];
+  /** Mark every asset with no recorded outcome failed with `reason` — used by the outer catch so
+   *  an unexpected throw (RPC hiccup mid-build, vault-balance read, blockhash fetch) can never
+   *  bubble up as an unhandled rejection that leaves the caller's busy state stuck forever. */
+  const failUnsettled = (reason: string) => {
+    for (const asset of assets)
+      if (!results.some((r) => r.asset === asset)) results.push({ asset, ok: false, reason });
+  };
+  try {
   if (!assets.length) return results;
   if (!otcPot || otcPot.totalLamportsSpent <= 0) {
     const reason = !otcPot
@@ -258,13 +266,43 @@ export async function executeClaimYield(opts: {
   await Promise.all(
     sent.map(async (s) => {
       if (!s) return;
-      const conf = await connection.confirmTransaction({ signature: s.sig, ...bh }, "confirmed");
-      const err = conf.value.err ? JSON.stringify(conf.value.err) : undefined;
-      if (err)
-        onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} FAILED_ON_CHAIN: ${err}`, sig: s.sig });
-      assetsOf(passing[s.k].i).forEach((asset) =>
-        results.push({ asset, ok: !err, sig: s.sig, reason: err }),
-      );
+      const settle = (okFlag: boolean, reason?: string) =>
+        assetsOf(passing[s.k].i).forEach((asset) =>
+          results.push({ asset, ok: okFlag, sig: s.sig, reason }),
+        );
+      try {
+        // Fresh blockhash right before confirming — the pre-sign one goes stale across a slow
+        // wallet prompt (same fix as activate.ts/swap.ts), and a confirm throw must never kill
+        // the rest of the batch.
+        const confirmBh = await connection.getLatestBlockhash("confirmed");
+        const conf = await connection.confirmTransaction(
+          { signature: s.sig, ...confirmBh },
+          "confirmed",
+        );
+        const err = conf.value.err ? JSON.stringify(conf.value.err) : undefined;
+        if (err)
+          onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} FAILED_ON_CHAIN: ${err}`, sig: s.sig });
+        settle(!err, err);
+      } catch (e) {
+        // Block-height-exceeded doesn't prove the claim never landed — check the signature
+        // directly before declaring failure (mirrors swap.ts's confirm path).
+        const status = await connection
+          .getSignatureStatus(s.sig, { searchTransactionHistory: true })
+          .catch(() => null);
+        const landed =
+          status?.value != null &&
+          status.value.err == null &&
+          (status.value.confirmationStatus === "confirmed" ||
+            status.value.confirmationStatus === "finalized");
+        if (landed) {
+          onLog({ type: "ok", msg: `TX ${passing[s.k].i + 1} LANDED (status check)`, sig: s.sig });
+          settle(true);
+        } else {
+          const reason = `confirm error: ${(e as Error).message}`;
+          onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} ${reason}`, sig: s.sig });
+          settle(false, reason);
+        }
+      }
     }),
   );
   const ok = results.filter((r) => r.ok).length;
@@ -273,4 +311,10 @@ export async function executeClaimYield(opts: {
     msg: `DONE :: ${ok}/${results.length} desk(s) claimed`,
   });
   return results;
+  } catch (e) {
+    const reason = (e as Error).message;
+    onLog({ type: "err", msg: `ABORT: ${reason}` });
+    failUnsettled(reason);
+    return results;
+  }
 }

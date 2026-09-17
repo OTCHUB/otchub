@@ -37,6 +37,10 @@ const QUICK = [
   { label: "MAX", frac: 1 },
 ] as const;
 const btn = "border px-2 py-1 text-[11px] disabled:opacity-30";
+/** Price-impact display/gate thresholds, in percent (Jupiter's fraction × 100). Above
+ *  IMPACT_ASK_PCT the swap button stays disabled until the user explicitly acknowledges. */
+const IMPACT_WARN_PCT = 5;
+const IMPACT_ASK_PCT = 15;
 
 /**
  * SOL ↔ $HUB via Jupiter — Uniswap-style stacked YOU PAY / YOU RECEIVE cards with a flip button,
@@ -59,6 +63,8 @@ export function SwapPanel({ state, address }: Props) {
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<SwapPhase | null>(null);
   const [logs, setLogs] = useState<TxLog[]>([]);
+  /** Explicit user acceptance for high price-impact swaps (thin $HUB pools move a lot). */
+  const [impactAck, setImpactAck] = useState(false);
   const gen = useRef(0);
   // Swap-context validity, tracked separately from `gen` (the quote-poll generation).
   // `gen` is bumped by the poll effect below, which also depends on `busy` — the very
@@ -95,7 +101,13 @@ export function SwapPanel({ state, address }: Props) {
   if (swapKeyRef.current !== swapKey) {
     swapKeyRef.current = swapKey;
     swapGen.current++;
+    setImpactAck(false); // new swap params = new impact, so a stale acknowledgment never carries
   }
+  // Jupiter's priceImpactPct is a decimal fraction ("0.015" = 1.5%); display and gate in %.
+  const impactPct = quote ? Number(quote.priceImpactPct ?? 0) * 100 : 0;
+  const impactTone =
+    impactPct > IMPACT_ASK_PCT ? "text-red-400" : impactPct > IMPACT_WARN_PCT ? "text-amber-400" : "text-green-300";
+  const needsImpactAck = !!quote && impactPct > IMPACT_ASK_PCT;
   const inBal = balances.data ? (isBuy ? balances.data.solLamports : balances.data.hubUnits) : null;
   const outBal = balances.data
     ? isBuy
@@ -344,9 +356,7 @@ export function SwapPanel({ state, address }: Props) {
           </div>
           <div>
             PRICE_IMPACT{" "}
-            <span className="text-green-300">
-              {(Number(quote.priceImpactPct ?? 0) * 100).toFixed(3)}%
-            </span>
+            <span className={impactTone}>{impactPct.toFixed(3)}%</span>
           </div>
           <div className="truncate">
             ROUTE{" "}
@@ -357,10 +367,26 @@ export function SwapPanel({ state, address }: Props) {
         </div>
       )}
 
+      {quote && needsImpactAck && (
+        <label className="mt-2 flex cursor-pointer items-start gap-2 border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-red-300">
+          <input
+            type="checkbox"
+            checked={impactAck}
+            onChange={(e) => setImpactAck(e.target.checked)}
+            disabled={busy}
+            className="mt-0.5 accent-red-400"
+          />
+          <span>
+            HIGH PRICE IMPACT — this trade moves the pool ~{impactPct.toFixed(1)}%, so you receive
+            far below spot. Consider a smaller size. Tick to confirm you understand.
+          </span>
+        </label>
+      )}
+
       <button
         type="button"
         onClick={doSwap}
-        disabled={busy || !mainnet || !address || !!inputError || !quote}
+        disabled={busy || !mainnet || !address || !!inputError || !quote || (needsImpactAck && !impactAck)}
         className={`mt-2 w-full border py-1.5 text-[13px] font-bold disabled:opacity-30 ${
           isBuy
             ? "border-emerald-500/60 text-emerald-300 hover:bg-emerald-500/10"

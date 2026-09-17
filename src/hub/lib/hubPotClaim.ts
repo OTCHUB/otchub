@@ -114,6 +114,12 @@ export async function executeClaimHubPotReward(opts: {
   const { connection, program, signer, assets, roundIndex, pot, onLog, onPhase } = opts;
   const claimant = new PublicKey(signer.publicKey);
   const results: HubPotClaimResult[] = [];
+  /** See claim.ts — an unexpected mid-build throw must never escape as an unhandled rejection. */
+  const failUnsettled = (reason: string) => {
+    for (const asset of assets)
+      if (!results.some((r) => r.asset === asset)) results.push({ asset, ok: false, reason });
+  };
+  try {
   if (!assets.length) return results;
 
   onPhase?.("build");
@@ -210,11 +216,37 @@ export async function executeClaimHubPotReward(opts: {
   await Promise.all(
     sent.map(async (s) => {
       if (!s) return;
-      const conf = await connection.confirmTransaction({ signature: s.sig, ...bh }, "confirmed");
-      const err = conf.value.err ? JSON.stringify(conf.value.err) : undefined;
-      if (err)
-        onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} FAILED_ON_CHAIN: ${err}`, sig: s.sig });
-      results.push({ asset: assets[passing[s.k].i], ok: !err, sig: s.sig, reason: err });
+      try {
+        // Fresh blockhash right before confirming — the pre-sign one goes stale across a slow
+        // wallet prompt; a confirm throw must never kill the rest of the batch.
+        const confirmBh = await connection.getLatestBlockhash("confirmed");
+        const conf = await connection.confirmTransaction(
+          { signature: s.sig, ...confirmBh },
+          "confirmed",
+        );
+        const err = conf.value.err ? JSON.stringify(conf.value.err) : undefined;
+        if (err)
+          onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} FAILED_ON_CHAIN: ${err}`, sig: s.sig });
+        results.push({ asset: assets[passing[s.k].i], ok: !err, sig: s.sig, reason: err });
+      } catch (e) {
+        // Block-height-exceeded doesn't prove non-landing — check the signature directly.
+        const status = await connection
+          .getSignatureStatus(s.sig, { searchTransactionHistory: true })
+          .catch(() => null);
+        const landed =
+          status?.value != null &&
+          status.value.err == null &&
+          (status.value.confirmationStatus === "confirmed" ||
+            status.value.confirmationStatus === "finalized");
+        if (landed) {
+          onLog({ type: "ok", msg: `TX ${passing[s.k].i + 1} LANDED (status check)`, sig: s.sig });
+          results.push({ asset: assets[passing[s.k].i], ok: true, sig: s.sig });
+        } else {
+          const reason = `confirm error: ${(e as Error).message}`;
+          onLog({ type: "err", msg: `TX ${passing[s.k].i + 1} ${reason}`, sig: s.sig });
+          results.push({ asset: assets[passing[s.k].i], ok: false, sig: s.sig, reason });
+        }
+      }
     }),
   );
   const ok = results.filter((r) => r.ok).length;
@@ -223,4 +255,10 @@ export async function executeClaimHubPotReward(opts: {
     msg: `DONE :: ${ok}/${results.length} desk(s) claimed`,
   });
   return results;
+  } catch (e) {
+    const reason = (e as Error).message;
+    onLog({ type: "err", msg: `ABORT: ${reason}` });
+    failUnsettled(reason);
+    return results;
+  }
 }
