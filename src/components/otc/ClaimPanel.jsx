@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Image } from "@/components/ui/image";
 import { buildClaimInstructions, buildActivateInstructions, buildDistributeInstructions, buildClaimPairs, executeClaimChunked, executePairedClaim, probeOwed } from "@/lib/otcClaim";
+import ConsolidateBar, { snapshotLineupBalances, diffLineupBalances } from "./ConsolidateBar";
+
+// Survives this panel's unmount/remount on the post-claim portfolio reload (see the comment at
+// the `onClaimed` call site): the conversion offer would otherwise vanish the instant the
+// portfolio refreshes. 15-minute freshness guard so a stale stash never resurfaces.
+let pendingConsolidation = null;
 import { getSignerForAddress, abortPendingSigns } from "@/lib/walletSigner";
 import { fetchTokenPricesUsd, SOL_MINT } from "@/lib/stockPrices";
 import { fmtSol, fmtUsd } from "@/lib/format";
@@ -26,6 +32,11 @@ export default function ClaimPanel({
   const [logs, setLogs] = useState([]);
   const [prices, setPrices] = useState({});
   const [cleared, setCleared] = useState(() => new Set()); // desks claimed & emptied this session
+  const [consolidation, setConsolidation] = useState(() => {
+    const v = pendingConsolidation;
+    pendingConsolidation = null;
+    return v && Date.now() - v.at < 15 * 60 * 1000 ? v.arrived : null;
+  });
   const [pullOwed, setPullOwed] = useState(false); // OFF = atomic distribute+claim pairs (fast); ON = also activate + distribute ALL owed backlog first
   const [progress, setProgress] = useState(null); // { group, totalGroups, phase } live chunk progress
   const [owed, setOwed] = useState(null); // PULL_OWED probe: asset_id -> { items: [{symbol, mint, decimals, amount}] }
@@ -223,7 +234,12 @@ export default function ClaimPanel({
       return;
     }
     setBusy(true);
+    setConsolidation(null);
+    pendingConsolidation = null;
     try {
+      // Baseline for the post-claim conversion offer — only tokens that GROW during this run
+      // are offered for swap; pre-existing balances are never swept.
+      const balBefore = await snapshotLineupBalances(address);
       const claimable = targets.filter((d) => d.claimable.length);
       if (!claimable.length && !pullOwed) {
         log({ type: "err", msg: "Nothing to claim — no claimable tickers. Toggle [PULL_OWED] to pull owed backlog first." });
@@ -322,6 +338,14 @@ export default function ClaimPanel({
         // refreshes: the panel remounted mid-run, served the pre-claim cache
         // within its TTL, and claimable counts never reset.
         if (onClaimed) onClaimed();
+        // Offer conversion of exactly what landed. The module-level stash survives the
+        // portfolio-reload remount that `onClaimed` can trigger (see above).
+        const arrived = diffLineupBalances(balBefore, await snapshotLineupBalances(address));
+        if (arrived.length) {
+          pendingConsolidation = { at: Date.now(), arrived };
+          setConsolidation(arrived);
+          log({ type: "info", msg: `CONSOLIDATE & SWAP available below — ${arrived.length} token(s) arrived.` });
+        }
       }
     } catch (e) {
       log({ type: "err", msg: `CLAIM_ABORT: ${e.message}` });
@@ -743,6 +767,14 @@ export default function ClaimPanel({
       )}
 
       {/* Log */}
+      {consolidation && consolidation.length > 0 && (
+        <ConsolidateBar
+          address={address}
+          deltas={consolidation}
+          onDismiss={() => setConsolidation(null)}
+          onDone={() => refreshLifetime?.(true)}
+        />
+      )}
       {logs.length > 0 && (
         <div className="mt-2 max-h-40 overflow-y-auto border border-green-500/20 bg-black p-2">
           {logs.map((l, i) => (
