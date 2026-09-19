@@ -1,1 +1,19 @@
-solana-address=denyall
+# OTCHUB (otchub.dev) — official Solana addresses served by this domain.
+# Verifiers: transactions built by this dApp target exactly these programs/accounts.
+# Any transaction from this origin touching OTHER programs is not us.
+
+# $HUB protocol program (the dApp at /hub drives it) — Anchor, OtterSec-verified build:
+# https://verify.osec.io/status/7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i
+solana-address=7c5oPs9GvX8vrC5jVFketNx1ZLuPs7HeH8Qc4XJx7b7i
+
+# $HUB token mint (Token-2022; mint authority revoked; metadata immutable)
+solana-address=5yrUrzyDBs5NrZdiGtW1BEYUjHyHBLx1L5vTAKUxvo1V
+
+# Treasury custody — Squads v4 multisig (2-of-3) vault; receives fees/treasury flows
+solana-address=qezk9nmtKfaPtceHhtjZfVu4FpAashnsKif9NSBFtrG
+
+# Third-party protocols this dApp integrates with (claims/routing; NOT ours):
+# - OTC Desks program AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW (native desk-earnings claims)
+# - Jupiter aggregator v6 JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 (swap routing)
+# - Raydium CP-Swap CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C (locked LP reads)
+# - Metaplex Core CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d (desk NFT reads)
