@@ -63,6 +63,7 @@ export const HUB_CONFIG = {
   rpcUrl: envRpcUrl && !/devnet/i.test(envRpcUrl) ? envRpcUrl : MAINNET_PUBLIC_RPC,
   // Defaults to the address baked into the vendored IDL (devnet deploy).
   programId: import.meta.env.VITE_HUB_PROGRAM_ID || undefined,
+  /** @type {"mainnet-beta"} */
   cluster: "mainnet-beta",
 };
 // "/devnet" sandbox — always devnet regardless of VITE_HUB_CLUSTER, so it
@@ -72,6 +73,7 @@ export const HUB_CONFIG = {
 export const HUB_DEVNET_CONFIG = {
   rpcUrl: import.meta.env.VITE_HUB_DEVNET_RPC_URL ?? "https://api.devnet.solana.com",
   programId: import.meta.env.VITE_HUB_DEVNET_PROGRAM_ID || undefined,
+  /** @type {"devnet"} */
   cluster: "devnet",
 };
 

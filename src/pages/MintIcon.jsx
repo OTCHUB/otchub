@@ -76,7 +76,8 @@ export default function MintIcon() {
     try {
       const blob = await new Promise((res) => render(1024).toBlob(res, "image/png"));
       const file = new File([blob], "hub-mint-icon.png", { type: "image/png" });
-      const r = await base44.integrations.Core.UploadPublicFile({ file });
+      // SDK exposes UploadFile (public storage → { file_url }); there is no UploadPublicFile.
+      const r = await base44.integrations.Core.UploadFile({ file });
       setPublishedUrl(r?.file_url || null);
     } catch (e) {
       setErr(e?.response?.data?.error || e.message || "Upload failed — are you signed in?");
