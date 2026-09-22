@@ -7,7 +7,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { secrets } from "base44:runtime";
 
-const WEBHOOK_URL = "https://knowing-otc-pulse-flow.base44.app/functions/otcWebhook";
+const WEBHOOK_URL = "https://otchubdev.base44.app/functions/otcWebhook";
 // Fire on any transaction touching the protocol config PDA (mint/claim/
 // distribute/buyback all write it) or the pot account.
 const WATCH_ADDRESSES = [

@@ -35,7 +35,7 @@ a public well-known file would break stealth.
 ## Facts shared by every submission
 
 - **Website:** https://otchub.dev (this dashboard is also published at
-  https://knowing-otc-pulse-flow.base44.app; both serve identical content).
+  https://otchubdev.base44.app; both serve identical content).
 - **What it is:** a read-mostly community analytics dashboard for the OTC
   Desks (otcdesks.cash) protocol: market/liquidity charts, NFT holdings
   gallery, treasury/pot metrics, and a launcher-ecosystem feed.
@@ -143,8 +143,8 @@ Same pattern as Solflare:
 1. Verify the files resolve on both domains:
    - https://otchub.dev/.well-known/security.txt
    - https://otchub.dev/.well-known/solana.txt
-   - https://knowing-otc-pulse-flow.base44.app/.well-known/security.txt
-   - https://knowing-otc-pulse-flow.base44.app/.well-known/solana.txt
+   - https://otchubdev.base44.app/.well-known/security.txt
+   - https://otchubdev.base44.app/.well-known/solana.txt
 2. (Recommended, sRFC-35 primary channel) add a DNS TXT record at the
    otchub.dev registrar: value `solana-address=denyall`.
 3. Submit the Phantom, Solflare, and Backpack requests above.
