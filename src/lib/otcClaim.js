@@ -258,7 +258,7 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
 function buildClaimSafetyAssertIx(userPk, userStock) {
   const ix = getAssertTokenAccountMultiInstruction({
     targetAccount: userStock.toBase58(),
-    logLevel: LogLevel.Silent,
+    logLevel: LogLevel.FailedPlaintextMessage,
     assertions: [
       tokenAccountAssertion("Owner", {
         value: userPk.toBase58(),
