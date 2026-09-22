@@ -24,6 +24,13 @@ import {
   ACCOUNT_SIZE,
   AccountLayout,
 } from "@solana/spl-token";
+import {
+  getAssertTokenAccountMultiInstruction,
+  tokenAccountAssertion,
+  IntegerOperator,
+  EquatableOperator,
+  LogLevel,
+} from "lighthouse-sdk";
 
 export const PROGRAM_ID = new PublicKey(
   "AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW"
@@ -237,6 +244,43 @@ function buildClaimIx(user, assetId, ticker, tokenProgramMap) {
   });
 }
 
+// Post-execution safety assertion (Lighthouse program) appended right after a
+// claim instruction, in the SAME transaction. Unlike the wallet's simulation
+// preview, this runs ON-CHAIN as part of the real signed tx and reverts the
+// whole tx if the destination stock ATA's final state doesn't match these
+// invariants — closing the same gap the official OTC portal's transactions
+// already close (their txs carry Lighthouse AssertTokenAccountMulti
+// instructions; ours previously had none). Both checks hold for every
+// legitimate claim, so this can never fail a real claim:
+//   - Owner == user   (the account that receives the stock is still the
+//     claimant's own account — guards against it having been reassigned)
+//   - Amount > 0      (something was actually deposited by this claim)
+function buildClaimSafetyAssertIx(userPk, userStock) {
+  const ix = getAssertTokenAccountMultiInstruction({
+    targetAccount: userStock.toBase58(),
+    logLevel: LogLevel.FailedPlaintextMessage,
+    assertions: [
+      tokenAccountAssertion("Owner", {
+        value: userPk.toBase58(),
+        operator: EquatableOperator.Equal,
+      }),
+      tokenAccountAssertion("Amount", {
+        value: 0n,
+        operator: IntegerOperator.GreaterThan,
+      }),
+    ],
+  });
+  return new TransactionInstruction({
+    programId: new PublicKey(ix.programAddress),
+    keys: ix.accounts.map((a) => ({
+      pubkey: new PublicKey(a.address),
+      isSigner: false,
+      isWritable: false,
+    })),
+    data: Buffer.from(ix.data),
+  });
+}
+
 // Pack instructions into transactions by serialized message size (legacy tx
 // limit ~1232 bytes). Each tx gets a compute-budget instruction up front.
 const MAX_MSG_BYTES = 1000;
@@ -251,31 +295,36 @@ async function packTxs(ixs, user, microLamports = FEE_FLOOR_UL) {
     if (cur) txs.push(cur);
     cur = null;
   };
+  const freshTx = () => {
+    const tx = new Transaction();
+    tx.feePayer = userPk;
+    tx.recentBlockhash = blockhash;
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports })
+    );
+    return tx;
+  };
   for (const ix of ixs) {
-    if (!cur) {
-      cur = new Transaction();
-      cur.feePayer = userPk;
-      cur.recentBlockhash = blockhash;
-      cur.add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports })
-      );
-    }
+    if (!cur) cur = freshTx();
     cur.add(ix);
     const size = cur.serializeMessage().length;
     if (size > MAX_MSG_BYTES) {
-      cur.instructions.pop(); // remove the ix that overflowed
+      const overflowIx = cur.instructions.pop(); // remove the ix that overflowed
+      // A Lighthouse assert ix (registered in PAIR_WITH_PREV by
+      // buildClaimInstructions) must never land in a different tx than the
+      // claim it guards — if it's the one that overflowed, pull its claim
+      // back out too so the pair moves to the next tx together instead of
+      // getting separated.
+      const carry =
+        PAIR_WITH_PREV.has(overflowIx) && cur.instructions.length > 2
+          ? [cur.instructions.pop(), overflowIx]
+          : [overflowIx];
       if (cur.instructions.length > 2) {
         finalize();
-        // start a new tx for this ix
-        cur = new Transaction();
-        cur.feePayer = userPk;
-        cur.recentBlockhash = blockhash;
-        cur.add(
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports })
-        );
-        cur.add(ix);
+        // start a new tx for this ix (or pair)
+        cur = freshTx();
+        for (const c of carry) cur.add(c);
       }
     }
   }
@@ -639,12 +688,28 @@ export async function executeClaimChunked(
   return results;
 }
 
+// Marks Lighthouse assert ixs that must never be separated from the claim ix
+// immediately preceding them (see buildClaimInstructions / packTxs below).
+// A WeakSet avoids stamping an untyped property onto TransactionInstruction.
+const PAIR_WITH_PREV = new WeakSet();
+
 // Build claim instructions for a set of desks' claimable tickers, in order.
+// Each claimIx is immediately followed by its Lighthouse safety assertion
+// (see buildClaimSafetyAssertIx) — the assert ix is registered in
+// PAIR_WITH_PREV so packTxs (the generic byte-packer used by the
+// PULL_OWED/chunked flow) never splits a claim from its own assert across a
+// tx boundary.
 export async function buildClaimInstructions(deskPlans, user, tokenProgramMap) {
+  const userPk = new PublicKey(user);
   const ixs = [];
   for (const d of deskPlans) {
     for (const t of d.claimable) {
       ixs.push(buildClaimIx(user, d.asset_id, t, tokenProgramMap));
+      const tp = new PublicKey(tokenProgramMap[t.mint] || TOKEN_PROGRAM_ID);
+      const userStock = userStockAta(userPk, t.mint, tp);
+      const assertIx = buildClaimSafetyAssertIx(userPk, userStock);
+      PAIR_WITH_PREV.add(assertIx);
+      ixs.push(assertIx);
     }
   }
   return ixs;
@@ -795,6 +860,7 @@ export async function buildDistributeForClaimable(deskPlans, tokenProgramMap) {
 // already-owed stock. Each pair carries its desk name/symbol so the progress
 // UI can show exactly which desks the current signing group covers.
 export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
+  const userPk = new PublicKey(user);
   const pairs = [];
   for (const d of deskPlans) {
     for (const t of d.claimable || []) {
@@ -802,9 +868,13 @@ export async function buildClaimPairs(deskPlans, user, tokenProgramMap) {
       if (!slot) continue;
       const distIx = buildDistributeIx(d.asset_id, slot.slot, slot.mint, tokenProgramMap);
       const claimIx = buildClaimIx(user, d.asset_id, t, tokenProgramMap);
+      const tp = new PublicKey(tokenProgramMap[t.mint] || TOKEN_PROGRAM_ID);
+      const userStock = userStockAta(userPk, t.mint, tp);
+      const assertIx = buildClaimSafetyAssertIx(userPk, userStock);
       pairs.push({
         distIx,
         claimIx,
+        assertIx,
         deskName: d.name || d.asset_id.slice(0, 8),
         assetId: d.asset_id,
         symbol: t.symbol,
@@ -1013,6 +1083,7 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
   const userPk = new PublicKey(user);
   const CU_PER_DIST = 40_000;
   const CU_PER_CLAIM = 120_000;
+  const CU_PER_ASSERT = 15_000;
   const CU_BASE = 30_000;
   const MAX_CU = 1_000_000;
   const txs = [];
@@ -1049,7 +1120,8 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
     const beforeCount = cur.instructions.length;
     for (let i = 0; i < n; i++) cur.add(p.distIx);
     cur.add(p.claimIx);
-    const pairCu = n * CU_PER_DIST + CU_PER_CLAIM;
+    if (p.assertIx) cur.add(p.assertIx); // Lighthouse safety check — same tx as its claim, never split off
+    const pairCu = n * CU_PER_DIST + CU_PER_CLAIM + (p.assertIx ? CU_PER_ASSERT : 0);
     const overflow =
       cur.serializeMessage().length > MAX_MSG_BYTES || curCu + pairCu > MAX_CU;
     if (overflow) {
@@ -1061,6 +1133,7 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
       curMembers = [];
       for (let i = 0; i < n; i++) cur.add(p.distIx);
       cur.add(p.claimIx);
+      if (p.assertIx) cur.add(p.assertIx);
     }
     curCu += pairCu;
     curMembers.push(pi);
