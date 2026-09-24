@@ -220,6 +220,18 @@ correct next step. Both channels (Blowfish GitHub issue + Phantom form)
 can be filed in parallel; Phantom does not expose a way to self-clear
 this warning from the app side.
 
+### Direct follow-up email to Phantom (William) — evidence dossier
+
+Use this if there's already a live thread/ticket with Phantom support (e.g.
+a named contact like William) rather than starting fresh via the Google
+Form. It leads with concrete on-chain data rather than re-explaining the
+theory already covered above.
+
+> **Subject:** Re: otchub.dev claim portal — "This dApp could be malicious"
+> false positive (evidence attached)
+>
+> [REDACTED — internal draft email removed from public history]
+
 ## Solflare — site review request
 
 Solflare flags new dApps similarly; submit via their site/brand review form
