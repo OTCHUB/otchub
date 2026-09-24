@@ -325,6 +325,15 @@ async function packTxs(ixs, user, microLamports = FEE_FLOOR_UL) {
         // start a new tx for this ix (or pair)
         cur = freshTx();
         for (const c of carry) cur.add(c);
+      } else {
+        // cur has no real content yet (only the base compute-budget ixs) —
+        // the carry ix(es) alone already exceed the soft MAX_MSG_BYTES
+        // target on their own. There is nothing left to split off, so add
+        // them back onto this same fresh tx instead of silently dropping
+        // them: a tx a little over the soft target (which still leaves
+        // ~230 bytes of margin below Solana's hard 1232-byte packet limit)
+        // is always better than losing a claim instruction entirely.
+        for (const c of carry) cur.add(c);
       }
     }
   }
@@ -1118,14 +1127,16 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
       curMembers = [];
     }
     const beforeCount = cur.instructions.length;
+    const isFirstInTx = curMembers.length === 0;
     for (let i = 0; i < n; i++) cur.add(p.distIx);
     cur.add(p.claimIx);
     if (p.assertIx) cur.add(p.assertIx); // Lighthouse safety check — same tx as its claim, never split off
     const pairCu = n * CU_PER_DIST + CU_PER_CLAIM + (p.assertIx ? CU_PER_ASSERT : 0);
     const overflow =
       cur.serializeMessage().length > MAX_MSG_BYTES || curCu + pairCu > MAX_CU;
-    if (overflow) {
-      // didn't fit — undo this pair and start a fresh tx for it
+    if (overflow && !isFirstInTx) {
+      // A prior pair is already packed into cur — undo this pair and start a
+      // fresh tx for it instead of overflowing the current one.
       cur.instructions.length = beforeCount;
       flush();
       cur = start();
@@ -1135,6 +1146,12 @@ function packPairedTxs(pairs, user, blockhash, microLamports = FEE_FLOOR_UL) {
       cur.add(p.claimIx);
       if (p.assertIx) cur.add(p.assertIx);
     }
+    // If overflow && isFirstInTx: this single pair alone (e.g. a desk many
+    // rounds behind with a large distCount) already exceeds the soft target
+    // with nothing else in the tx to split it away from — flushing here
+    // would just push a spurious no-op tx (only the 2 base compute-budget
+    // ixs) into the output, wasting a wallet signature/fee for nothing. So
+    // the pair stays in this same tx as-is instead.
     curCu += pairCu;
     curMembers.push(pi);
   }
