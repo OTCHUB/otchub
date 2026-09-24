@@ -141,11 +141,83 @@ current status against each:
 | Transaction not pre-simulated (`sigVerify: false`) before the sign prompt | ✅ Already done: `otcClaim.js` (`simulate`/`simulateMany`), `src/hub/lib/swap.ts`, `src/hub/lib/consolidate.ts`, and `ConsolidateBar.jsx` all call `connection.simulateTransaction(tx, { sigVerify: false })` (or the relay equivalent) and skip/refuse to sign anything that fails. |
 | Transaction approaching Solana's size limit (no Address Lookup Tables) | ✅ Audited 2026-09-24. `packTxs`/`packPairedTxs` in `otcClaim.js` dynamically measure `serializeMessage().length` and cap each tx at a 1000-byte soft target (~230 bytes of margin below the 1232-byte hard limit) — measured against the actual instruction builders, even the worst case (a desk 8 rounds behind: 8 distributes + claim + Lighthouse assert in one tx) is only ~812 bytes message / ~877 bytes full tx. Compute units are similarly nowhere near the cap (worst case ~455k of the 1,000,000-unit budget). ALTs are not needed at current instruction sizes. The audit did surface two latent bugs in the packing logic's overflow handling (an instruction could be silently dropped in `packTxs`, and a spurious empty no-op tx could be emitted in `packPairedTxs`) — both fixed in the same pass so an oversized item is never lost and never causes a wasted signature. |
 
+### Confirmed 2026-09-24: this IS the transaction-simulation warning, on the claim tx specifically
+
+Live report: swap panel (Jupiter) shows no warning; the claim portal is
+hard-blocked with "Request blocked — This dApp could be malicious." Per
+[Phantom's own docs](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings),
+this exact message **is** the transaction-simulation warning above, not a
+separate domain-reputation tier — it fires per transaction, based on
+whether Phantom/Blowfish's simulator can confidently predict that specific
+transaction's outcome. That explains the swap/claim split perfectly:
+swap routes through Jupiter, a program Blowfish already recognizes and
+models; claim calls the `otcdesks.cash` program
+(`AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW`), which Blowfish has never
+seen. When its simulator can't attribute what an unfamiliar program does
+to a vault/user token account, it falls back to "unable to safely predict
+outcome" → the malicious warning. (The Lighthouse assertion instruction is
+not the likely culprit — it's a widely-used, well-known safety-check
+program already integrated into `@blowfishxyz/safeguard` itself, which
+even defines a specific `MISSING_LIGHTHOUSE_PROGRAM_CALL` check expecting
+it to be present.) This is a known, common false positive for any new
+Solana program: two directly comparable cases —
+[`game.just2more.fun`](https://github.com/blowfishxyz/blocklist/issues/183)
+and [`eyezon.gg`](https://github.com/blowfishxyz/blocklist/issues/186) —
+hit the identical warning for the identical reason (unfamiliar
+program/new domain) and got it resolved by filing a GitHub issue directly
+against Blowfish's own blocklist repo.
+
+### Fastest remedy: file a false-positive report on `blowfishxyz/blocklist`
+
+This channel is separate from (and reportedly faster than) Phantom's
+Google Form, and is the one both precedent cases above actually used:
+
+**https://github.com/blowfishxyz/blocklist/issues/new**
+
+Paste-ready issue body:
+
+> **Title:** False positive: otchub.dev — OTC Hub claim portal flagged as
+> malicious dApp
+>
+> otchub.dev is being flagged with a "This dApp could be malicious"
+> warning by Blowfish/Phantom specifically on claim transactions (the
+> swap panel on the same domain, which routes through Jupiter, shows no
+> warning). The site is a legitimate community analytics dashboard and
+> claim client for the OTC Desks protocol — no drainer logic, no token
+> approvals/delegations, no authority changes.
+>
+> - **Name:** OTC Hub
+> - **Website:** https://otchub.dev
+> - **Description:** community-built (unofficial) analytics dashboard and
+>   claim client for the OTC Desks protocol (otcdesks.cash) on Solana. The
+>   flagged action moves the signer's own already-owned stock allocation
+>   from the desk vault into the signer's own wallet ATA — the on-chain
+>   program enforces that the signer owns the underlying NFT before any
+>   balance moves, so a wrong asset is rejected at simulation, and no
+>   third party ever receives funds.
+> - **Program interacted with:** `AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW`
+>   (otcdesks.cash claim/distribute program) — likely unrecognized by your
+>   simulator, which is probably why the outcome can't be confidently
+>   predicted. Also present: the standard SPL Token / Token-2022 /
+>   Associated Token / System programs, and a Lighthouse
+>   (`AssertTokenAccountMulti`) safety-assertion instruction pinning the
+>   destination account's owner/amount post-state, which we added
+>   specifically to give an on-chain guarantee beyond simulation.
+> - **Transaction Link:** *(paste the Solscan link for the reproduction
+>   transaction — see "Before submitting" above)*
+> - **Team/repo:** https://github.com/OTCHUB/otchub · X:
+>   https://x.com/otchubdev
+>
+> Could you review and whitelist this program/dApp pattern? Happy to
+> provide additional verification, source, or migrate to a different
+> transaction structure if useful.
+
 If the warning reproduces even on a simple, single-instruction action (a
 Jupiter swap, or a single-ticker claim), that points away from tx content
-and back to unreviewed domain reputation — in which case the form
+and back to unreviewed domain reputation — in which case the Google Form
 submission above (with that transaction's Solscan link attached) is the
-correct and only next step; Phantom does not expose a way to self-clear
+correct next step. Both channels (Blowfish GitHub issue + Phantom form)
+can be filed in parallel; Phantom does not expose a way to self-clear
 this warning from the app side.
 
 ## Solflare — site review request
