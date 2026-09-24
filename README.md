@@ -1,10 +1,55 @@
-# Base44 Project
+<div align="center">
 
-Use this repository to run and edit the app locally, then publish changes back through Base44.
+# 🟢 OTC Hub
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+**Community analytics dashboard, claim client and swap panel for the OTC Desks
+protocol (otcdesks.cash) on Solana.**
+Base44 (React + Vite) frontend · Cloudflare Worker relay · operator-run RU_FOMO signal bot.
 
-## Prerequisites
+[![website](https://img.shields.io/badge/website-otchub.dev-14f195)](https://otchub.dev)
+[![hub app](https://img.shields.io/badge/HUB%20app-otchub.dev%2Fhub-14f195)](https://otchub.dev/hub)
+[![x](https://img.shields.io/badge/-@otchubdev-000000?logo=x&logoColor=white)](https://x.com/otchubdev)
+[![dexscreener](https://img.shields.io/badge/DexScreener-%24HUB-14f195)](https://dexscreener.com/solana/4L45QjLmaKkqtyXgpR28fqcgWaF7cVZnHcDRCCwfy8TH)
+
+**Community tooling — not affiliated with, endorsed by, or maintained by the
+OTC Desks / OTCDesks Protocol team.**
+
+</div>
+
+Base44 app repository: use it to run and edit the app locally, then publish changes back
+through Base44. Any change pushed to the tracked remote is also reflected in the Base44
+Builder.
+
+## Links
+
+| | |
+|---|---|
+| 🌐 Website | [otchub.dev](https://otchub.dev) |
+| 📊 $HUB Protocol Dashboard (feature-flagged) | [otchub.dev/hub](https://otchub.dev/hub) |
+| 🐦 X / Twitter | [@otchubdev](https://x.com/otchubdev) |
+| 💬 Telegram (community bot) | [t.me/otchubSol_bot](https://t.me/otchubSol_bot) |
+| 📈 DexScreener ($HUB) | [dexscreener.com/solana/4L45…fy8TH](https://dexscreener.com/solana/4L45QjLmaKkqtyXgpR28fqcgWaF7cVZnHcDRCCwfy8TH) |
+| 🧩 Companion protocol repo | [OTCHUB/hubconnect](https://github.com/OTCHUB/hubconnect) |
+| 🔒 Wallet/security review notes | [`docs/wallet-domain-review.md`](docs/wallet-domain-review.md) |
+
+## What is OTC Hub?
+
+**OTCDesks Protocol** (otcdesks.cash) runs OTC desk NFTs and a token launcher on Solana.
+OTC Hub is a read-mostly community dashboard over that protocol: market/liquidity charts,
+an NFT holdings gallery, treasury/pot metrics, a launcher-ecosystem feed with risk
+enrichment, an in-app Jupiter swap panel, and (behind a feature flag) a claim client and
+treasury dashboard for the companion **$HUB** yield protocol (see
+[OTCHUB/hubconnect](https://github.com/OTCHUB/hubconnect) for the on-chain program).
+
+The app never holds keys. Every wallet interaction — a claim, a swap, an activation — is
+built client-side, pre-simulated (`sigVerify: false`) against our own RPC, and only then
+handed to the connected wallet for the user's own signature via `solana:signTransaction`.
+See [`docs/wallet-domain-review.md`](docs/wallet-domain-review.md) for the full security
+posture and wallet-review submissions.
+
+## Local Development
+
+### Prerequisites
 
 1. Clone the repository using the project's Git URL.
 2. Navigate to the project directory.
@@ -14,7 +59,7 @@ Any change pushed to the repo will also be reflected in the Base44 Builder.
 
 Run `base44 --help` (or see the [CLI reference](https://docs.base44.com/developers/references/cli/commands/introduction)) for the full command surface.
 
-## Run Locally
+### Run Locally
 
 Three commands, from the project root:
 
@@ -33,7 +78,7 @@ Notes:
 - **The app must be published at least once for the UI to load under `base44 dev`.** The frontend boots by fetching app settings from the hosted app; before the first publish that fails and every page redirects to login. The local API works regardless.
 - Entities, functions, and auth run locally — entity data is **in-memory only**, wiped when `base44 dev` restarts. Everything else (Core integrations, OAuth login) is forwarded to your deployed app. Full breakdown: [Local development overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview).
 
-## Frontend Only, Hosted Backend
+### Frontend Only, Hosted Backend
 
 To work on just the frontend against your app's live hosted backend:
 
@@ -43,7 +88,7 @@ base44 dev --remote
 
 ⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
 
-## Publish Your Changes
+### Publish Your Changes
 
 After pushing your changes to git, open the Base44 dashboard and publish the app:
 
@@ -53,7 +98,51 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
-## $HUB Protocol Dashboard (feature-flagged, off by default)
+### Checks
+
+```bash
+npm run lint        # eslint
+npm run typecheck   # tsc (jsconfig.json, checkJs)
+node --test tests/*.test.mjs   # offline unit/regression tests
+npm run build        # vite build (production bundle)
+```
+
+Run the relevant checks above before finishing a change; the `tests/` suite covers the
+launcher analytics/backend, RU_FOMO API, and swap-amount logic offline (no live RPC/wallet
+required). Hosted RLS, live transactions, and wallet-connect flows still need a manual pass
+against `base44 dev` or the deployed app.
+
+## Architecture
+
+```
+src/                 React (Vite) frontend
+  api/               Base44 SDK client (base44Client.js)
+  components/otc/    OTC desk analytics UI, wallet portfolio, claim panel
+  lib/                otcClaim.js (claim tx build/pack/simulate/execute), walletSigner.js,
+                      hubFlag.js (feature flag), marketplace.js (Magic Eden listings)
+  hub/, hub-sdk/     $HUB dashboard UI + read-only SDK, vendored from hubconnect (feature-flagged)
+  pages/, hooks/, utils/, types/
+base44/              Base44 app config, entities, backend functions (getDeskListings,
+                     getHubCirculatingSupply, otcWebhook, ...), workflows, mcp
+workers/
+  solana-relay/       Cloudflare Worker: tx simulation/broadcast relay
+  hub-standalone/     standalone $HUB deployment target
+services/
+  ru-fomo-bot/        operator-run RU_FOMO signal/trading bot process (separate from the published app)
+docs/                specs (hub-protocol-spec.md, hubconnect-spec.md, ui-design-spec.md),
+                     RU_FOMO contract/rollout, launcher live-data/risk notes,
+                     wallet-domain-review.md (wallet/security submissions)
+tests/               node:test offline suites — launcher, RU_FOMO API/bot, swap amounts
+public/, dist/       static assets, icons/favicons, well-known files (security.txt, solana.txt)
+```
+
+The `hub/` and `hub-sdk/` directories are vendored copies of `hubconnect/web/src/hub` and
+`hubconnect/sdk` (see [Companion protocol repo](#links)) — re-copy both whenever `hubconnect`
+changes; they are not built from a shared package.
+
+## Features
+
+### $HUB Protocol Dashboard (feature-flagged, off by default)
 
 The $HUB protocol dashboard (treasury, burn, pot, per-tier yield) is vendored into this repo
 but **disabled until the token launches on mainnet**: `otchub.dev` shows only mainnet content.
@@ -84,7 +173,7 @@ Live mainnet $HUB pair: [dexscreener.com/solana/4L45QjLmaKkqtyXgpR28fqcgWaF7cVZn
 - Spec: `src/docs/hubconnect-spec.md` (mirror of `hubconnect/docs/hubconnect-spec.md`).
 
 
-## Public Analytics and RU_FOMO
+### Public Analytics and RU_FOMO
 
 - [API contracts and security boundaries](docs/ru-fomo-implementation-contract.md)
 - [Rollout checklist and secret placement](docs/ru-fomo-rollout.md)
@@ -97,7 +186,7 @@ publishing the app does not start it. Never put wallet keys in Base44 or Vite.
 Run offline regressions with `node --test tests/*.test.mjs`, then lint and build.
 Hosted RLS and live transaction compatibility need separate operator validation.
 
-## Launcher analytics and in-app swaps
+### Launcher analytics and in-app swaps
 
 The analytics feed polls `getLauncherLive` every 30 seconds while visible. Filter
 by GRADUATED, BONDING or ABOUT_TO_GRADUATE; use ALL plus search to find any launch,
@@ -140,10 +229,62 @@ workflow. It reuses the existing server-side Helius configuration. Follow with
 hosted checks for status freshness, wallet selection and route availability;
 the offline tests do not replace those checks.
 
+## Security
+
+- **No key custody.** The app never touches private keys, seed phrases, or signatures.
+  Every transaction (claim, swap, activate) is built client-side, pre-simulated
+  (`sigVerify: false`) against our own RPC, and signed in the wallet itself via
+  `solana:signTransaction` (never `signAndSendTransaction` on the primary path).
+- **Disclosure**: `https://otchub.dev/.well-known/security.txt` (RFC 9116) carries the
+  responsible-disclosure contact.
+- **Domain association**: `https://otchub.dev/.well-known/solana.txt` (sRFC-35) currently
+  declares `solana-address=denyall` — this domain claims no Solana mint/program/address
+  ahead of the $HUB mainnet launch.
+- **Wallet/security warnings**: known false-positive wallet-simulation warnings, submission
+  templates for Phantom/Solflare/Backpack/Jupiter, and root-cause analysis are tracked in
+  [`docs/wallet-domain-review.md`](docs/wallet-domain-review.md). Do not add named-contact
+  email drafts or personal contact details to that file — it mirrors to the public
+  `OTCHUB/otchub` org repo; keep those in an untracked `*.local.md` file instead.
+- **Operator bot**: `services/ru-fomo-bot` is a separate operator-run process; publishing the
+  app never starts it, and wallet keys must never be placed in Base44 or Vite env vars. See
+  [`docs/ru-fomo-implementation-contract.md`](docs/ru-fomo-implementation-contract.md) for
+  API/security boundaries.
+
+## Repositories
+
+Two GitHub homes, one codebase — mirrors the [`hubconnect`](https://github.com/OTCHUB/hubconnect)
+pattern: development happens in the `nodecattel` account, and only reviewed commits are
+mirrored to the public `OTCHUB` organisation, which is what the Google Form / Blowfish /
+wallet-review submissions above point reviewers at.
+
+| Remote | Repository | Visibility | Watched by |
+|---|---|---|---|
+| `origin` | `nodecattel/otchub` | private | Base44 (git sync), Cloudflare Pages (`deploy.yml`) |
+| `production` | `OTCHUB/otchub` | public | wallet/security reviewers, community |
+
+```bash
+git remote -v                     # origin → nodecattel/otchub, production → OTCHUB/otchub
+git remote add production https://github.com/OTCHUB/otchub.git   # once, on a fresh clone
+git push origin main               # ships to Base44 + triggers Cloudflare Pages deploy
+git push production main           # mirrors the reviewed commit to the public org repo
+```
+
+Because `production` is public, review a commit's diff before mirroring it there —
+personal contact details, named-support-thread drafts, and other internal-only notes
+belong in gitignored `*.local` / `*.local.md` files, never in tracked docs.
+
 ## Docs & Support
 
-GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)
+- [MASTER_PROMPT.md](docs/MASTER_PROMPT.md) — project/agent operating notes
+- [hub-protocol-spec.md](docs/hub-protocol-spec.md), [hubconnect-spec.md](docs/hubconnect-spec.md) — $HUB protocol spec mirrors
+- [ui-design-spec.md](docs/ui-design-spec.md) — design system reference
+- [launcher-live-data.md](docs/launcher-live-data.md), [launcher-risk.md](docs/launcher-risk.md) — launcher feed semantics and risk enrichment
+- [ru-fomo-implementation-contract.md](docs/ru-fomo-implementation-contract.md), [ru-fomo-rollout.md](docs/ru-fomo-rollout.md) — RU_FOMO API/security boundaries and rollout
+- [wallet-domain-review.md](docs/wallet-domain-review.md) — wallet/security warning submissions and status
+- [services/ru-fomo-bot/README.md](services/ru-fomo-bot/README.md) — operator bot configuration and limitations
 
-Local development: [https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
+Base44 platform docs:
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+- [GitHub integration](https://docs.base44.com/developers/app-code/local-development/github)
+- [Local development overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
+- [Support](https://app.base44.com/support)
