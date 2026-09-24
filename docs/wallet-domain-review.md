@@ -1,6 +1,6 @@
 # Wallet domain review submissions — otchub.dev
 
-Updated 2026-09-09. This document holds the paste-ready submission text for
+Updated 2026-09-24. This document holds the paste-ready submission text for
 each wallet's domain/security review. It now references the two standard
 verification files served on every published domain of the app:
 
@@ -57,35 +57,96 @@ a public well-known file would break stealth.
 
 ## Phantom — dApp review request
 
-Submit at Phantom's dApp review form ("Request a dApp review" in the
-Phantom developer portal / the security-review flow linked from the
-warning). Paste-ready answers:
+Phantom's only submission channel (confirmed from their live docs page,
+[Domain and transaction warnings](https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings),
+2026-09-24) is this Google Form — there is no separate "developer portal"
+review flow:
 
-- **dApp URL:** https://otchub.dev
-- **Contact email:** tjaygmi@gmail.com
-- **dApp name:** OTC Pulse
-- **What does your dApp do?**
-  > OTC Pulse is a community analytics dashboard for the OTC Desks
-  > protocol (otcdesks.cash): charts, holdings, treasury metrics and a
-  > launcher feed. The only wallet actions are user-initiated Jupiter swaps
-  > and claim calls against the official otcdesks.cash on-chain program.
-  > The app never holds keys — every transaction is signed in Phantom.
-- **Why should this dApp be trusted / not flagged?**
-  > The domain deliberately publishes an sRFC-35 association file
+**https://docs.google.com/forms/d/1JgIxdmolgh_80xMfQKBKx9-QPC7LRdN6LHpFFW8BlKM/viewform**
+
+It must be submitted by the project team (not a user), and its fields are
+fixed — paste-ready answers below map 1:1 to the actual form questions:
+
+- **Project Name:** OTC Hub (site title/branding: `OTC_HUB`)
+- **Describe your dApp:**
+  > OTC Hub is a community-built (unofficial) analytics dashboard and
+  > toolset for the OTC Desks protocol (otcdesks.cash) on Solana: market
+  > charts, NFT holdings gallery, treasury/pot metrics, a launcher-ecosystem
+  > feed, and (via the `/hub` route) a companion $HUB protocol for staking
+  > and desk activation. The only wallet actions are user-initiated Jupiter
+  > swap quotes and claim/distribute/activate calls against the official
+  > on-chain programs. The app never holds keys — every transaction is
+  > built client-side, pre-simulated against our own RPC, and only then
+  > sent to the wallet for the user's own signature.
+- **dApp website URL:** https://otchub.dev
+- **Your Name:** *(fill in — the person submitting on behalf of the team)*
+- **Your E-mail:** tjaygmi@gmail.com
+- **Transaction Link:** *(required — see "Before submitting" below)*
+- **Team Information:** https://github.com/OTCHUB — public org for this
+  project's repos.
+- **Social Media Handles:** X: https://x.com/otchubdev · Telegram (own
+  community bot): https://t.me/otchubSol_bot · Telegram (official OTC
+  community, not ours but where the project is discussed):
+  https://t.me/otcdesksofficial
+- **Repository Links:** https://github.com/OTCHUB/otchub ·
+  https://github.com/OTCHUB/hubconnect
+- **Community vouch (optional):** leave blank unless a known Solana dev
+  agrees to vouch — per Phantom's Blowfish-era guidance this can fast-track
+  review, but is not required.
+- **Any additional information:**
+  > The domain publishes an sRFC-35 association file
   > (https://otchub.dev/.well-known/solana.txt) whose only record is
   > `solana-address=denyall` — it formally claims association with no
   > Solana mint or program, so it cannot be impersonating the token or
   > protocol it visualizes. It also publishes a standard RFC 9116
-  > security.txt with a contact for responsible disclosure
+  > security.txt with a responsible-disclosure contact
   > (https://otchub.dev/.well-known/security.txt). The app displays a
   > permanent "community tooling, not affiliated with otcdesks.cash"
-  > disclaimer, including inside the wallet-connect flow itself, where we
-  > explain the new-dApp warning to users. The mint shown with the
-  > "OFFICIAL" badge is verified against the official contract address at
-  > render time.
-- **Additional notes:** new dApp; no marketing claims, no token sale on the
-  site, no airdrop promises, no requests for seed phrases or signatures
-  outside of explicit swap/claim approval prompts.
+  > disclaimer, including inside the wallet-connect flow, where we explain
+  > the new-dApp warning to users. Every transaction is simulated
+  > (`sigVerify: false`) against our own RPC before it is ever shown to the
+  > wallet, requires exactly one signer (the connected wallet — no
+  > additional keypairs), and is signed via `solana:signTransaction`
+  > (never `signAndSendTransaction`), matching Phantom's own transaction-
+  > simulation-warning guidance.
+
+### Before submitting: the "Transaction Link" field is required
+
+Phantom's form will not accept a submission without a Solscan link to an
+**actual transaction** that triggered the warning. This means someone on
+the team must:
+
+1. Connect Phantom to https://otchub.dev (or `/hub`).
+2. Trigger the flow that shows the warning (e.g. a claim, swap, or `/hub`
+   stake/activate action) and go through with signing + sending it.
+3. Copy the resulting signature's Solscan URL
+   (`https://solscan.io/tx/<signature>`) into the form.
+
+There is no way to pre-fill this field — it has to come from a live
+reproduction, so this is the one manual step before the form above can be
+submitted.
+
+### Why Phantom might show "Unable to simulate" / "This dApp could be malicious"
+
+Per Phantom's own docs, this warning fires when Phantom's own RPC-side
+simulation of the transaction is inconclusive before signing — it is a
+transaction-content check, separate from the domain-reputation "new/
+unreviewed domain" warning. Their documented causes and this codebase's
+current status against each:
+
+| Phantom's cause | Status in this codebase |
+|---|---|
+| Transaction requires more than one signer | ✅ Every claim/swap/activate tx has exactly one signer (the connected wallet); no extra `Keypair`/`partialSign` is used (`src/lib/otcClaim.js`, `src/hub/lib/*.ts`). |
+| Using `signAndSendTransaction` instead of `signTransaction` first | ✅ The primary flow (`src/lib/walletSigner.js`, `src/hub/lib/wallets.ts`) signs via `solana:signTransaction` / injected `signTransaction`, then broadcasts through our own relay — `signAndSendTransaction` is only used as a narrow fallback for specific mobile wallets in the Jupiter swap panel. |
+| Transaction not pre-simulated (`sigVerify: false`) before the sign prompt | ✅ Already done: `otcClaim.js` (`simulate`/`simulateMany`), `src/hub/lib/swap.ts`, `src/hub/lib/consolidate.ts`, and `ConsolidateBar.jsx` all call `connection.simulateTransaction(tx, { sigVerify: false })` (or the relay equivalent) and skip/refuse to sign anything that fails. |
+| Transaction approaching Solana's size limit (no Address Lookup Tables) | ⚠️ Not yet audited. Claim batching (`packTxs` in `otcClaim.js`) plus the Lighthouse safety-assertion instruction added per ticker could push a multi-ticker claim tx close to the 1232-byte legacy limit. Worth checking `packTxs`'s size accounting if the warning specifically reproduces on large multi-ticker claims but not on single-ticker ones or swaps. |
+
+If the warning reproduces even on a simple, single-instruction action (a
+Jupiter swap, or a single-ticker claim), that points away from tx content
+and back to unreviewed domain reputation — in which case the form
+submission above (with that transaction's Solscan link attached) is the
+correct and only next step; Phantom does not expose a way to self-clear
+this warning from the app side.
 
 ## Solflare — site review request
 
@@ -147,6 +208,8 @@ Same pattern as Solflare:
    - https://otchubdev.base44.app/.well-known/solana.txt
 2. (Recommended, sRFC-35 primary channel) add a DNS TXT record at the
    otchub.dev registrar: value `solana-address=denyall`.
-3. Submit the Phantom, Solflare, and Backpack requests above.
+3. Reproduce the warning once to get a Solscan transaction link, then
+   submit the Phantom form above (it will reject submission without one).
+   Also submit the Solflare and Backpack requests.
 4. At $HUB launch: swap the denyall record for real mint/program records,
    add the DNS TXT equivalent, and request Jupiter token verification.

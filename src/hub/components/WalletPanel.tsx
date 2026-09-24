@@ -63,12 +63,21 @@ function DeskCard({ desk, onOpen }: { desk: OwnedDesk; onOpen: () => void }) {
   const pending = desk.pendingLamports;
   const lifetime = desk.tier?.totalClaimedLamports ?? 0;
   const native = desk.nativeActive;
+  const listed = desk.listedPriceSol;
   return (
     <button
       type="button"
       onClick={onOpen}
-      title="Open desk — claim · activate · upgrade"
-      className="flex min-h-[92px] flex-col justify-between gap-1 border border-green-500/15 p-1.5 text-left transition-colors hover:border-emerald-400/50 hover:bg-green-500/5"
+      title={
+        listed != null
+          ? "Listed on Magic Eden — delist to activate/upgrade/claim"
+          : "Open desk — claim · activate · upgrade"
+      }
+      className={`flex min-h-[92px] flex-col justify-between gap-1 border p-1.5 text-left transition-colors hover:bg-green-500/5 ${
+        listed != null
+          ? "border-amber-500/40 hover:border-amber-400/60"
+          : "border-green-500/15 hover:border-emerald-400/50"
+      }`}
     >
       <div className="flex w-full items-center gap-1.5">
         {desk.art?.image ? (
@@ -92,6 +101,14 @@ function DeskCard({ desk, onOpen }: { desk: OwnedDesk; onOpen: () => void }) {
           <span className="text-[9px] font-bold uppercase tracking-widest text-green-700">RAW</span>
         )}
       </div>
+      {listed != null && (
+        <div
+          className="text-[9px] font-bold uppercase tracking-widest text-amber-400"
+          title="Currently listed for sale on Magic Eden"
+        >
+          LISTED · {listed.toFixed(2)} SOL
+        </div>
+      )}
       {/* Activation story at a glance: the $HUB tier (e.g. "HUB ACTIVATED · T1
           TRADER"), whether the official OTC Desks program recognizes the desk's
           payout vault on-chain, and the earnings ledger — pending (unclaimed

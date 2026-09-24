@@ -46,9 +46,17 @@ function DeskRow({ desk, onActivate }: { desk: OwnedDesk; onActivate?: (asset: s
   const t = desk.tier;
   const voided = !!t?.voided;
   const tier = t && !voided ? t.tier : 0;
-  const canAdvance = !voided && tier < MAX_TIER;
+  const listed = desk.listedPriceSol;
+  // A listed desk's on-chain Core owner is Magic Eden's escrow, not this wallet — any
+  // activate/upgrade tx would fail on-chain (signer ≠ owner) until it's delisted.
+  const canAdvance = !voided && tier < MAX_TIER && listed == null;
   return (
-    <div className="border border-green-500/15 p-1.5 text-xs">
+    <div className={`border p-1.5 text-xs ${listed != null ? "border-amber-500/40" : "border-green-500/15"}`}>
+      {listed != null && (
+        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
+          LISTED ON MAGIC EDEN · {listed.toFixed(2)} SOL — delist to activate/upgrade/claim
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {desk.art?.image ? (
           <img
@@ -131,6 +139,7 @@ export function WalletPortfolio({ address, state, onClear, onActivate }: Props) 
     data?.desks.reduce((s, d) => s + (d.tier?.totalClaimedLamports ?? 0), 0) ?? 0;
   const activatedDesks = data?.desks.filter((d) => d.tier && !d.tier.voided) ?? [];
   const nativeCount = (data?.desks.length ?? 0) - activatedDesks.length;
+  const listedCount = data?.desks.filter((d) => d.listedPriceSol != null).length ?? 0;
 
   const roundInputs = baseInputs(state.currentEpoch, state.config);
   const distributable = distributableLamports(
@@ -210,7 +219,7 @@ export function WalletPortfolio({ address, state, onClear, onActivate }: Props) 
                 <Metric
                   label="DESKS_OWNED"
                   value={fmtNum(data.desks.length)}
-                  sub="in configured collection"
+                  sub={listedCount > 0 ? `${listedCount} listed on Magic Eden` : "in configured collection"}
                   accent="text-cyan-400"
                 />
                 <Metric

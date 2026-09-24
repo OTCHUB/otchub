@@ -37,7 +37,12 @@ export function DeskSheet({ desk, state, address, onClose, onChanged }: Props) {
   const voided = !!desk.tier?.voided;
   const tier = desk.tier && !voided ? desk.tier.tier : 0;
   const pending = desk.pendingLamports;
-  const canAdvance = !voided && tier < MAX_TIER;
+  const listed = desk.listedPriceSol;
+  // Listed on Magic Eden ⇒ the on-chain Core owner is ME's escrow PDA, not this wallet — claim
+  // and activate/upgrade both require signer === owner, so both would fail on-chain until
+  // delisted. Gate them here rather than let the wallet prompt appear only to error out.
+  const canAdvance = !voided && tier < MAX_TIER && listed == null;
+  const canClaim = pending > 0 && listed == null;
   // `pending` is the lamport-equivalent yield accrual; claim_yield actually pays out $OTC bought
   // by the keeper at the pot's lifetime average rate (see OtcPotView/otcDueForLamports) — surface
   // that conversion here so the SOL figure isn't mistaken for a literal SOL payout.
@@ -72,7 +77,28 @@ export function DeskSheet({ desk, state, address, onClose, onChanged }: Props) {
         </span>
       </div>
 
-      {pending > 0 && (
+      {listed != null && (
+        <div className="mt-3 border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[11px] text-amber-300">
+          <div className="font-bold uppercase tracking-widest">
+            LISTED ON MAGIC EDEN · {listed.toFixed(2)} SOL
+          </div>
+          <div className="mt-1 text-amber-200/80">
+            This desk's on-chain owner is Magic Eden's escrow while listed — claim / activate /
+            upgrade all require signing as the current owner, so they're disabled here.{" "}
+            <a
+              href={magicEdenItemUrl(desk.asset)}
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-amber-100"
+            >
+              Delist on Magic Eden ↗
+            </a>{" "}
+            to re-enable them.
+          </div>
+        </div>
+      )}
+
+      {canClaim && (
         <div className="mt-3">
           <button
             type="button"
