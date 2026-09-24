@@ -167,50 +167,21 @@ hit the identical warning for the identical reason (unfamiliar
 program/new domain) and got it resolved by filing a GitHub issue directly
 against Blowfish's own blocklist repo.
 
-### Fastest remedy: file a false-positive report on `blowfishxyz/blocklist`
+### Filed 2026-09-24: `blowfishxyz/blocklist` false-positive report
 
-This channel is separate from (and reportedly faster than) Phantom's
-Google Form, and is the one both precedent cases above actually used:
+**Status: submitted.** Filed via the GitHub API against Blowfish's own
+blocklist repo:
 
-**https://github.com/blowfishxyz/blocklist/issues/new**
+**https://github.com/blowfishxyz/blocklist/issues/189**
 
-Paste-ready issue body:
-
-> **Title:** False positive: otchub.dev — OTC Hub claim portal flagged as
-> malicious dApp
->
-> otchub.dev is being flagged with a "This dApp could be malicious"
-> warning by Blowfish/Phantom specifically on claim transactions (the
-> swap panel on the same domain, which routes through Jupiter, shows no
-> warning). The site is a legitimate community analytics dashboard and
-> claim client for the OTC Desks protocol — no drainer logic, no token
-> approvals/delegations, no authority changes.
->
-> - **Name:** OTC Hub
-> - **Website:** https://otchub.dev
-> - **Description:** community-built (unofficial) analytics dashboard and
->   claim client for the OTC Desks protocol (otcdesks.cash) on Solana. The
->   flagged action moves the signer's own already-owned stock allocation
->   from the desk vault into the signer's own wallet ATA — the on-chain
->   program enforces that the signer owns the underlying NFT before any
->   balance moves, so a wrong asset is rejected at simulation, and no
->   third party ever receives funds.
-> - **Program interacted with:** `AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW`
->   (otcdesks.cash claim/distribute program) — likely unrecognized by your
->   simulator, which is probably why the outcome can't be confidently
->   predicted. Also present: the standard SPL Token / Token-2022 /
->   Associated Token / System programs, and a Lighthouse
->   (`AssertTokenAccountMulti`) safety-assertion instruction pinning the
->   destination account's owner/amount post-state, which we added
->   specifically to give an on-chain guarantee beyond simulation.
-> - **Transaction Link:** *(paste the Solscan link for the reproduction
->   transaction — see "Before submitting" above)*
-> - **Team/repo:** https://github.com/OTCHUB/otchub · X:
->   https://x.com/otchubdev
->
-> Could you review and whitelist this program/dApp pattern? Happy to
-> provide additional verification, source, or migrate to a different
-> transaction structure if useful.
+The issue body includes the real reproduction Solscan link
+(`4rX9kaBh...`), the flagged program ID
+(`AjMx5My4YUDHMiCtLpTAtgkiUJgrpJnQqd5AcQnddHQW`), the six-transaction
+on-chain evidence table (954-byte raw / 889-byte message, 62–66% CU
+headroom, `err: null` across all six), and a link to the public
+`https://github.com/OTCHUB/otchub` repo (`src/lib/otcClaim.js`
+specifically) so Blowfish's team can review the actual client-side
+transaction-building code, not just our description of it.
 
 If the warning reproduces even on a simple, single-instruction action (a
 Jupiter swap, or a single-ticker claim), that points away from tx content
