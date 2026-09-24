@@ -80,7 +80,8 @@ fixed — paste-ready answers below map 1:1 to the actual form questions:
   > sent to the wallet for the user's own signature.
 - **dApp website URL:** https://otchub.dev
 - **Your Name:** *(fill in — the person submitting on behalf of the team)*
-- **Your E-mail:** tjaygmi@gmail.com
+- **Your E-mail:** *(team contact — see `docs/wallet-domain-review.private.local.md`,
+  not committed)*
 - **Transaction Link:** *(required — see "Before submitting" below)*
 - **Team Information:** https://github.com/OTCHUB — public org for this
   project's repos.
@@ -191,17 +192,21 @@ correct next step. Both channels (Blowfish GitHub issue + Phantom form)
 can be filed in parallel; Phantom does not expose a way to self-clear
 this warning from the app side.
 
-### Direct follow-up email to Phantom (William) — evidence dossier
+### Direct follow-up email to Phantom support — evidence dossier
 
-Use this if there's already a live thread/ticket with Phantom support (e.g.
-a named contact like William) rather than starting fresh via the Google
-Form. It leads with concrete on-chain data rather than re-explaining the
-theory already covered above.
+**Status: sent, draft kept out of this public repo.** The full paste-ready
+draft (named support contact, the six-transaction evidence table, and the
+`blowfishxyz/blocklist#189` reference) lives locally in
+`docs/wallet-domain-review.private.local.md`, which is gitignored
+(`*.local.md`) and never committed. Regenerate it if needed rather than
+pasting a support-thread draft back into this tracked file — this repo
+mirrors to the public `OTCHUB/otchub` org repo, and named-contact
+correspondence and personal contact emails don't belong there.
 
-> **Subject:** Re: otchub.dev claim portal — "This dApp could be malicious"
-> false positive (evidence attached)
->
-> [REDACTED — internal draft email removed from public history]
+The technical substance (root cause, the six-tx size/CU/err table, and the
+"not a batching issue" conclusion) is already fully captured above and in
+issue #189, so nothing evidentiary is lost by keeping the email draft
+itself local-only.
 
 ## Solflare — site review request
 
