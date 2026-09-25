@@ -4,7 +4,8 @@
 
 **Community analytics dashboard, claim client and swap panel for the OTC Desks
 protocol (otcdesks.cash) on Solana.**
-Base44 (React + Vite) frontend · Cloudflare Worker relay · operator-run RU_FOMO signal bot.
+React + Vite frontend on Cloudflare Pages · Base44 backend (entities/functions/auth) ·
+Cloudflare Worker relay · operator-run RU_FOMO signal bot.
 
 [![website](https://img.shields.io/badge/website-otchub.dev-14f195)](https://otchub.dev)
 [![hub app](https://img.shields.io/badge/HUB%20app-otchub.dev%2Fhub-14f195)](https://otchub.dev/hub)
@@ -16,9 +17,11 @@ OTC Desks / OTCDesks Protocol team.**
 
 </div>
 
-Base44 app repository: use it to run and edit the app locally, then publish changes back
-through Base44. Any change pushed to the tracked remote is also reflected in the Base44
-Builder.
+Base44 app repository: use it to run and edit the app locally against the Base44 backend
+(entities, functions, auth). **Official deployment is Cloudflare Pages, not Base44 hosting** —
+every push to `origin main` triggers [`deploy.yml`](.github/workflows/deploy.yml), which builds
+the app and deploys it straight to Cloudflare Pages at [otchub.dev](https://otchub.dev). No
+manual Base44 "Publish" step is required for the live site.
 
 ## Links
 
@@ -88,15 +91,19 @@ base44 dev --remote
 
 ⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
 
-### Publish Your Changes
+### Deploying Your Changes
 
-After pushing your changes to git, open the Base44 dashboard and publish the app:
+Push to `origin main` and you're done — [`deploy.yml`](.github/workflows/deploy.yml) builds
+the app and deploys `dist/` to Cloudflare Pages (`otchub.dev`) automatically. This is the
+**official deployment path**; there is no manual publish step for the live site.
 
-```bash
-base44 dashboard open
-```
+Never run `base44 deploy` or `wrangler pages deploy` from a local machine for production —
+either bypasses the CI-built environment (secrets baked in via `.env.production.local`, see
+`deploy.yml`) and can ship a build that silently diverges from what's in git.
 
-This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
+This repo still syncs to Base44 through git for the **backend** (entities, functions, auth,
+local `base44 dev`) — opening the Base44 dashboard and clicking Publish only affects Base44's
+own hosted preview domain (`otchubdev.base44.app`), not the production site.
 
 ### Checks
 
@@ -259,13 +266,13 @@ wallet-review submissions above point reviewers at.
 
 | Remote | Repository | Visibility | Watched by |
 |---|---|---|---|
-| `origin` | `nodecattel/otchub` | private | Base44 (git sync), Cloudflare Pages (`deploy.yml`) |
+| `origin` | `nodecattel/otchub` | private | Cloudflare Pages (`deploy.yml`, official deploy), Base44 (git sync, backend only) |
 | `production` | `OTCHUB/otchub` | public | wallet/security reviewers, community |
 
 ```bash
 git remote -v                     # origin → nodecattel/otchub, production → OTCHUB/otchub
 git remote add production https://github.com/OTCHUB/otchub.git   # once, on a fresh clone
-git push origin main               # ships to Base44 + triggers Cloudflare Pages deploy
+git push origin main               # triggers the official Cloudflare Pages deploy + Base44 backend sync
 git push production main           # mirrors the reviewed commit to the public org repo
 ```
 
