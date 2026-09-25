@@ -100,7 +100,7 @@ const LINKS = [
     group: "join-community",
     label: "OTC Community (X Chat)",
     hint: "holders group chat",
-    href: "https://x.com/i/chat/group_join/g2094534355506860481/nX3pHq1n00",
+    href: "https://x.com/i/chat/group_join/g2100025894198989277/7LDV6dwx22",
     icon: MessagesSquare,
   },
   {
