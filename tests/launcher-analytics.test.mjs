@@ -5,33 +5,79 @@ import { runInNewContext } from "node:vm";
 import React from "react";
 import ts from "typescript";
 import * as format from "../src/lib/format.js";
+import * as rewardIcons from "../src/lib/rewardIcons.js";
 import { createLauncherLiveHandler } from "../base44/functions/getLauncherLive/handler.js";
 
-const componentPath = new URL("../src/components/otc/LauncherAnalytics.jsx", import.meta.url);
-const compiled = ts.transpileModule(readFileSync(componentPath, "utf8"), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
-}).outputText;
+function compileJsx(relPath) {
+  return ts.transpileModule(readFileSync(new URL(relPath, import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
+  }).outputText;
+}
+// Real JSX for the panel plus its two nested payout components: the harness
+// renders all three so payout content (Stonk payout card, tape-row badge) is
+// genuinely reachable instead of stopping at a placeholder tag.
+const compiledAnalytics = compileJsx("../src/components/otc/LauncherAnalytics.jsx");
+const compiledRewardSection = compileJsx("../src/components/otc/RewardPayoutSection.jsx");
+const compiledRowPayout = compileJsx("../src/components/otc/RowPayout.jsx");
+
+function evalJsx(compiledSrc, requireFn) {
+  const mod = { exports: {} };
+  runInNewContext(compiledSrc, { module: mod, exports: mod.exports, URL, require: requireFn });
+  return mod.exports;
+}
 
 const PagerStub = (props) => null;
 
 // Exercise real JSX, state setters and rendered props without DOM/network. Radix
 // and effects are stubbed: focus trapping/ESC/portal behavior still needs hosted QA.
+//
+// Hook-slot order below MUST mirror LauncherAnalytics' own top-to-bottom
+// useState/useRef call order exactly (data, err, kpi, status, payout, search,
+// detailMint, detailTrigger, panelRef, timeframe, filtersOpen, page, pageSize,
+// prevOrderRef, flash) — the harness seeds only the slots a test needs to
+// override and lets the component's own initial values fill the rest.
 function harness(rows, kpi = "change24h", options = {}) {
-  const state = new Map([["root", [{ ranked: rows, feeModel: [] }, null, kpi, options.status ?? "ALL", options.search ?? "", null]]]);
+  const seed = [];
+  seed[2] = kpi;
+  seed[3] = options.status ?? "ALL";
+  seed[4] = options.payout ?? "ALL";
+  seed[5] = options.search ?? "";
+  if (options.timeframe !== undefined) seed[9] = options.timeframe;
+  if (options.filtersOpen !== undefined) seed[10] = options.filtersOpen;
+  if (options.page !== undefined) seed[11] = options.page;
+  const state = new Map([["root", seed]]);
   let active = state.get("root"), cursor = 0, props = options.props, lastParams = null;
   const useState = (initial) => {
     const slots = active, index = cursor++;
     if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
     return [slots[index], (value) => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
   };
+  const reactShim = {
+    __esModule: true, default: React,
+    useState, useRef: (initial) => useState({ current: initial })[0], useId: () => "token-details-test",
+    useMemo: (fn) => fn(), useEffect: () => {},
+  };
+  const rewardSectionModule = evalJsx(compiledRewardSection, (name) => {
+    if (name === "react") return reactShim;
+    if (name === "@/lib/rewardIcons") return rewardIcons;
+    assert.fail(`Unexpected import in RewardPayoutSection: ${name}`);
+  });
+  const rowPayoutModule = evalJsx(compiledRowPayout, (name) => {
+    if (name === "react") return reactShim;
+    if (name === "@/components/otc/RewardPayoutSection") return rewardSectionModule;
+    assert.fail(`Unexpected import in RowPayout: ${name}`);
+  });
   const module = { exports: {} };
   const modules = {
-    react: {
-      __esModule: true, default: React,
-      useState, useRef: (initial) => useState({ current: initial })[0], useId: () => "token-details-test",
-      useMemo: (fn) => fn(), useEffect: () => {},
-    },
-    "lucide-react": { Twitter: "Twitter", Send: "Send", Globe: "Globe" },
+    react: reactShim,
+    "lucide-react": { Twitter: "Twitter", Send: "Send", Globe: "Globe", ArrowLeftRight: "ArrowLeftRight", Check: "Check", Copy: "Copy", LineChart: "LineChart" },
+    "@/components/otc/XIcon": { __esModule: true, default: "XIcon" },
+    "@/components/otc/RowPayout": rowPayoutModule,
+    "@/components/otc/RewardPayoutSection": rewardSectionModule,
+    "@/lib/hubMint": { isOfficialHubMint: (mint) => options.officialHubMint === mint },
+    "@/lib/useDexQuotes": { useDexQuotes: () => ({ quotes: options.dexQuotes ?? {}, at: options.dexAt ?? null }) },
+    "@/lib/launcherGraduationConfirm": { confirmPendingGraduations: () => {} },
+    "@/lib/launcherFeed": { fetchLauncherAnalyticsMirror: async () => { throw new Error("no mirror in test"); } },
     "@/components/ui/dialog": Object.fromEntries(["Dialog", "DialogContent", "DialogHeader", "DialogTitle", "DialogDescription"].map((name) => [name, name])),
     "@/api/base44Client": { base44: {} },
     "@/lib/format": format,
@@ -44,7 +90,7 @@ function harness(rows, kpi = "change24h", options = {}) {
     "@/lib/usePumpSample": { usePumpSample: () => null },
     "@/components/otc/Pager": { __esModule: true, default: PagerStub },
   };
-  runInNewContext(compiled, {
+  runInNewContext(compiledAnalytics, {
     module, exports: module.exports, URL,
     require: (name) => {
       assert.ok(Object.hasOwn(modules, name), `Unexpected import: ${name}`);
@@ -65,6 +111,9 @@ function harness(rows, kpi = "change24h", options = {}) {
     logo: () => nodes(h.tree).find((node) => node.type === "button" && node.props["aria-haspopup"] === "dialog"),
     dialog: () => nodes(h.tree).find((node) => node.type === "Dialog"),
     details: () => h.component(nodes(h.tree).find((node) => node.type?.name === "TokenDetails")),
+    // Descends one further level into the details dialog's nested Stonk
+    // payout card (a separate component since the payout-UI split).
+    payout: (tree) => h.component(nodes(tree ?? h.details()).find((node) => node.type?.name === "RewardPayoutSection"), "RewardPayoutSection"),
   };
   h.render(); return h;
 }
@@ -78,15 +127,32 @@ function nodes(element) {
 const links = (tree, host) => nodes(tree).filter((n) => n.type === "a" && n.props.href.includes(host));
 const order = (tree) => links(tree, "dexscreener.com").map((n) => n.props.href.split("/").at(-1));
 const coin = (mint, change24h, extra = {}) => ({ mint, symbol: mint, change24h, vol24: 1200, mcap: 32000, ...extra });
+const text = (node) => Array.isArray(node) ? node.map(text).join("") : node && typeof node === "object"
+  ? text(node.props?.children) : typeof node === "string" || typeof node === "number" ? String(node) : "";
+// Quick-access status/rank buttons render `{label} ({count})` (array children)
+// or a bare `{label}` (rank-only buttons); tab-role controls behind the
+// Filters expander follow the same two shapes.
+const findByLabel = (tree, label) => nodes(tree).find((n) => n.type === "button" &&
+  (n.props.children === label || (Array.isArray(n.props.children) && n.props.children[0] === label)));
+const findTab = (tree, label) => nodes(tree).find((n) => n.type === "button" && n.props.role === "tab" &&
+  (n.props.children === label || (Array.isArray(n.props.children) && n.props.children[0] === label)));
+const findFiltersToggle = (tree) => nodes(tree).find((n) => n.type === "button" &&
+  (n.props.title === "No filters active" || n.props.title?.startsWith("Active filters")));
+const openFilters = (h) => { findFiltersToggle(h.tree).props.onClick(); h.render(); };
+const findTradeButtons = (tree) => nodes(tree).filter((n) => n.type === "button" && n.props["aria-label"]?.startsWith("Swap "));
+// Each tape row is its own bordered grid div; scoping a query to one lets us
+// read that row's own status badge/text instead of the whole flattened tree.
+const rowDivs = (tree) => nodes(tree).filter((n) => n.type === "div" && n.props?.className?.includes("last:border-0"));
+const rowFor = (tree, mint) => rowDivs(tree).find((row) => nodes(row).some((n) => n.props?.["aria-label"] === `Open profile for ${mint}`));
 
 test("KPI buttons drive the server sort; rows render in server order, unmutated", () => {
   const rows = [coin("unknown", null), coin("loss", -8), coin("gain", 23)];
   const before = structuredClone(rows);
   const h = harness(rows, "change24h");
-  assert.deepEqual(h.params(), { page: 1, pageSize: 50, status: "ALL", sort: "change24h" });
+  assert.deepEqual(h.params(), { page: 1, pageSize: 25, status: "ALL", sort: "change24h" });
   assert.deepEqual(order(h.tree), ["unknown", "loss", "gain"], "Server order is authoritative, not the panel");
   assert.deepEqual(rows, before, "The panel must not mutate the feed payload");
-  nodes(h.tree).filter((n) => n.type === "button" && n.props.children?.[1] === "MARKET_CAP")[0].props.onClick();
+  findByLabel(h.tree, "MCAP").props.onClick();
   h.render();
   assert.equal(h.params().sort, "mcap");
   assert.equal(h.params().page, 1, "Switching rank resets to page one");
@@ -97,14 +163,14 @@ test("timeframe windows and the pager drive the paged tape", () => {
   const h = harness(rows, "vol24");
   assert.equal("maxAgeHours" in h.params(), false, "ALL timeframe ships no age window");
   assert.doesNotMatch(text(h.tree), /NaN%|Infinity%/);
-  const byLabel = (tree, label) => nodes(tree).find((n) => n.type === "button" && n.props.role === "tab" && n.props.children === label);
-  byLabel(h.tree, "24H").props.onClick(); h.render();
+  openFilters(h);
+  findTab(h.tree, "24H").props.onClick(); h.render();
   assert.equal(h.params().maxAgeHours, 24);
-  byLabel(h.tree, "7D").props.onClick(); h.render();
+  findTab(h.tree, "7D").props.onClick(); h.render();
   assert.equal(h.params().maxAgeHours, 168);
   assert.equal(h.params().page, 1);
   const pager = nodes(h.tree).find((n) => n.type === PagerStub);
-  assert.equal(pager.props.label, "LAUNCHES");
+  assert.equal(pager.props.label, "launches");
   pager.props.onPage(1); h.render();
   assert.equal(h.params().page, 2, "Pager pages are 0-based upstream, 1-based in the request");
 });
@@ -113,40 +179,42 @@ test("feed rows render verbatim with honest empty, stale and locked states", () 
   const rows = Array.from({ length: 20 }, (_, i) => coin(String(i), i));
   assert.deepEqual(order(render(rows, "vol24")), rows.map((r) => r.mint), "No client-side cap: the page renders as shipped");
   assert.deepEqual(order(render([])), []);
-  assert.match(text(render([], "vol24")), /NO MATCHING LAUNCHES/);
-  assert.doesNotMatch(text(render([], "vol24")), /LOADING/);
+  assert.match(text(render([], "vol24")), /No matching launches/i);
+  assert.doesNotMatch(text(render([], "vol24")), /loading/i);
   assert.match(text(render(rows, "vol24", { error: "offline", feed: { stale: true } })), /STALE/);
   const locked = render(rows, "vol24", { props: { onTrade: () => {}, tradingDisabled: true } });
-  assert.ok(nodes(locked).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]").every((n) => n.props.disabled));
+  assert.ok(findTradeButtons(locked).every((n) => n.props.disabled));
 });
 
-test("Trade and token-name buttons select the exact row in-app, not a Jupiter redirect", () => {
+test("Trade button selects the exact row in-app; token name/logo open details, not a Jupiter redirect", () => {
   const mints = ["So11111111111111111111111111111111111111112", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"];
   const rows = mints.map((mint) => coin(mint, 1)), selected = [];
-  const tree = render(rows, "vol24", { props: { onTrade: (row) => selected.push(row) } });
-  const trades = nodes(tree).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]");
+  const h = harness(rows, "vol24", { props: { onTrade: (row) => selected.push(row) } });
+  const trades = findTradeButtons(h.tree);
   assert.equal(trades.length, mints.length);
   trades.forEach(({ props }, i) => {
     assert.equal(props.disabled, false);
-    props.onClick();
+    props.onClick({ stopPropagation() {} });
     assert.equal(selected[i], rows[i]);
   });
-  assert.equal(links(tree, "jup.ag").length, 0);
-  const nameButtons = nodes(tree).filter((n) => n.type === "button" && n.props.title?.endsWith("select for in-app swap"));
-  nameButtons[0].props.onClick();
-  assert.equal(selected.at(-1), rows[0]);
-  const copies = nodes(tree).filter((n) => typeof n.type === "function" && n.type.name === "CopyCa");
-  assert.deepEqual(copies.map((n) => n.props.mint), mints);
+  assert.equal(links(h.tree, "jup.ag").length, 0);
+  const nameButtons = nodes(h.tree).filter((n) => n.type === "button" && n.props["aria-label"]?.startsWith("Open profile for"));
+  assert.equal(nameButtons.length, mints.length);
+  nameButtons[0].props.onClick({ stopPropagation() {} });
+  h.render();
+  assert.equal(h.dialog().props.open, true, "Name button opens details");
+  assert.equal(selected.length, mints.length, "Opening details does not call onTrade");
+  // The mint copy control only lives inside the opened token details dialog.
+  const copy = nodes(h.details()).find((n) => typeof n.type === "function" && n.type.name === "CopyCa");
+  assert.equal(copy.props.mint, mints[0]);
 });
-
-const text = (node) => Array.isArray(node) ? node.map(text).join("") : node && typeof node === "object"
-  ? text(node.props?.children) : typeof node === "string" || typeof node === "number" ? String(node) : "";
 
 test("status tabs drive the server status filter; rows keep their own status labels", () => {
   const rows = [coin("grad", -5, { status: "GRADUATED" }), coin("bond", 6, { status: "BONDING" }),
     coin("near", 9, { status: "ABOUT_TO_GRADUATE", curveComplete: true }), coin("unknown", 99)];
   for (const status of ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"]) {
-    const h = harness(rows, "change24h", { status });
+    // The full status tab list only renders once the Filters tray is expanded.
+    const h = harness(rows, "change24h", { status, filtersOpen: true });
     assert.equal(h.params().status, status);
     assert.deepEqual(order(h.tree), ["grad", "bond", "near", "unknown"], "Filtering happens server-side");
     const tabs = nodes(h.tree).filter((n) => n.type === "button" && n.props.role === "tab"
@@ -155,22 +223,24 @@ test("status tabs drive the server status filter; rows keep their own status lab
     assert.equal(tabs[0].props["aria-selected"], true);
   }
   const all = render(rows, "change24h");
-  for (const status of ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "UNKNOWN"]) {
-    assert.match(text(all), new RegExp(`\\[${status}\\]`));
-  }
+  // Dense rows show a compact status chip (STATUS_SHORT) rather than the full name.
+  assert.match(text(rowFor(all, "grad")), /GRAD/);
+  assert.match(text(rowFor(all, "bond")), /BOND/);
+  assert.match(text(rowFor(all, "near")), /NEAR/);
+  assert.match(text(rowFor(all, "unknown")), /UNK/);
 });
 
 test("ABOUT_TO_GRADUATE ranks by curve progress; PROGRESS is a server sort", () => {
   const rows = [coin("slow", 1, { curveProgress: 91 }), coin("fast", 2, { curveProgress: 98.5 })];
   const h = harness(rows, "vol24");
   assert.equal(h.params().sort, "vol24");
-  const tab = nodes(h.tree).find((n) => n.type === "button" && n.props.role === "tab"
-    && n.props.children?.[0] === "ABOUT_TO_GRADUATE");
+  openFilters(h);
+  const tab = findTab(h.tree, "ABOUT_TO_GRADUATE");
   tab.props.onClick(); h.render();
   assert.equal(h.params().status, "ABOUT_TO_GRADUATE");
   assert.equal(h.params().sort, "curveProgress", "Near-graduation view sorts by progress");
-  const progressBtn = nodes(h.tree).find((n) => n.type === "button" && n.props.children?.[1] === "PROGRESS");
-  assert.ok(progressBtn, "PROGRESS rank button exists");
+  const progressBtn = findByLabel(h.tree, "Progress");
+  assert.ok(progressBtn, "Progress rank button exists");
   progressBtn.props.onClick(); h.render();
   assert.equal(h.params().sort, "curveProgress");
   assert.equal(h.params().page, 1, "Switching rank resets to page one");
@@ -197,11 +267,11 @@ test("search reaches the full tape server-side and honest states persist", () =>
   assert.deepEqual(order(render([coin("a", 3), coin("b", 2)])), ["a", "b"]);
 });
 
-test("market cap and volume use fmtUsd and price change is signed", () => {
+test("market cap and volume use fmtUsdCompact and price change is signed", () => {
   const text = nodes(render([coin("a", -1.25)])).flatMap((n) => React.Children.toArray(n.props?.children))
     .filter((n) => typeof n === "string").join(" ");
-  assert.ok(text.includes(format.fmtUsd(32000)));
-  assert.ok(text.includes(format.fmtUsd(1200)));
+  assert.ok(text.includes(format.fmtUsdCompact(32000)));
+  assert.ok(text.includes(format.fmtUsdCompact(1200)));
   assert.ok(text.includes("-1.3"));
 });
 
@@ -268,16 +338,20 @@ test("actual live API metadata maps into lazy thumbnails, original assets, socia
   assert.match(large.props.className, /object-contain/);
   const socialLinks = nodes(content).filter((n) => n.type === "a" && n.props["aria-label"]);
   assert.deepEqual(socialLinks.map((n) => n.props.href), Object.values(source.socials));
-  assert.deepEqual(socialLinks.map((n) => n.props["aria-label"]), ["Twitter / X", "Telegram", "Website"]);
+  assert.deepEqual(socialLinks.map((n) => n.props["aria-label"]), ["X", "Telegram", "Website"]);
   assert.ok(socialLinks.every((n) => n.props.target === "_blank" && n.props.rel === "noopener noreferrer"));
-  assert.ok(nodes(content).some((n) => n.type === "Twitter"));
+  assert.ok(nodes(content).some((n) => n.type === "XIcon"));
   assert.ok(nodes(content).some((n) => n.type === "Send"));
   assert.ok(nodes(content).some((n) => n.type === "Globe"));
-  assert.match(text(content), /Stonk payout.*Reported primary reward: \$OTC.*2 tokens/);
-  assert.match(text(content), /Reported rewardCycle: 0 · units\/meaning unverified/);
-  assert.match(text(content), /Allocation, eligibility and payout timing are not provided/);
-  assert.deepEqual(links(content, "solscan.io").map((n) => n.props.href.split("/").at(-1)), [OTC, OTC, SOL]);
-  assert.match(text(content), /24h Volume.*\$2,345\.00.*24h Momentum.*-3\.3%.*Market Cap.*\$56,000\.00/);
+  // Payout content lives in a real nested component (RewardPayoutSection);
+  // it must be actually invoked to see its rendered text, not just walked
+  // as an opaque element.
+  const payoutTree = h.payout(content);
+  // The source rewardBasket [OTC, SOL, OTC] is de-duplicated to [OTC, SOL] upstream.
+  assert.match(text(payoutTree), /Stonk payout.*\$OTC.*reported.*Basket · 2 tokens/);
+  assert.match(text(content), /Assets and links are third-party metadata, not endorsements\. Verify payout mints and launch terms before trading\./);
+  assert.deepEqual(links(payoutTree, "solscan.io").map((n) => n.props.href.split("/").at(-1)), [OTC, OTC, SOL]);
+  assert.match(text(content), /Vol 24h.*\$2\.35K.*24h.*-3\.3%.*Mcap.*\$56\.00K/);
   const curve = nodes(content).find((n) => n.type?.name === "CurveProgress");
   assert.match(text(curve.type(curve.props)), /unavailable/);
 });
@@ -289,7 +363,7 @@ test("logo expansion, closing and TRADE retain separate state and work while swa
   openDetails(h, { isConnected: true, focus() { focused++; } });
   assert.equal(selected.length, 0, "Logo never calls onTrade");
   assert.ok(nodes(h.tree).some((n) => n.props?.["data-selected"] === true), "Swap selection retained");
-  nodes(h.tree).filter((n) => n.type === "button" && n.props.children === "[⇄ TRADE]")[1].props.onClick();
+  findTradeButtons(h.tree)[1].props.onClick({ stopPropagation() {} });
   h.render();
   assert.equal(selected[0], rows[1]);
   assert.match(text(h.details()), /\$.*MukLD/);
@@ -299,13 +373,17 @@ test("logo expansion, closing and TRADE retain separate state and work while swa
   dialogContent.props.onCloseAutoFocus({ preventDefault() { prevented++; } });
   assert.equal(h.dialog().props.open, false);
   assert.equal(focused, 1); assert.equal(prevented, 1);
-  nodes(h.tree).find((n) => n.props?.title?.endsWith("select for in-app swap")).props.onClick();
-  assert.equal(selected.at(-1), rows[0]);
+  // Opening a profile is a separate action from swap selection; it must
+  // never itself push to onTrade.
+  nodes(h.tree).find((n) => n.props?.["aria-label"]?.startsWith("Open profile for")).props.onClick({ stopPropagation() {} });
+  h.render();
+  assert.equal(h.dialog().props.open, true, "Name button opens details, not swap");
+  assert.equal(selected.length, 1, "Opening details does not call onTrade");
   const locked = harness(rows, "vol24", { props: { onTrade: () => assert.fail("Locked swap invoked"), tradingDisabled: true } });
-  assert.ok(nodes(locked.tree).filter((n) => n.props?.children === "[⇄ TRADE]").every((n) => n.props.disabled));
+  assert.ok(findTradeButtons(locked.tree).every((n) => n.props.disabled));
   assert.ok(!locked.logo().props.disabled);
   openDetails(locked);
-  assert.match(text(locked.details()), /Stonk payout/);
+  assert.match(text(locked.payout()), /Stonk payout/);
 });
 
 test("open details follow fresh rows by mint across ranking/filter changes, and surface stale/removal states", () => {
@@ -318,7 +396,7 @@ test("open details follow fresh rows by mint across ranking/filter changes, and 
   assert.equal(h.params().search, SOL.toLowerCase());
   h.render([rows[1], { ...rows[0], vol24: 9000, curveProgress: 91.25, status: "ABOUT_TO_GRADUATE" }]);
   assert.deepEqual(order(h.tree), [SOL, OTC], "Filtering is server-side; the shipped page renders verbatim");
-  assert.match(text(h.details()), /ABOUT_TO_GRADUATE.*\$9,000\.00/);
+  assert.match(text(h.details()), /ABOUT_TO_GRADUATE.*\$9\.00K/);
   const curve = nodes(h.details()).find((n) => n.type?.name === "CurveProgress");
   assert.equal(nodes(curve.type(curve.props)).find((n) => n.props?.role === "progressbar").props["aria-valuenow"], 91.25);
   h.render([]);
@@ -330,7 +408,7 @@ test("open details follow fresh rows by mint across ranking/filter changes, and 
   nodes(h.tree).find((n) => n.type === "DialogContent").props.onCloseAutoFocus({ preventDefault() {} });
   assert.equal(focused, true, "Removed trigger falls back to stable analytics panel");
   const stale = harness(rows, "vol24", { feed: { stale: true } }); openDetails(stale);
-  assert.match(text(stale.tree), /STALE · showing the last available token snapshot/);
+  assert.match(text(stale.tree), /Stale · showing the last available token snapshot/);
 });
 
 test("missing/unsafe metadata renders honest fallbacks; broken images recover after URL changes", () => {
@@ -347,8 +425,9 @@ test("missing/unsafe metadata renders honest fallbacks; broken images recover af
   asset = h.component(h.logo().props.children, "thumbnail");
   assert.equal(nodes(asset).find((n) => n.type === "img").props.src, "https://assets.example/new.png");
   openDetails(h);
-  assert.match(text(h.details()), /Social links unavailable.*Payout metadata unavailable/);
-  assert.match(text(h.details()), /24h Momentum—/);
+  assert.match(text(h.details()), /Social links unavailable/);
+  assert.match(text(h.payout()), /Payout metadata unavailable/);
+  assert.match(text(h.details()), /24h—/);
   assert.equal(nodes(h.details()).filter((n) => n.type === "a" && n.props["aria-label"]).length, 0);
   for (const value of [null, "data:image/svg+xml,invalid", "ftp://example.test/x", "https://user:pass@example.test/x"]) {
     h.render([{ ...row, logoUrl: value, image: value }]);
@@ -362,8 +441,7 @@ test("detail layout is width/height bounded on mobile and preserves incoming das
   assert.match(content.props.className, /max-h-\[90dvh\].*w-\[calc\(100%-2rem\)\].*overflow-y-auto/);
   assert.equal(content.props.id, h.logo().props["aria-controls"]);
   assert.ok(nodes(h.details()).some((n) => n.props?.className?.includes("sm:grid-cols-")));
-  assert.match(text(h.tree), /NOT AFFILIATED WITH THE TOKEN LAUNCHES SHOWN/);
-  assert.match(text(h.tree), /YOU WIN BIG OR LOSE IT ALL/);
+  assert.match(text(h.tree), /Not affiliated with the launches shown · DYOR/);
 });
 
 test("partial payout metadata does not invent a basket, mint, split or schedule", () => {
@@ -373,11 +451,10 @@ test("partial payout metadata does not invent a basket, mint, split or schedule"
     { rewardMint: null, rewardSymbol: "REPORTED", rewardBasket: [], rewardCycle: 0 },
   ]) {
     const h = harness([coin(OTC, 0, { payoutInfo })]); openDetails(h);
-    const detail = h.details();
-    assert.equal(links(detail, "solscan.io").length, payoutInfo.rewardBasket.length + Number(!!payoutInfo.rewardMint));
-    assert.equal(text(detail).includes("Reported reward basket"), !!payoutInfo.rewardBasket.length);
-    assert.match(text(detail), /Reported rewardCycle: (unavailable|0) · units\/meaning unverified/);
-    assert.match(text(detail), /not verified distributions or guaranteed returns/);
-    assert.doesNotMatch(text(detail), /equal split|every \d+|50%|No rewards/i);
+    const detail = h.details(), payoutTree = h.payout(detail);
+    assert.equal(links(payoutTree, "solscan.io").length, payoutInfo.rewardBasket.length + Number(!!payoutInfo.rewardMint));
+    assert.equal(text(payoutTree).includes("Basket ·"), payoutInfo.rewardBasket.length > 1);
+    assert.match(text(detail), /Assets and links are third-party metadata, not endorsements\. Verify payout mints and launch terms before trading\./);
+    assert.doesNotMatch(text(payoutTree), /equal split|every \d+|50%|No rewards/i);
   }
 });

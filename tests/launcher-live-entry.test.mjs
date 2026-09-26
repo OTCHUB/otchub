@@ -10,6 +10,7 @@ test("Deno entry wires the existing Helius helper and pinned web3 deriver into o
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const PublicKey = class {}, rpc = () => {}, derive = () => {}, handler = () => {};
   const store = { load: () => {}, save: () => {} }, client = { asServiceRole: {} };
+  const coinsArchive = { load: () => {} };
   let factories = 0;
   const modules = {
     "npm:@solana/web3.js@1.98.4": { PublicKey },
@@ -20,10 +21,12 @@ test("Deno entry wires the existing Helius helper and pinned web3 deriver into o
       return derive;
     } },
     "../../shared/launcherGraduates.ts": { createLauncherGraduationStore: () => store },
+    "../../shared/launcherArchive.ts": { createLauncherCoinsArchiveLoader: () => coinsArchive },
     "./handler.js": { createLauncherLiveHandler: (dependencies) => {
       assert.equal(dependencies.rpc, rpc);
       assert.equal(dependencies.deriveCurveAddress, derive);
       assert.equal(dependencies.graduationStore, store);
+      assert.equal(dependencies.coinsArchive, coinsArchive);
       assert.equal(typeof dependencies.createClient, "function");
       factories++;
       return handler;

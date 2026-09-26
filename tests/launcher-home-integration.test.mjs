@@ -33,6 +33,7 @@ function harness(path, modules = {}, initialProps = {}) {
       });
     },
   };
+  hooks.useLayoutEffect = hooks.useEffect;
   const module = { exports: {} }, children = {};
   runInNewContext(compile(path), {
     module, exports: module.exports,
@@ -59,6 +60,11 @@ function harness(path, modules = {}, initialProps = {}) {
     },
     async flush() { for (let i = 0; i < 10; i++) { await Promise.resolve(); if (dirty) h.render(); } },
     child: (id) => nodes(h.tree).find((node) => node.type === children[id]),
+    // BootScreen is React.lazy()-loaded: its JSX element's `type` is React's
+    // internal lazy wrapper object, not our plain stub function, so it can't
+    // be matched by module identity like the other stubbed children. It's
+    // the only element with both a `ready` and an `onComplete` prop.
+    bootScreen: () => nodes(h.tree).find((node) => "ready" in (node.props ?? {}) && typeof node.props.onComplete === "function"),
   };
   h.render(); return h;
 }
@@ -66,17 +72,18 @@ function harness(path, modules = {}, initialProps = {}) {
 test("Home selection opens the swap, updates exact mint, preserves it on refresh, and locks during swaps", async () => {
   const h = harness("../src/pages/Home.jsx", {
     "@/api/base44Client": { base44: { functions: { invoke: async () => ({ data: { latest: {} } }) } } },
+    "@/lib/dashboardFeed": { fetchDashboardBody: async () => ({ latest: {} }) },
     "lucide-react": { RefreshCw: () => null },
     "@/lib/format": { timeAgo: () => "now" }, "@/lib/useLiveOtcPrice": { useLiveOtcPrice: () => null },
     "@/lib/solanaWallets": { silentReconnect: () => {} },
   });
-  h.child("BootScreen").props.onComplete(); await h.flush();
+  h.bootScreen().props.onComplete(); await h.flush();
   assert.equal(h.child("JupiterSwapPanel").props.token, undefined);
   const row = { mint: "launcher-mint", symbol: "ALT", mcap: 100 };
   h.child("LauncherAnalytics").props.onTrade(row); await h.flush();
   assert.equal(h.child("JupiterSwapPanel").props.token, row);
   assert.equal(h.child("LauncherAnalytics").props.selectedMint, row.mint);
-  const card = nodes(h.tree).find((n) => n.props?.title === "TRADE :: $ALT");
+  const card = nodes(h.tree).find((n) => n.props?.title === "Trade · $ALT");
   assert.equal(card.props.openSignal, 1);
   for (const fn of h.timers.values()) fn(); assert.ok(h.scrolls.includes("otc-swap"));
   const updated = { ...row, mcap: 200 };
@@ -89,7 +96,7 @@ test("Home selection opens the swap, updates exact mint, preserves it on refresh
   await h.flush();
   assert.equal(h.child("JupiterSwapPanel").props.token, updated);
   assert.equal(h.child("LauncherAnalytics").props.tradingDisabled, true);
-  assert.equal(nodes(h.tree).find((n) => n.props?.title === "TRADE :: $ALT").props.locked, true);
+  assert.equal(nodes(h.tree).find((n) => n.props?.title === "Trade · $ALT").props.locked, true);
   h.child("JupiterSwapPanel").props.onBusyChange(false); await h.flush();
   h.child("JupiterSwapPanel").props.onResetToken(); await h.flush();
   assert.equal(h.child("JupiterSwapPanel").props.token, undefined);
