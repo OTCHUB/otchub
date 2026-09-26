@@ -23,6 +23,14 @@ const payoutKeyOf = (row) => {
   if (Array.isArray(p.rewardBasket) && p.rewardBasket.length > 1) return "BASKET";
   return p.rewardMint || p.rewardSymbol ? "SINGLE" : "NONE";
 };
+// Launch venue — same contract as the server's venueKey.
+const venueKeyOf = (row) => {
+  const v = (row.venue || "pump.fun").toLowerCase();
+  if (v === "pump.fun") return "PUMP_FUN";
+  if (v === "meteora") return "METEORA";
+  if (v === "raydium") return "RAYDIUM";
+  return "OTHER";
+};
 
 // Null-last stable ranking — same ordering contract as the server's
 // rankLauncherRows (duplicated here because the server module can't be
@@ -83,11 +91,18 @@ export function projectLauncherView(mirror, params = {}) {
   }
   const statusCounts = { ALL: scoped.length, GRADUATED: 0, BONDING: 0, MIGRATING: 0, ABOUT_TO_GRADUATE: 0, UNKNOWN: 0 };
   for (const row of scoped) statusCounts[statusKeyOf(row)]++;
+  const venueCounts = { ALL: scoped.length, PUMP_FUN: 0, METEORA: 0, RAYDIUM: 0, OTHER: 0 };
+  for (const row of scoped) venueCounts[venueKeyOf(row)]++;
+  const payoutCounts = { ALL: scoped.length, SINGLE: 0, BASKET: 0, NONE: 0 };
+  for (const row of scoped) payoutCounts[payoutKeyOf(row)]++;
   if (params.status && params.status !== "ALL") {
     scoped = scoped.filter((row) => statusKeyOf(row) === params.status);
   }
   if (params.payout === "SINGLE" || params.payout === "BASKET") {
     scoped = scoped.filter((row) => payoutKeyOf(row) === params.payout);
+  }
+  if (params.venue && params.venue !== "ALL") {
+    scoped = scoped.filter((row) => venueKeyOf(row) === params.venue);
   }
   const sortField = params.sort === "newest" || params.sort === "oldest" ? "ageH" : (params.sort || "vol24");
   const sorted = rankRows(scoped, sortField, params.sort === "newest");
@@ -101,6 +116,8 @@ export function projectLauncherView(mirror, params = {}) {
     ranked,
     riskCoverage: { ...(mirror.riskCoverage || {}), forceStale: true },
     statusCounts,
+    venueCounts,
+    payoutCounts,
     matches: scoped.length,
     page,
     pageCount,

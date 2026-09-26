@@ -23,7 +23,11 @@ export default function RowPayout({ payout, symbols = {}, catalog = {} }) {
   const iconOf = (mint) => byMint[mint]?.icon || null;
   // Mint-less rewards (pending token) resolve through the symbol catalog.
   const symbolMeta = !mints.length && payout?.rewardSymbol ? bySymbol[payout.rewardSymbol] : null;
-  const title = `Rewards holders in ${mints.length
+  // Rotating basket vs a fixed single reward — surfaced explicitly (not just
+  // implied by icon count) so the tape reads at a glance like the official
+  // launcher's reward-pairing focus.
+  const isBasket = basket.length > 1;
+  const title = `${isBasket ? `Rotating basket of ${basket.length} reward tokens` : "Single reward token"}: ${mints.length
     ? mints.map((m) => `$${symOf(m)}`).join(", ")
     : `$${payout.rewardSymbol}`} · source-reported, unverified`;
   return (
@@ -40,6 +44,7 @@ export default function RowPayout({ payout, symbols = {}, catalog = {} }) {
       </> : payout?.rewardSymbol ? (
         <PayoutIcon mint={payout.rewardMint || payout.rewardSymbol} symbol={payout.rewardSymbol} icon={symbolMeta?.icon || null} />
       ) : null}
+      {isBasket && <span className="ml-0.5 font-mono text-[9px] font-bold text-amber-300">×{basket.length}</span>}
     </span>
   );
 }

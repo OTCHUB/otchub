@@ -27,6 +27,22 @@ const KPIS = [
 ];
 // Reward payout shape filter: single reward vs rotating MemeStock basket.
 const PAYOUTS = ["ALL", "SINGLE", "BASKET"];
+const PAYOUT_TITLES = { BASKET: "Rotating multi-token MemeStock reward baskets", SINGLE: "Single source-reported reward token", ALL: "No payout filter" };
+// Launch venue filter — same buckets the server/mirror classify rows into.
+const VENUES = ["ALL", "PUMP_FUN", "METEORA", "RAYDIUM", "OTHER"];
+// Row/detail venue badge: label + accent per venue, keyed off the raw
+// source-reported `venue` string (default "pump.fun" when the field is absent).
+function venueMeta(venue) {
+  const v = (venue || "pump.fun").toLowerCase();
+  if (v === "meteora") return { key: "METEORA", label: "METEORA", name: "Meteora", className: "border-fuchsia-400/60 bg-fuchsia-500/10 text-fuchsia-300" };
+  if (v === "raydium") return { key: "RAYDIUM", label: "RAYDIUM", name: "Raydium", className: "border-sky-400/60 bg-sky-500/10 text-sky-300" };
+  if (v === "pump.fun") return { key: "PUMP_FUN", label: "PUMP", name: "Pump.fun", className: "border-emerald-400/60 bg-emerald-500/10 text-emerald-300" };
+  return { key: "OTHER", label: v.toUpperCase().slice(0, 10) || "OTHER", name: v || "Unknown venue", className: "border-green-500/40 text-green-500/70" };
+}
+const VENUE_LABELS = { ALL: "ALL", PUMP_FUN: "PUMP", METEORA: "METEORA", RAYDIUM: "RAYDIUM", OTHER: "OTHER" };
+// Quote/reward asset a launch trades against and pays holders in — SOL when
+// the source reports no explicit pairing (pairMint/pairSymbol absent).
+const pairLabel = (t) => t.pairSymbol ? `$${t.pairSymbol}` : "SOL";
 const STATUSES = ["GRADUATED", "BONDING", "ABOUT_TO_GRADUATE", "MIGRATING", "ALL", "UNKNOWN"];
 const statusOf = (row) => STATUSES.includes(row.status) && row.status !== "ALL" ? row.status : "UNKNOWN";
 // Compact status chips for dense rows (full status stays in the details dialog).
@@ -35,6 +51,8 @@ const STATUS_SHORT = { GRADUATED: ["GRAD", "text-emerald-400"], BONDING: ["BOND"
 /** @type {Array<[string, number|null]>} */
 const TIMEFRAMES = [["1H", 1], ["24H", 24], ["7D", 168], ["30D", 720], ["ALL", null]];
 const EMPTY_COUNTS = Object.fromEntries(STATUSES.map((s) => [s, 0]));
+const EMPTY_VENUE_COUNTS = Object.fromEntries(VENUES.map((v) => [v, 0]));
+const EMPTY_PAYOUT_COUNTS = Object.fromEntries(PAYOUTS.map((p) => [p === "ALL" ? "ALL" : p, 0]));
 
 // Also validate in the client for older/cached feeds and defensive rendering.
 function metadataUrl(value) {
@@ -61,6 +79,17 @@ function TokenAsset({ token, large = false }) {
   );
 }
 
+// Compact launch-venue badge, shared by the tape row and the detail dialog.
+function VenueBadge({ venue }) {
+  const v = venueMeta(venue);
+  return (
+    <span className={`shrink-0 border px-1 font-mono text-[10px] font-bold uppercase tracking-wider ${v.className}`}
+      title={`Launch venue: ${v.name}`}>
+      {v.label}
+    </span>
+  );
+}
+
 function TokenDetails({ token, symbols = {}, catalog = {} }) {
   const socials = [{ key: "twitter", label: "X", Icon: XIcon }, { key: "telegram", label: "Telegram", Icon: Send },
     { key: "website", label: "Website", Icon: Globe }]
@@ -69,7 +98,10 @@ function TokenDetails({ token, symbols = {}, catalog = {} }) {
   const logo = logoOf(token);
   return <>
     <DialogHeader className="pr-6 text-left">
-      <DialogTitle className="break-words text-green-300">{token.name || token.symbol || "Launcher token"} · ${token.symbol || "?"}</DialogTitle>
+      <DialogTitle className="flex flex-wrap items-center gap-1.5 break-words text-green-300">
+        {token.name || token.symbol || "Launcher token"} · ${token.symbol || "?"}
+        <VenueBadge venue={token.venue} />
+      </DialogTitle>
       <DialogDescription className="text-green-500/70">Token details · [{statusOf(token)}] · source snapshots may lag</DialogDescription>
     </DialogHeader>
     <div className="grid min-w-0 gap-4 sm:grid-cols-[224px_minmax(0,1fr)]">
@@ -97,7 +129,8 @@ function TokenDetails({ token, symbols = {}, catalog = {} }) {
         </div>
         <dl className="grid grid-cols-2 gap-2 text-xs">
           {[["Vol 24h", fmtUsdCompact(token.vol24)], ["24h", momentum(token.change24h)],
-            ["Mcap", fmtUsdCompact(token.mcap)], ["Liq", fmtUsdCompact(token.liquidity)]].map(([label, value]) =>
+            ["Mcap", fmtUsdCompact(token.mcap)], ["Liq", fmtUsdCompact(token.liquidity)],
+            ["Trades against", pairLabel(token)]].map(([label, value]) =>
             <div key={label} className="min-w-0 border border-green-500/20 p-2">
               <dt className="text-green-500/60">{label}</dt><dd className="break-words font-mono text-green-300">{value}</dd>
             </div>)}
@@ -151,6 +184,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   const [kpi, setKpi] = useState("vol24");
   const [status, setStatus] = useState("ALL");
   const [payout, setPayout] = useState("ALL");
+  const [venue, setVenue] = useState("ALL");
   const [search, setSearch] = useState("");
   const [detailMint, setDetailMint] = useState(null);
   const detailTrigger = useRef(null), panelRef = useRef(null);
@@ -164,6 +198,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     status !== "ALL" ? status : null,
     timeframe !== "ALL" ? `since ${timeframe}` : null,
     payout !== "ALL" ? `${payout.toLowerCase()} payout` : null,
+    venue !== "ALL" ? VENUE_LABELS[venue] : null,
   ].filter(Boolean);
   const [page, setPage] = useState(1);
   // Bounded page: max 25 launches per page keeps the tape short on mobile
@@ -177,6 +212,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
     ...(search.trim() ? { search: search.trim().toLowerCase() } : {}),
     ...(maxAgeHours != null ? { maxAgeHours } : {}),
     ...(payout !== "ALL" ? { payout } : {}),
+    ...(venue !== "ALL" ? { venue } : {}),
   });
   // Browser-side pump.fun market sample (large GeckoTerminal pool scan); the
   // server payload ships a small search-based fallback until this arrives.
@@ -215,6 +251,8 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
   // Server-filtered, sorted and paged slice of the full launch tape.
   const ranked = feed?.ranked ?? [];
   const counts = feed?.statusCounts ?? EMPTY_COUNTS;
+  const venueCounts = feed?.venueCounts ?? EMPTY_VENUE_COUNTS;
+  const payoutCounts = feed?.payoutCounts ?? EMPTY_PAYOUT_COUNTS;
   const pageCount = feed?.pageCount ?? 1;
   const matches = feed?.matches ?? 0;
   // LIVE DEX QUOTES (browser): the upstream market snapshots lag minutes
@@ -393,8 +431,18 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
               <button key={p} type="button" role="tab" aria-selected={payout === p}
                 onClick={() => { setPayout(p); setPage(1); }}
                 className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${payout === p ? "border-amber-400 text-amber-300" : "border-green-500/30 text-green-500/70"}`}
-                title={p === "BASKET" ? "Rotating multi-token MemeStock reward baskets" : p === "SINGLE" ? "Single source-reported reward token" : "No payout filter"}>
-                {p}
+                title={PAYOUT_TITLES[p]}>
+                {p} ({payoutCounts[p] ?? 0})
+              </button>
+            ))}
+            <span className="text-green-500/30">·</span>
+            <span className="text-[10px] uppercase tracking-widest text-green-500/50">Venue</span>
+            {VENUES.map((v) => (
+              <button key={v} type="button" role="tab" aria-selected={venue === v}
+                onClick={() => { setVenue(v); setPage(1); }}
+                className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase ${venue === v ? "border-cyan-400 text-cyan-300" : "border-green-500/30 text-green-500/70"}`}
+                title={v === "ALL" ? "No venue filter" : `Launch venue: ${venueMeta(v === "PUMP_FUN" ? "pump.fun" : v.toLowerCase()).name}`}>
+                {VENUE_LABELS[v]} ({venueCounts[v] ?? 0})
               </button>
             ))}
             <span className="text-green-500/30">·</span>
@@ -437,6 +485,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 ${t.symbol || t.mint.slice(0, 6)}
               </button>
               {t.name && <span className="hidden max-w-[22ch] truncate text-[11px] text-green-500/50 lg:inline" title={t.name}>{t.name}</span>}
+              <VenueBadge venue={t.venue} />
               {isOfficialHubMint(t.mint) && (
                 <span className="shrink-0 border border-fuchsia-500 bg-fuchsia-500/20 px-1 font-mono text-[10px] font-bold uppercase tracking-wider text-fuchsia-300"
                   title={`Official $HUB — this row's mint matches the pinned official CA (${t.mint})`}>
@@ -473,6 +522,7 @@ export default function LauncherAnalytics({ onTrade = undefined, selectedMint = 
                 <span className={t.change24h >= 0 ? "text-emerald-400" : "text-red-400"}>{momentum(t.change24h)}</span>
               )}
               {t.dexLive && <span className="text-emerald-400" title="Live DexScreener quote (browser, ~15s)">●</span>}
+              <span className="text-green-500/50" title="Quote/reward asset this launch trades against and pays holders in">vs {pairLabel(t)}</span>
               <span>mc {fmtUsdCompact(t.mcap)}</span>
               <span>vol {fmtUsdCompact(t.vol24)}</span>
               <span>liq {fmtUsdCompact(t.liquidity)}</span>

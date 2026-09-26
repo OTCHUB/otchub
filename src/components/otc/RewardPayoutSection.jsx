@@ -75,6 +75,11 @@ export default function RewardPayoutSection({ payout, symbols = {}, catalog = {}
               : "symbol unavailable"}
           </p>
         )}
+        {/* Explicit single-vs-basket label — the official launcher's reward-
+            pairing focus, surfaced here instead of only implied by icon count. */}
+        {basket.length <= 1 && (
+          <p className="text-[11px] uppercase tracking-widest text-green-500/50">Single reward</p>
+        )}
         {basket.length > 1 && (
           <div>
             <p className="text-green-300">Basket · {basket.length} tokens</p>

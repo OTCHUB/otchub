@@ -32,19 +32,20 @@ const PagerStub = (props) => null;
 // and effects are stubbed: focus trapping/ESC/portal behavior still needs hosted QA.
 //
 // Hook-slot order below MUST mirror LauncherAnalytics' own top-to-bottom
-// useState/useRef call order exactly (data, err, kpi, status, payout, search,
-// detailMint, detailTrigger, panelRef, timeframe, filtersOpen, page, pageSize,
-// prevOrderRef, flash) — the harness seeds only the slots a test needs to
-// override and lets the component's own initial values fill the rest.
+// useState/useRef call order exactly (data, err, kpi, status, payout, venue,
+// search, detailMint, detailTrigger, panelRef, timeframe, filtersOpen, page,
+// pageSize, prevOrderRef, flash) — the harness seeds only the slots a test
+// needs to override and lets the component's own initial values fill the rest.
 function harness(rows, kpi = "change24h", options = {}) {
   const seed = [];
   seed[2] = kpi;
   seed[3] = options.status ?? "ALL";
   seed[4] = options.payout ?? "ALL";
-  seed[5] = options.search ?? "";
-  if (options.timeframe !== undefined) seed[9] = options.timeframe;
-  if (options.filtersOpen !== undefined) seed[10] = options.filtersOpen;
-  if (options.page !== undefined) seed[11] = options.page;
+  seed[5] = options.venue ?? "ALL";
+  seed[6] = options.search ?? "";
+  if (options.timeframe !== undefined) seed[10] = options.timeframe;
+  if (options.filtersOpen !== undefined) seed[11] = options.filtersOpen;
+  if (options.page !== undefined) seed[12] = options.page;
   const state = new Map([["root", seed]]);
   let active = state.get("root"), cursor = 0, props = options.props, lastParams = null;
   const useState = (initial) => {

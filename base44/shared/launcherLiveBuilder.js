@@ -27,6 +27,26 @@ const SOCIAL_KEYS = ["twitter", "telegram", "website"];
 const reportedMint = (v) =>
   /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text(v)) ? text(v) : null;
 
+// Launch venue classification, shared by the live/paged handler and the
+// client-side mirror projection (same contract, same bucket names) so venue
+// filters and popularity counts agree everywhere the tape is rendered.
+export function venueKey(row) {
+  const v = (row.venue || "pump.fun").toLowerCase();
+  if (v === "pump.fun") return "PUMP_FUN";
+  if (v === "meteora") return "METEORA";
+  if (v === "raydium") return "RAYDIUM";
+  return "OTHER";
+}
+
+// Source-reported payout shape: BASKET = rotating multi-token reward,
+// SINGLE = one reward mint/symbol, NONE = no payout metadata.
+export function payoutKey(row) {
+  const p = row.payoutInfo;
+  if (!p) return "NONE";
+  if (Array.isArray(p.rewardBasket) && p.rewardBasket.length > 1) return "BASKET";
+  return p.rewardMint || p.rewardSymbol ? "SINGLE" : "NONE";
+}
+
 // Stable, finite-only, null-last comparison, including all-negative momentum.
 export function rankLauncherRows(rows, key, ascending = false) {
   return [...rows].sort((a, b) => {
@@ -564,6 +584,13 @@ export function createLauncherLiveBuilder(
           : "UNKNOWN";
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     }
+    // Venue and payout-shape popularity, full-roster scope (same "no filter"
+    // scope statusCounts uses above) — powers the analytics dashboard's
+    // venue/launch-option breakdown alongside the status tabs.
+    const venueCounts = { ALL: rows.length, PUMP_FUN: 0, METEORA: 0, RAYDIUM: 0, OTHER: 0 };
+    for (const row of rows) venueCounts[venueKey(row)]++;
+    const payoutCounts = { ALL: rows.length, SINGLE: 0, BASKET: 0, NONE: 0 };
+    for (const row of rows) payoutCounts[payoutKey(row)]++;
     // Completed-but-unconfirmed curves for the client to verify: DexScreener
     // rate-limits the shared function-runtime egress IP, so AMM-migration
     // evidence is confirmed from the visitor's own browser and reported once;
@@ -599,6 +626,8 @@ export function createLauncherLiveBuilder(
       legacyRanked: rankLauncherRows(shipped, "vol24"),
       riskCoverage,
       statusCounts,
+      venueCounts,
+      payoutCounts,
       rewardSymbols,
       rewardCatalog,
       rosterTotal: rows.length,
