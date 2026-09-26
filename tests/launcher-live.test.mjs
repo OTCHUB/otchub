@@ -194,7 +194,7 @@ test("row contract preserves finite zeros/losses and sanitizes unknown metrics a
   const { body } = await s.read();
   assert.deepEqual(body.ranked.map((r) => r.mint), [mint(1), mint(2), mint(3), mint(4)]);
   assert.deepEqual(Object.keys(body.ranked[0]).sort(), ["mint", "symbol", "name", "image", "logoUrl", "socials", "payoutInfo", "vol24", "mcap", "liquidity",
-    "change24h", "ageH", "metricsAt", "curveProgress", "status", "curveComplete", "statusAt", "risk"].sort());
+    "change24h", "ageH", "metricsAt", "venue", "pairMint", "pairSymbol", "curveProgress", "status", "curveComplete", "statusAt", "risk"].sort());
   assert.deepEqual([body.ranked[0].vol24, body.ranked[0].mcap, body.ranked[0].liquidity, body.ranked[0].change24h], [0, 0, 0, 0]);
   assert.equal(body.ranked[1].symbol, "");
   assert.equal(body.ranked[1].change24h, -20);

@@ -48,7 +48,7 @@ test("snapshots carry numeric price change, volume and cap in the cached payload
   assert.equal(body.ranked[0].mcap, 67890);
   assert.equal(body.ranked[0].feesEst24h, 123.45);
   assert.equal(body.ranked[0].graduated, true);
-  assert.deepEqual(body.feeModel.map((s) => s.pct), [70, 10, 15, 5]);
+  assert.deepEqual(body.feeModel.map((s) => s.pct), [67.5, 10, 10, 5, 5, 2.5]);
   // 7 search terms × 2 solana pump pairs each, deduped by mint.
   assert.equal(body.native.n, 14);
   assert.equal(body.native.graduatedShare, 0.5);

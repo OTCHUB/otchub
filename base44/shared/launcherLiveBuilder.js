@@ -4,8 +4,16 @@
 // graduation ledger, risk enrichment and the full-body projection. One
 // instance per caller; the live handler and the mirror run the same build.
 
-import { decodeLauncherCurve, hasConfirmedAmmPair, launcherStatus, NEAR_THRESHOLD } from "./launcherCurve.js";
-import { createLauncherRiskService, emptyLauncherRisk } from "./launcherRisk.js";
+import {
+  decodeLauncherCurve,
+  hasConfirmedAmmPair,
+  launcherStatus,
+  NEAR_THRESHOLD,
+} from "./launcherCurve.js";
+import {
+  createLauncherRiskService,
+  emptyLauncherRisk,
+} from "./launcherRisk.js";
 import { resolveRewardMetaProxied } from "./rewardStockCatalog.js";
 
 const COINS_URL = "https://otcdesks.cash/api/coins";
@@ -16,7 +24,8 @@ const numeric = (v) => Number.isFinite(v) ? v : null;
 const nonnegative = (v) => Number.isFinite(v) && v >= 0 ? v : null;
 const text = (v) => typeof v === "string" ? v.trim() : "";
 const SOCIAL_KEYS = ["twitter", "telegram", "website"];
-const reportedMint = (v) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text(v)) ? text(v) : null;
+const reportedMint = (v) =>
+  /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text(v)) ? text(v) : null;
 
 // Stable, finite-only, null-last comparison, including all-negative momentum.
 export function rankLauncherRows(rows, key, ascending = false) {
@@ -44,42 +53,80 @@ function sourceTime(value, at) {
 function httpUrl(value) {
   try {
     const url = new URL(text(value));
-    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
-  } catch { return ""; }
+    return ["https:", "http:"].includes(url.protocol) && !url.username &&
+        !url.password
+      ? url.href
+      : "";
+  } catch {
+    return "";
+  }
 }
 
 function sourceSocials(coin) {
-  const nested = coin.socials && typeof coin.socials === "object" && !Array.isArray(coin.socials) ? coin.socials : {};
-  return Object.fromEntries(SOCIAL_KEYS.map((key) => [key, httpUrl(nested[key]) || httpUrl(coin[key])]));
+  const nested = coin.socials && typeof coin.socials === "object" &&
+      !Array.isArray(coin.socials)
+    ? coin.socials
+    : {};
+  return Object.fromEntries(
+    SOCIAL_KEYS.map((key) => [key, httpUrl(nested[key]) || httpUrl(coin[key])]),
+  );
 }
 
 function payoutInfo(coin) {
-  const rewardMint = reportedMint(coin.rewardMint), rewardSymbol = text(coin.rewardSymbol) || null;
-  const rewardCycle = Number.isSafeInteger(coin.rewardCycle) && coin.rewardCycle >= 0 ? coin.rewardCycle : null;
-  const rewardBasket = [...new Set((Array.isArray(coin.rewardBasket) ? coin.rewardBasket : [])
-    .map(reportedMint).filter(Boolean))];
+  const rewardMint = reportedMint(coin.rewardMint),
+    rewardSymbol = text(coin.rewardSymbol) || null;
+  const rewardCycle =
+    Number.isSafeInteger(coin.rewardCycle) && coin.rewardCycle >= 0
+      ? coin.rewardCycle
+      : null;
+  const rewardBasket = [
+    ...new Set(
+      (Array.isArray(coin.rewardBasket) ? coin.rewardBasket : [])
+        .map(reportedMint).filter(Boolean),
+    ),
+  ];
   // These are source-reported settings, not verified distributions or a schedule.
-  return rewardMint !== null || rewardSymbol !== null || rewardCycle !== null || rewardBasket.length
-    ? { rewardMint, rewardSymbol, rewardCycle, rewardBasket } : null;
+  return rewardMint !== null || rewardSymbol !== null || rewardCycle !== null ||
+      rewardBasket.length
+    ? { rewardMint, rewardSymbol, rewardCycle, rewardBasket }
+    : null;
 }
 
 function dexMetadata(pair) {
-  const info = pair.info, links = Array.isArray(info?.socials) ? info.socials : [];
+  const info = pair.info,
+    links = Array.isArray(info?.socials) ? info.socials : [];
   const websites = Array.isArray(info?.websites) ? info.websites : [];
-  const firstUrl = (entries) => entries.map((entry) => httpUrl(entry?.url)).filter(Boolean).sort()[0] || "";
-  const socials = Object.fromEntries(SOCIAL_KEYS.map((key) => [key, firstUrl(key === "website"
-    ? websites : links.filter((entry) => text(entry?.type).toLowerCase() === key))]));
+  const firstUrl = (entries) =>
+    entries.map((entry) => httpUrl(entry?.url)).filter(Boolean).sort()[0] || "";
+  const socials = Object.fromEntries(
+    SOCIAL_KEYS.map((key) => [
+      key,
+      firstUrl(
+        key === "website"
+          ? websites
+          : links.filter((entry) => text(entry?.type).toLowerCase() === key),
+      ),
+    ]),
+  );
   const logoUrl = httpUrl(info?.imageUrl);
   // A total, locale-independent tie break makes fallback independent of API order,
   // including duplicate/missing pair addresses and duplicate social entries.
-  const key = JSON.stringify([text(pair.pairAddress), logoUrl, ...SOCIAL_KEYS.map((name) => socials[name])]);
+  const key = JSON.stringify([
+    text(pair.pairAddress),
+    logoUrl,
+    ...SOCIAL_KEYS.map((name) => socials[name]),
+  ]);
   return { liquidity: numeric(pair.liquidity?.usd), key, logoUrl, socials };
 }
 
 function fillDexMetadata(row, pairs) {
   // DEX info belongs to the BASE token, unlike the base-or-quote status check.
-  const matching = pairs.filter((pair) => pair?.chainId === "solana" && pair.baseToken?.address === row.mint)
-    .map(dexMetadata).sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  const matching = pairs.filter((pair) =>
+    pair?.chainId === "solana" && pair.baseToken?.address === row.mint
+  )
+    .map(dexMetadata).sort((a, b) =>
+      a.key < b.key ? -1 : a.key > b.key ? 1 : 0
+    );
   for (const metadata of rankLauncherRows(matching, "liquidity")) {
     row.logoUrl ||= metadata.logoUrl;
     for (const key of SOCIAL_KEYS) row.socials[key] ||= metadata.socials[key];
@@ -87,7 +134,9 @@ function fillDexMetadata(row, pairs) {
 }
 
 export function extractCoins(raw) {
-  const coins = Array.isArray(raw) ? raw : raw?.coins ?? raw?.data ?? raw?.tokens;
+  const coins = Array.isArray(raw)
+    ? raw
+    : raw?.coins ?? raw?.data ?? raw?.tokens;
   return Array.isArray(coins) ? coins : null;
 }
 
@@ -95,13 +144,30 @@ export function extractCoins(raw) {
 // mint in the coins archive) — gives rows outside the live candidate set a
 // real status instead of UNKNOWN.
 function archivedCurveStatus(coin) {
-  const curve = coin?.curve && typeof coin.curve === "object" ? coin.curve : null;
-  if (!curve || !Number.isFinite(curve.at)) return { curveProgress: null, status: "UNKNOWN", curveComplete: null, statusAt: null };
+  const curve = coin?.curve && typeof coin.curve === "object"
+    ? coin.curve
+    : null;
+  if (!curve || !Number.isFinite(curve.at)) {
+    return {
+      curveProgress: null,
+      status: "UNKNOWN",
+      curveComplete: null,
+      statusAt: null,
+    };
+  }
   const complete = curve.complete === true ? true : null;
-  const progress = complete === true ? 100 : Number.isFinite(curve.progress) ? curve.progress : null;
+  const progress = complete === true
+    ? 100
+    : Number.isFinite(curve.progress)
+    ? curve.progress
+    : null;
   return {
-    curveProgress: progress, curveComplete: complete,
-    status: launcherStatus({ curveComplete: complete, curveProgress: progress }, false),
+    curveProgress: progress,
+    curveComplete: complete,
+    status: launcherStatus(
+      { curveComplete: complete, curveProgress: progress },
+      false,
+    ),
     statusAt: curve.at,
   };
 }
@@ -115,12 +181,27 @@ function rosterRows(raw, at) {
     if (!mint || seen.has(mint)) continue;
     seen.add(mint);
     const snapshot = coin?.snapshot, image = httpUrl(coin.image);
+    // Launch venue: pump.fun (default/legacy, no field) or "meteora" today,
+    // with Raydium expected next (otcdesks.cash/docs#launch). pairMint/
+    // pairSymbol name the quote asset a custom-paired or Meteora launch
+    // earns fees in and pays its holders — SOL when absent.
     rows.push({
-      mint, symbol: text(coin.symbol), name: text(coin.name), image,
-      logoUrl: image, socials: sourceSocials(coin), payoutInfo: payoutInfo(coin),
-      vol24: nonnegative(snapshot?.volume24h), mcap: nonnegative(snapshot?.marketCap),
-      liquidity: nonnegative(snapshot?.liquidity), change24h: numeric(snapshot?.change24h),
-      ageH: ageHours(coin.createdAt, at), metricsAt: sourceTime(snapshot?.at, at),
+      mint,
+      symbol: text(coin.symbol),
+      name: text(coin.name),
+      image,
+      logoUrl: image,
+      socials: sourceSocials(coin),
+      payoutInfo: payoutInfo(coin),
+      vol24: nonnegative(snapshot?.volume24h),
+      mcap: nonnegative(snapshot?.marketCap),
+      liquidity: nonnegative(snapshot?.liquidity),
+      change24h: numeric(snapshot?.change24h),
+      ageH: ageHours(coin.createdAt, at),
+      metricsAt: sourceTime(snapshot?.at, at),
+      venue: text(coin.venue) || "pump.fun",
+      pairMint: reportedMint(coin.pairMint),
+      pairSymbol: text(coin.pairSymbol) || null,
       ...archivedCurveStatus(coin),
     });
   }
@@ -134,7 +215,10 @@ export function launcherCandidates(rows) {
     ...rankLauncherRows(rows, "change24h").slice(0, 60),
     ...rankLauncherRows(rows, "ageH", true).slice(0, 30),
   ];
-  return [...new Map(union.map((row) => [row.mint, row])).values()].slice(0, 150);
+  return [...new Map(union.map((row) => [row.mint, row])).values()].slice(
+    0,
+    150,
+  );
 }
 
 async function withDeadline(task, ms) {
@@ -144,52 +228,90 @@ async function withDeadline(task, ms) {
     return await Promise.race([
       Promise.resolve().then(() => task(controller.signal)),
       new Promise((_, reject) => {
-        timer = setTimeout(() => { controller.abort(); reject(new Error("UPSTREAM_TIMEOUT")); }, ms);
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("UPSTREAM_TIMEOUT"));
+        }, ms);
       }),
     ]);
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function runBounded(tasks) {
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(3, tasks.length) }, async () => {
-    while (next < tasks.length) await tasks[next++]();
-  }));
+  await Promise.all(
+    Array.from({ length: Math.min(3, tasks.length) }, async () => {
+      while (next < tasks.length) await tasks[next++]();
+    }),
+  );
 }
 
-export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl = fetch,
-  clock = Date.now, probeTimeoutMs = 9000, riskService, riskOptions, graduationStore,
-  coinsArchive = null, freshPages = 0 }) {
+export function createLauncherLiveBuilder(
+  {
+    rpc,
+    deriveCurveAddress,
+    fetchImpl = fetch,
+    clock = Date.now,
+    probeTimeoutMs = 9000,
+    riskService,
+    riskOptions,
+    graduationStore,
+    coinsArchive = null,
+    freshPages = 0,
+  },
+) {
   let activeRpc = 0;
-  const risks = riskService ?? createLauncherRiskService({ ...riskOptions, fetchImpl, clock });
+  const risks = riskService ??
+    createLauncherRiskService({ ...riskOptions, fetchImpl, clock });
 
   // The risk stage is best-effort enrichment: a failing or throwing risk service
   // must never empty the feed. Degrade to explicit NOT_CHECKED rows instead.
-  const enrichRisks = (rows, priority) => Promise.resolve()
-    .then(() => risks.enrich(rows, priority)).catch(() => undefined);
+  const enrichRisks = (rows, priority) =>
+    Promise.resolve()
+      .then(() => risks.enrich(rows, priority)).catch(() => undefined);
   function attachRisks(rows, coverage) {
-    try { return risks.attach(rows, coverage); }
-    catch {
+    try {
+      return risks.attach(rows, coverage);
+    } catch {
       for (const row of rows) row.risk ||= emptyLauncherRisk();
-      return { total: rows.length, checked: 0, stale: 0, unavailable: 0,
-        notChecked: rows.length, requested: 0, limited: false, nextRetryAt: null };
+      return {
+        total: rows.length,
+        checked: 0,
+        stale: 0,
+        unavailable: 0,
+        notChecked: rows.length,
+        requested: 0,
+        limited: false,
+        nextRetryAt: null,
+      };
     }
   }
 
-  const fetchJson = (url, timeoutMs) => withDeadline(async (signal) => {
-    const res = await fetchImpl(url, { signal });
-    if (!res.ok) throw new Error("UPSTREAM_UNAVAILABLE");
-    return res.json();
-  }, timeoutMs);
+  const fetchJson = (url, timeoutMs) =>
+    withDeadline(async (signal) => {
+      const res = await fetchImpl(url, { signal });
+      if (!res.ok) throw new Error("UPSTREAM_UNAVAILABLE");
+      return res.json();
+    }, timeoutMs);
 
   async function readAccounts(addresses) {
     // heliusRpc has no AbortSignal argument. Timed-out calls retain their slot
     // until settled, so repeated refreshes cannot accumulate unbounded RPCs.
-    if (activeRpc >= 2 || typeof rpc !== "function") throw new Error("CURVE_RPC_UNAVAILABLE");
+    if (activeRpc >= 2 || typeof rpc !== "function") {
+      throw new Error("CURVE_RPC_UNAVAILABLE");
+    }
     activeRpc++;
-    const pending = Promise.resolve().then(() => rpc("getMultipleAccounts", [addresses, {
-      encoding: "base64", commitment: "confirmed", dataSlice: { offset: 0, length: 49 },
-    }])).finally(() => { activeRpc--; });
+    const pending = Promise.resolve().then(() =>
+      rpc("getMultipleAccounts", [addresses, {
+        encoding: "base64",
+        commitment: "confirmed",
+        dataSlice: { offset: 0, length: 49 },
+      }])
+    ).finally(() => {
+      activeRpc--;
+    });
     return withDeadline(() => pending, probeTimeoutMs);
   }
 
@@ -201,8 +323,15 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     // Newest upstream pages: brand-new launches surface within one 30s poll
     // instead of waiting for the next 5-min archive sweep.
     if (freshPages > 0) {
-      const pages = await Promise.all(Array.from({ length: freshPages }, (_, i) =>
-        fetchJson(`${COINS_URL}?page=${i + 1}`, probeTimeoutMs).catch(() => null)));
+      const pages = await Promise.all(
+        Array.from(
+          { length: freshPages },
+          (_, i) =>
+            fetchJson(`${COINS_URL}?page=${i + 1}`, probeTimeoutMs).catch(() =>
+              null
+            ),
+        ),
+      );
       for (const page of pages) {
         for (const coin of extractCoins(page) || []) coins.push(coin);
       }
@@ -214,7 +343,9 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     if (coinsArchive) {
       try {
         for (const coin of (await coinsArchive()) || []) coins.push(coin);
-      } catch { errors.add("LAUNCHER_ARCHIVE_UNAVAILABLE"); }
+      } catch {
+        errors.add("LAUNCHER_ARCHIVE_UNAVAILABLE");
+      }
     }
     const rows = rosterRows({ coins }, at);
     // Reward-pairing symbol map: reward baskets ship as raw mints, but the
@@ -225,7 +356,9 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     const rewardSymbols = {};
     for (const row of rows) {
       const p = row.payoutInfo;
-      if (p?.rewardMint && p?.rewardSymbol && !(p.rewardMint in rewardSymbols)) {
+      if (
+        p?.rewardMint && p?.rewardSymbol && !(p.rewardMint in rewardSymbols)
+      ) {
         rewardSymbols[p.rewardMint] = p.rewardSymbol;
       }
     }
@@ -241,12 +374,19 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       if (!p) continue;
       const primary = resolveRewardMetaProxied(p.rewardMint, p.rewardSymbol);
       if (primary) {
-        if (p.rewardMint && !(p.rewardMint in rewardCatalog.byMint)) rewardCatalog.byMint[p.rewardMint] = primary;
-        if (primary.symbol && !(primary.symbol in rewardCatalog.bySymbol)) rewardCatalog.bySymbol[primary.symbol] = primary;
+        if (p.rewardMint && !(p.rewardMint in rewardCatalog.byMint)) {
+          rewardCatalog.byMint[p.rewardMint] = primary;
+        }
+        if (primary.symbol && !(primary.symbol in rewardCatalog.bySymbol)) {
+          rewardCatalog.bySymbol[primary.symbol] = primary;
+        }
       }
       for (const mint of p.rewardBasket || []) {
         if (mint in rewardCatalog.byMint) continue;
-        const member = resolveRewardMetaProxied(mint, rewardSymbols[mint] || null);
+        const member = resolveRewardMetaProxied(
+          mint,
+          rewardSymbols[mint] || null,
+        );
         if (member) rewardCatalog.byMint[mint] = member;
       }
     }
@@ -255,15 +395,31 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     // unavailable ledger must never fail the live feed.
     let persisted = new Map();
     if (graduationStore) {
-      try { persisted = await graduationStore.load(getClient); }
-      catch { errors.add("GRADUATION_LEDGER_UNAVAILABLE"); }
+      try {
+        persisted = await graduationStore.load(getClient);
+      } catch {
+        errors.add("GRADUATION_LEDGER_UNAVAILABLE");
+      }
     }
     const candidates = launcherCandidates(rows).map((row) => ({
-      row, address: null, curve: null, curveAt: null, dexAt: null, graduated: false,
+      row,
+      address: null,
+      curve: null,
+      curveAt: null,
+      dexAt: null,
+      graduated: false,
     }));
+    // Pump.fun's bonding-curve PDA only exists for pump.fun launches; probing
+    // it for a Meteora (or future Raydium) mint would always read back empty.
+    // Those venues fall back to archivedCurveStatus / AMM-pair graduation
+    // detection instead (hasConfirmedAmmPair already covers meteora/raydium).
     for (const candidate of candidates) {
-      try { candidate.address = deriveCurveAddress(candidate.row.mint); }
-      catch { errors.add("INVALID_MINT"); }
+      if (candidate.row.venue !== "pump.fun") continue;
+      try {
+        candidate.address = deriveCurveAddress(candidate.row.mint);
+      } catch {
+        errors.add("INVALID_MINT");
+      }
     }
     const valid = candidates.filter((c) => c.address), tasks = [];
     for (let i = 0; i < valid.length; i += 100) {
@@ -271,36 +427,53 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       tasks.push(async () => {
         try {
           const result = await readAccounts(chunk.map((c) => c.address));
-          if (!Array.isArray(result?.value) || result.value.length !== chunk.length) throw new Error();
+          if (
+            !Array.isArray(result?.value) ||
+            result.value.length !== chunk.length
+          ) throw new Error();
           const checkedAt = clock();
           chunk.forEach((c, index) => {
             try {
               c.curve = decodeLauncherCurve(result.value[index]);
               c.curveAt = checkedAt;
-              if (c.curve && c.curve.curveProgress === null) errors.add("CURVE_RESERVES_INVALID");
-            } catch { errors.add("CURVE_ACCOUNT_INVALID"); }
+              if (c.curve && c.curve.curveProgress === null) {
+                errors.add("CURVE_RESERVES_INVALID");
+              }
+            } catch {
+              errors.add("CURVE_ACCOUNT_INVALID");
+            }
           });
-        } catch { errors.add("CURVE_RPC_UNAVAILABLE"); }
+        } catch {
+          errors.add("CURVE_RPC_UNAVAILABLE");
+        }
       });
     }
     for (let i = 0; i < valid.length; i += 30) {
       const chunk = valid.slice(i, i + 30);
       tasks.push(async () => {
         try {
-          const data = await fetchJson(DEX_URL + chunk.map((c) => c.row.mint).join(","), probeTimeoutMs);
-          if (!Array.isArray(data?.pairs) && data?.pairs !== null) throw new Error();
+          const data = await fetchJson(
+            DEX_URL + chunk.map((c) => c.row.mint).join(","),
+            probeTimeoutMs,
+          );
+          if (!Array.isArray(data?.pairs) && data?.pairs !== null) {
+            throw new Error();
+          }
           const checkedAt = clock();
           for (const c of chunk) {
             c.graduated = hasConfirmedAmmPair(c.row.mint, data.pairs || []);
             c.dexAt = checkedAt;
             fillDexMetadata(c.row, data.pairs || []);
           }
-        } catch { errors.add("DEXSCREENER_UNAVAILABLE"); }
+        } catch {
+          errors.add("DEXSCREENER_UNAVAILABLE");
+        }
       });
     }
     // Await the bounded risk stage alongside existing probes, never after them.
     const [, enrichmentCoverage] = await Promise.all([
-      runBounded(tasks), enrichRisks(rows, candidates.map((c) => c.row)),
+      runBounded(tasks),
+      enrichRisks(rows, candidates.map((c) => c.row)),
     ]);
     // Probes may outlast risk enrichment. Re-project freshness at response time.
     const riskCoverage = attachRisks(rows, enrichmentCoverage);
@@ -310,17 +483,23 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       c.graduated = c.graduated || persistedGrad != null;
       // Live probe first; a failed probe falls back to the row's archived
       // curve check (mirror-cycle sweep) instead of UNKNOWN.
-      const archived = c.curve ? null
+      const archived = c.curve
+        ? null
         : (c.row.curveComplete != null || c.row.curveProgress != null)
-          ? { curveComplete: c.row.curveComplete, curveProgress: c.row.curveProgress }
-          : null;
+        ? {
+          curveComplete: c.row.curveComplete,
+          curveProgress: c.row.curveProgress,
+        }
+        : null;
       c.row.status = launcherStatus(c.curve ?? archived, c.graduated);
       // Known statuses carry the time of their supporting evidence, not a later
       // empty check. Unknown rows can still have a successful no-account check.
       if (c.graduated) c.row.statusAt = persistedGrad?.graduated_at ?? c.dexAt;
       else if (c.curve) c.row.statusAt = c.curveAt;
       else if (archived) { /* archived statusAt already stands */ }
-      else c.row.statusAt = c.curveAt === null ? c.dexAt : Math.max(c.curveAt, c.dexAt ?? c.curveAt);
+      else {c.row.statusAt = c.curveAt === null
+          ? c.dexAt
+          : Math.max(c.curveAt, c.dexAt ?? c.curveAt);}
     }
     // Ledger-backed roster rows outside the candidate set keep their persisted
     // GRADUATED status with no live probe: every ledger entry was verified
@@ -346,12 +525,23 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
       for (const [mint, entry] of persisted) {
         if (rosterMints.has(mint)) continue;
         rows.push({
-          mint, symbol: entry.symbol || "", name: entry.name || "",
-          image: "", logoUrl: "", socials: sourceSocials({}), payoutInfo: null,
-          vol24: null, mcap: null, liquidity: null, change24h: null,
-          ageH: ageHours(entry.launched_at, at), metricsAt: null,
-          curveProgress: 100, curveComplete: true,
-          status: "GRADUATED", statusAt: entry.graduated_at,
+          mint,
+          symbol: entry.symbol || "",
+          name: entry.name || "",
+          image: "",
+          logoUrl: "",
+          socials: sourceSocials({}),
+          payoutInfo: null,
+          vol24: null,
+          mcap: null,
+          liquidity: null,
+          change24h: null,
+          ageH: ageHours(entry.launched_at, at),
+          metricsAt: null,
+          curveProgress: 100,
+          curveComplete: true,
+          status: "GRADUATED",
+          statusAt: entry.graduated_at,
           historical: true,
         });
       }
@@ -366,33 +556,58 @@ export function createLauncherLiveBuilder({ rpc, deriveCurveAddress, fetchImpl =
     }
     const statusCounts = { ALL: rows.length };
     for (const row of rows) {
-      const s = ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"].includes(row.status) ? row.status : "UNKNOWN";
+      const s =
+        ["GRADUATED", "BONDING", "MIGRATING", "ABOUT_TO_GRADUATE"].includes(
+            row.status,
+          )
+          ? row.status
+          : "UNKNOWN";
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     }
     // Completed-but-unconfirmed curves for the client to verify: DexScreener
     // rate-limits the shared function-runtime egress IP, so AMM-migration
     // evidence is confirmed from the visitor's own browser and reported once;
     // the persisted result is then global for every visitor.
-    const pendingGraduation = graduationStore ? (() => {
-      const listed = new Set(), mints = [];
-      const push = (mint) => { if (!listed.has(mint)) { listed.add(mint); mints.push(mint); } };
-      for (const c of candidates) {
-        if (c.curve?.curveComplete === true && !c.graduated) push(c.row.mint);
-      }
-      // Archived sweep rows whose curves completed outside the live candidate
-      // set join the same browser confirmation queue.
-      for (const row of rows) {
-        if (mints.length >= 90) break;
-        if (row.curveComplete === true && row.status !== "GRADUATED") push(row.mint);
-      }
-      return mints.slice(0, 90);
-    })() : [];
+    const pendingGraduation = graduationStore
+      ? (() => {
+        const listed = new Set(), mints = [];
+        const push = (mint) => {
+          if (!listed.has(mint)) {
+            listed.add(mint);
+            mints.push(mint);
+          }
+        };
+        for (const c of candidates) {
+          if (c.curve?.curveComplete === true && !c.graduated) push(c.row.mint);
+        }
+        // Archived sweep rows whose curves completed outside the live candidate
+        // set join the same browser confirmation queue.
+        for (const row of rows) {
+          if (mints.length >= 90) break;
+          if (row.curveComplete === true && row.status !== "GRADUATED") {
+            push(
+              row.mint,
+            );
+          }
+        }
+        return mints.slice(0, 90);
+      })()
+      : [];
     return {
-      at, rows, legacyRanked: rankLauncherRows(shipped, "vol24"), riskCoverage,
-      statusCounts, rewardSymbols, rewardCatalog, rosterTotal: rows.length, pendingGraduation,
+      at,
+      rows,
+      legacyRanked: rankLauncherRows(shipped, "vol24"),
+      riskCoverage,
+      statusCounts,
+      rewardSymbols,
+      rewardCatalog,
+      rosterTotal: rows.length,
+      pendingGraduation,
       candidateCount: candidates.length,
-      statusChecked: candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
-      statusError: errors.size ? [...errors].sort() : null, nearThreshold: NEAR_THRESHOLD,
+      statusChecked:
+        candidates.filter((c) => c.curveAt !== null || c.dexAt !== null).length,
+      statusError: errors.size ? [...errors].sort() : null,
+      nearThreshold: NEAR_THRESHOLD,
     };
   }
 

@@ -23,8 +23,13 @@ const text = (v) => (typeof v === "string" ? v.trim() : "");
 // Only the fields the roster projection consumes — trimmed coins keep the
 // archive row small (~300B each, ~2.5MB for the full ~9k-launch tape).
 export function trimLauncherCoin(coin) {
-  const snapshot = coin?.snapshot && typeof coin.snapshot === "object" ? coin.snapshot : {};
-  const socials = coin?.socials && typeof coin.socials === "object" && !Array.isArray(coin.socials) ? coin.socials : {};
+  const snapshot = coin?.snapshot && typeof coin.snapshot === "object"
+    ? coin.snapshot
+    : {};
+  const socials = coin?.socials && typeof coin.socials === "object" &&
+      !Array.isArray(coin.socials)
+    ? coin.socials
+    : {};
   const num = (v) => (Number.isFinite(v) ? v : null);
   return {
     mint: text(coin?.mint),
@@ -37,10 +42,17 @@ export function trimLauncherCoin(coin) {
       telegram: text(socials.telegram),
       website: text(socials.website),
     },
+    venue: text(coin?.venue) || "pump.fun",
+    pairMint: text(coin?.pairMint),
+    pairSymbol: text(coin?.pairSymbol),
     rewardMint: text(coin?.rewardMint),
     rewardSymbol: text(coin?.rewardSymbol),
-    rewardCycle: Number.isSafeInteger(coin?.rewardCycle) ? coin.rewardCycle : null,
-    rewardBasket: Array.isArray(coin?.rewardBasket) ? coin.rewardBasket.map(text).filter(Boolean) : [],
+    rewardCycle: Number.isSafeInteger(coin?.rewardCycle)
+      ? coin.rewardCycle
+      : null,
+    rewardBasket: Array.isArray(coin?.rewardBasket)
+      ? coin.rewardBasket.map(text).filter(Boolean)
+      : [],
     snapshot: {
       volume24h: num(snapshot.volume24h),
       marketCap: num(snapshot.marketCap),
@@ -52,8 +64,13 @@ export function trimLauncherCoin(coin) {
   };
 }
 
-export async function fetchLauncherCoinsPage(page, { fetchImpl = fetch, timeoutMs = 12_000 } = {}) {
-  const res = await fetchImpl(`${COINS_URL}?page=${page}`, { signal: AbortSignal.timeout(timeoutMs) });
+export async function fetchLauncherCoinsPage(
+  page,
+  { fetchImpl = fetch, timeoutMs = 12_000 } = {},
+) {
+  const res = await fetchImpl(`${COINS_URL}?page=${page}`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (!res.ok) throw new Error(`launcher coins page ${page} -> ${res.status}`);
   const raw = await res.json();
   const coins = Array.isArray(raw?.coins) ? raw.coins : [];
@@ -67,11 +84,22 @@ export async function fetchLauncherCoinsPage(page, { fetchImpl = fetch, timeoutM
 // cycles (each cycle re-checks the never-checked first, then the stalest).
 // Absent curve accounts are recorded as checked-but-unknown (absence is not
 // evidence of graduation) so they stop displacing fresh checks in priority.
-export async function sweepLauncherCurveStatuses(coins, { rpc, deriveCurveAddress,
-  chunks = 20, chunkSize = 100, clock = Date.now } = {}) {
-  if (typeof rpc !== "function" || typeof deriveCurveAddress !== "function" || !Array.isArray(coins)) return 0;
+export async function sweepLauncherCurveStatuses(
+  coins,
+  { rpc, deriveCurveAddress, chunks = 20, chunkSize = 100, clock = Date.now } =
+    {},
+) {
+  if (
+    typeof rpc !== "function" || typeof deriveCurveAddress !== "function" ||
+    !Array.isArray(coins)
+  ) return 0;
+  // Only pump.fun launches have a bonding-curve PDA under this program;
+  // Meteora (and future Raydium) mints would never resolve to a real
+  // account, so skip them rather than spend RPC budget on guaranteed misses.
   const targets = coins
-    .filter((coin) => text(coin?.mint))
+    .filter((coin) =>
+      text(coin?.mint) && (!coin.venue || coin.venue === "pump.fun")
+    )
     .sort((a, b) => (a.curve?.at ?? 0) - (b.curve?.at ?? 0))
     .slice(0, chunks * chunkSize);
   let checked = 0;
@@ -79,17 +107,26 @@ export async function sweepLauncherCurveStatuses(coins, { rpc, deriveCurveAddres
     const chunk = targets.slice(i, i + chunkSize);
     const accounts = [], valid = [];
     for (const coin of chunk) {
-      try { accounts.push(deriveCurveAddress(coin.mint)); valid.push(coin); }
-      catch { /* non-canonical mint: stays unchecked */ }
+      try {
+        accounts.push(deriveCurveAddress(coin.mint));
+        valid.push(coin);
+      } catch { /* non-canonical mint: stays unchecked */ }
     }
     if (!valid.length) continue;
     let value;
     try {
       const result = await rpc("getMultipleAccounts", [accounts, {
-        encoding: "base64", commitment: "confirmed", dataSlice: { offset: 0, length: 49 },
+        encoding: "base64",
+        commitment: "confirmed",
+        dataSlice: { offset: 0, length: 49 },
       }]);
-      value = Array.isArray(result?.value) && result.value.length === valid.length ? result.value : null;
-    } catch { continue; }
+      value =
+        Array.isArray(result?.value) && result.value.length === valid.length
+          ? result.value
+          : null;
+    } catch {
+      continue;
+    }
     if (!value) continue;
     const at = clock();
     valid.forEach((coin, index) => {
@@ -101,7 +138,11 @@ export async function sweepLauncherCurveStatuses(coins, { rpc, deriveCurveAddres
       try {
         const decoded = decodeLauncherCurve(value[index]);
         if (decoded) {
-          coin.curve = { complete: decoded.curveComplete, progress: decoded.curveProgress, at };
+          coin.curve = {
+            complete: decoded.curveComplete,
+            progress: decoded.curveProgress,
+            at,
+          };
           checked++;
         }
       } catch { /* invalid account: stays unchecked, retried next cycle */ }
@@ -112,14 +153,19 @@ export async function sweepLauncherCurveStatuses(coins, { rpc, deriveCurveAddres
 
 // Read the archived tape from Supabase. Returns [] when the archive is
 // missing/unreachable — the caller degrades to the bare active set.
-export async function readLauncherCoinsArchive({ fetchImpl = fetch, timeoutMs = 20_000 } = {}) {
+export async function readLauncherCoinsArchive(
+  { fetchImpl = fetch, timeoutMs = 20_000 } = {},
+) {
   const url = (secrets.get("SUPABASE_URL") || "").replace(/\/$/, "");
   const serviceKey = secrets.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return [];
-  const res = await fetchImpl(`${url}/rest/v1/${TABLE}?select=payload&key=eq.${ARCHIVE_KEY}`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const res = await fetchImpl(
+    `${url}/rest/v1/${TABLE}?select=payload&key=eq.${ARCHIVE_KEY}`,
+    {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    },
+  );
   if (!res.ok) return [];
   const rows = await res.json();
   const coins = rows?.[0]?.payload?.coins;
@@ -132,15 +178,22 @@ export async function writeLauncherCoinsArchive(coins, at = Date.now()) {
 
 // In-isolate cached loader for the live build (same pattern as the graduation
 // store). Failures resolve to [] — the feed never breaks on the archive.
-export function createLauncherCoinsArchiveLoader({ cacheMs = CACHE_MS, clock = Date.now } = {}) {
+export function createLauncherCoinsArchiveLoader(
+  { cacheMs = CACHE_MS, clock = Date.now } = {},
+) {
   let cache = null, inflight = null;
   return async function loadCoins() {
     if (cache && clock() - cache.at < cacheMs) return cache.coins;
     if (!inflight) {
       inflight = readLauncherCoinsArchive()
-        .then((coins) => { cache = { at: clock(), coins }; return coins; })
+        .then((coins) => {
+          cache = { at: clock(), coins };
+          return coins;
+        })
         .catch(() => [])
-        .finally(() => { inflight = null; });
+        .finally(() => {
+          inflight = null;
+        });
     }
     return inflight;
   };
@@ -150,7 +203,9 @@ export function createLauncherCoinsArchiveLoader({ cacheMs = CACHE_MS, clock = D
 // page is fully archived (caught up), capped at `pages`. Fresh sweeps win by
 // mint; new launches append. Self-healing after downtime: a longer outage just
 // means the next cycles sweep deeper until caught up.
-export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetch, curveSweep = null } = {}) {
+export async function refreshLauncherCoinsArchive(
+  { pages = 40, fetchImpl = fetch, curveSweep = null } = {},
+) {
   const archived = await readLauncherCoinsArchive({ fetchImpl });
   const byMint = new Map();
   for (const coin of archived) {
@@ -160,8 +215,11 @@ export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetc
   let swept = 0, added = 0, refreshed = 0;
   for (let page = 1; page <= pages; page++) {
     let result;
-    try { result = await fetchLauncherCoinsPage(page, { fetchImpl }); }
-    catch { continue; }
+    try {
+      result = await fetchLauncherCoinsPage(page, { fetchImpl });
+    } catch {
+      continue;
+    }
     if (!result.coins.length) break;
     const pageKnown = result.coins.every((c) => byMint.has(text(c?.mint)));
     for (const coin of result.coins) {
@@ -181,8 +239,9 @@ export async function refreshLauncherCoinsArchive({ pages = 40, fetchImpl = fetc
   const coins = [...byMint.values()];
   let curveChecked = 0;
   if (curveSweep) {
-    try { curveChecked = await sweepLauncherCurveStatuses(coins, curveSweep); }
-    catch { /* sweep is best-effort — the archive still refreshes */ }
+    try {
+      curveChecked = await sweepLauncherCurveStatuses(coins, curveSweep);
+    } catch { /* sweep is best-effort — the archive still refreshes */ }
   }
   await writeLauncherCoinsArchive(coins);
   return { total: coins.length, swept, added, refreshed, curveChecked };
