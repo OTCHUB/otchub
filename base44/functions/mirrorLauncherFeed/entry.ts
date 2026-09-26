@@ -19,13 +19,17 @@ export default async function (req) {
     const base44 = createClientFromRequest(req);
 
     // FULL-TAPE SWEEP FIRST: catch the archive up with every launch since the
-    // last cycle (bounded page sweep, stops early once caught up), so the tape
-    // built below carries the complete launch history.
+    // last cycle (bounded, parallel-batched page sweep, stops early once
+    // caught up), so the tape built below carries the complete launch
+    // history. 96 pages (8x parallel batches of 12s-timeout fetches) bounds
+    // worst-case sweep time to ~2.5 min — comfortably inside the 5-min cycle
+    // — while covering 2.4x more launches/cycle than the old sequential
+    // 40-page cap, so backlogs and launch bursts catch up in fewer cycles.
     let archive = null;
     try {
       // curveSweep: bounded on-chain probe of the archived tape so launches
       // outside the live candidate set still get real curve statuses.
-      archive = await refreshLauncherCoinsArchive({ pages: 40, curveSweep: {
+      archive = await refreshLauncherCoinsArchive({ pages: 96, curveSweep: {
         rpc: heliusRpc, deriveCurveAddress: createCurveAddressDeriver(PublicKey),
       } });
     }

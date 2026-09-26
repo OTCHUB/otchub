@@ -199,10 +199,20 @@ export function createLauncherCoinsArchiveLoader(
   };
 }
 
-// Mirror-cycle refresh: sweep upstream pages (newest-first), stop early once a
-// page is fully archived (caught up), capped at `pages`. Fresh sweeps win by
-// mint; new launches append. Self-healing after downtime: a longer outage just
-// means the next cycles sweep deeper until caught up.
+// Pages are fetched in bounded-concurrency batches instead of one at a time.
+// A sequential 40-page sweep at up to 12s/page could take minutes once the
+// upstream API is slow, risking overlap with the next 5-min mirror cycle and
+// starving deep catch-up sweeps of their page budget — exactly the kind of
+// stall that leaves real launches missing from the archive far longer than
+// the "every 5 minutes" design intends. Batching bounds worst-case wall time
+// to `ceil(pages / PAGE_CONCURRENCY)` timeouts instead of `pages` timeouts.
+const PAGE_CONCURRENCY = 8;
+
+// Mirror-cycle refresh: sweep upstream pages (newest-first) in parallel
+// batches, stop early once a whole batch is fully archived (caught up),
+// capped at `pages`. Fresh sweeps win by mint; new launches append.
+// Self-healing after downtime: a longer outage just means the next cycles
+// sweep deeper until caught up.
 export async function refreshLauncherCoinsArchive(
   { pages = 40, fetchImpl = fetch, curveSweep = null } = {},
 ) {
@@ -213,28 +223,50 @@ export async function refreshLauncherCoinsArchive(
     if (mint && !byMint.has(mint)) byMint.set(mint, coin);
   }
   let swept = 0, added = 0, refreshed = 0;
-  for (let page = 1; page <= pages; page++) {
-    let result;
-    try {
-      result = await fetchLauncherCoinsPage(page, { fetchImpl });
-    } catch {
-      continue;
+  for (let start = 1; start <= pages; start += PAGE_CONCURRENCY) {
+    const batch = [];
+    for (
+      let page = start;
+      page < start + PAGE_CONCURRENCY && page <= pages;
+      page++
+    ) {
+      batch.push(page);
     }
-    if (!result.coins.length) break;
-    const pageKnown = result.coins.every((c) => byMint.has(text(c?.mint)));
-    for (const coin of result.coins) {
-      const trimmed = trimLauncherCoin(coin);
-      if (!trimmed.mint) continue;
-      // Persisted curve checks survive fresh upstream overwrites — the sweep
-      // below refreshes them on its own schedule.
-      const prev = byMint.get(trimmed.mint);
-      if (prev?.curve) trimmed.curve = prev.curve;
-      if (byMint.has(trimmed.mint)) refreshed++;
-      else added++;
-      byMint.set(trimmed.mint, trimmed);
-      swept++;
+    const results = await Promise.all(
+      batch.map((page) =>
+        fetchLauncherCoinsPage(page, { fetchImpl }).catch(() => null)
+      ),
+    );
+    // A page fetch failing is NOT evidence of being caught up — treat it like
+    // the sequential version's `continue` (keep sweeping) rather than letting
+    // a network blip masquerade as "every remaining page is already known".
+    let batchFullyKnown = true, batchExhausted = false;
+    for (const result of results) {
+      if (!result) {
+        batchFullyKnown = false;
+        continue;
+      }
+      if (!result.coins.length) {
+        batchExhausted = true;
+        continue;
+      }
+      if (!result.coins.every((c) => byMint.has(text(c?.mint)))) {
+        batchFullyKnown = false;
+      }
+      for (const coin of result.coins) {
+        const trimmed = trimLauncherCoin(coin);
+        if (!trimmed.mint) continue;
+        // Persisted curve checks survive fresh upstream overwrites — the sweep
+        // below refreshes them on its own schedule.
+        const prev = byMint.get(trimmed.mint);
+        if (prev?.curve) trimmed.curve = prev.curve;
+        if (byMint.has(trimmed.mint)) refreshed++;
+        else added++;
+        byMint.set(trimmed.mint, trimmed);
+        swept++;
+      }
     }
-    if (pageKnown) break;
+    if (batchExhausted || batchFullyKnown) break;
   }
   const coins = [...byMint.values()];
   let curveChecked = 0;
