@@ -123,7 +123,7 @@ export const TREASURY_HUB_FLOAT_CAP_BP = 500;
 export const OTC_PAY_SWAP_BURN_PCT_BP = 5_000;
 
 /**
- * §A6.3 second flywheel — the treasury's pro-rata claim on the OTC launcher's 70%
+ * §A6.3 second flywheel — the treasury's pro-rata claim on the OTC launcher's 67.5%
  * holders-in-stock leg (already $OTC, since the treasury holds 2% of $HUB supply). Re-split
  * 80/5/5/5/5 every time the pending balance clears the threshold: 80% is a direct, swap-free
  * injection into the $OTC yield pot (raises everyone's lifetime average buy rate); the other

@@ -47,17 +47,19 @@ protocol). Facts as of **2026-09-07**.
 
 | Recipient | Share | Meaning for $HUB |
 |---|---|---|
-| **Holders, in stock** | **70%** | $HUB creator fees **buy OTC** and distribute to $HUB holders pro-rata |
-| OTC protocol | 15% | Eco support |
+| **Holders, in stock** | **67.5%** | $HUB creator fees **buy OTC** and distribute to $HUB holders pro-rata |
 | **OTC desk pot** | **10%** | $HUB volume funds *all* desk holders' pot rounds |
-| OTC buybacks | 5% | Eco support |
+| OTC buybacks | 10% | Buys OTC on the open market and burns it — eco support |
+| OTC protocol | 5% | Servers, database, APIs and infrastructure |
+| OTC holders | 5% | Paid in SOL every 12h to wallets holding $20+ of $OTC — a protocol-wide stream, not $HUB-specific |
+| Account rent | 2.5% | Opens the token accounts the OTC-holder payout above is paid into |
 | Launcher (us) | 0% ("Nothing to you, the launcher") | $HUB extracts nothing for the treasury here |
 
 Key consequences:
 
 - **Every $HUB trade is direct OTC buy pressure.** Choosing reward stock = OTC
   is the deliberate eco-alignment decision (see §3).
-- **The 70% leg is holder-pro-rata, per wallet — it cannot be routed to a central
+- **The 67.5% leg is holder-pro-rata, per wallet — it cannot be routed to a central
   pot.** This is why $HUB tiers are *burn*-based, not lock-based (see §5.2).
 - **Launched coins join the reward-stock rotation** (verified: $PONS, a launcher
   coin, now appears in the selectable stock list). Once $HUB is launched, future
@@ -108,7 +110,7 @@ Launched **via the OTC launcher** (https://otcdesks.cash/launcher):
 |---|---|---|
 | Name / ticker | Hub / **$HUB** | |
 | **Reward stock** | **OTC** | Every $HUB trade's creator fees buy OTC for $HUB holders — maximum eco coupling; $HUB volume becomes OTC buy pressure |
-| Launcher's own share | **None** (0%) | "Not greedy" made literal; the 70/15/10/5 split is the treasury's take |
+| Launcher's own share | **None** (0%) | "Not greedy" made literal; the 67.5/10/10/5/5/2.5 split is the treasury's take |
 | First buy | Small, optional (0.5–1% of curve) | Bootstraps holder alignment; nothing can front-run it |
 | Socials | OTC Hub dashboard links | Transparency: all analytics public |
 
@@ -162,7 +164,7 @@ desks, light enough to pay back fast.
 |---|---|---|---|
 | A | **Activation fees** | 0.45 SOL × each tier step taken | One-off, front-loaded at launch |
 | B | **Treasury desk yield** | Treasury-owned desks claim desk-pot rounds (13-stock rotation); proceeds → pot | 0.144 SOL/desk/day × desks swept |
-| C | **Treasury OTC-stock claims** | Treasury's HUB float claims its pro-rata 70% launcher leg (paid in OTC); OTC sold → pot | Scales with $HUB volume |
+| C | **Treasury OTC-stock claims** | Treasury's HUB float claims its pro-rata 67.5% launcher leg (paid in OTC); OTC sold → pot | Scales with $HUB volume |
 | D | **Discount-exit SOL leg** | 50% SOL half of every treasury desk sale → pot | Episodic |
 
 ### 5.2 Distribution — burn, don't lock
@@ -174,7 +176,7 @@ buyback_burn   =              0.10 × pot_inflow_epoch           [SOL → buy $H
 
 - One epoch = 24h (parameter `EPOCH_HOURS = 24`). Unclaimed yield rolls to the
   next epoch.
-- **Why burn-based tiers:** the launcher's 70% leg pays **per wallet, pro-rata
+- **Why burn-based tiers:** the launcher's 67.5% leg pays **per wallet, pro-rata
   on HUB held**. Locked HUB in an escrow would likely *miss* that stream; burned
   tiers never conflict with it. Stakers therefore hold $HUB in their own wallet
   (earning launcher OTC distributions directly, §5.3) and *burn* for tier weight
@@ -189,14 +191,16 @@ launcher sets it per coin):
 
 ```text
 daily_creator_fees = f × V
-→ holders (bought OTC):  0.70 × f × V     [distributed pro-rata to $HUB wallets]
-→ desk pot:              0.10 × f × V     [funds ALL desks — HUB's gift to the eco]
-→ OTC buybacks:          0.05 × f × V
-→ OTC protocol:         0.15 × f × V
+→ holders (bought OTC):  0.675 × f × V     [distributed pro-rata to $HUB wallets]
+→ desk pot:              0.10  × f × V     [funds ALL desks — HUB's gift to the eco]
+→ OTC buybacks:          0.10  × f × V     [buys OTC on the open market and burns it]
+→ OTC protocol:          0.05  × f × V     [servers, database, APIs, infrastructure]
+→ OTC holders:           0.05  × f × V     [paid in SOL every 12h to $20+ $OTC wallets, not HUB-specific]
+→ account rent:          0.025 × f × V     [opens the OTC-holder payout token accounts]
 ```
 
 Worked example, `f = 0.25%` (placeholder — verify), `V = 50,000 SOL`:
-holders receive **87.5 SOL/day of OTC purchases**; the desk pot gains 12.5 SOL/day
+holders receive **84.375 SOL/day of OTC purchases**; the desk pot gains 12.5 SOL/day
 on top of its current ~343 SOL/day inflow — from $HUB volume alone.
 
 ---
@@ -278,7 +282,7 @@ launch that selects $HUB as its reward stock has **its own creator fees buy $HUB
 from the open market** for its holders:
 
 ```text
-inbound_HUB_buys = Σ over launches selecting HUB: 0.70 × f_launch × V_launch
+inbound_HUB_buys = Σ over launches selecting HUB: 0.675 × f_launch × V_launch
 ```
 
 This is passive, compounding fee extraction from the launcher economy — powered
@@ -388,7 +392,7 @@ The desk take has collapsed before (per-desk take fell ~85% from peak during the
 2. **Reward-stock rotation entry:** confirm a launched coin automatically joins
    the selectable stock list (PONS precedent) → the inbound channel (§7) exists.
 3. **Creator-fee rate `f`:** confirm the fee the launcher sets on the coin and
-   that the **70/15/10/5 split holds at launch time** on the launch summary
+   that the **67.5/10/10/5/5/2.5 split holds at launch time** on the launch summary
    before signing.
 4. **Desk-pot mechanics for swept desks:** confirm treasury-owned desks receive
    rounds identically (same claim instruction, no owner-type restriction) using

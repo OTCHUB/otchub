@@ -21,8 +21,9 @@ context required.
 A stake-to-earn layer for existing OTC desk NFTs, plus a treasury desk flywheel:
 
 - **$HUB** launches **via the OTC launcher** with reward stock = **OTC**. Every $HUB
-  trade's creator fees buy OTC for $HUB holders (70%), fund the OTC desk pot (10%),
-  OTC buybacks (5%), and the OTC protocol (15%). The launcher takes 0%.
+  trade's creator fees buy OTC for $HUB holders (67.5%), fund the OTC desk pot (10%),
+  OTC buybacks (10%), the OTC protocol (5%), OTC-token holder rewards (5%), and
+  token-account rent (2.5%). The launcher takes 0%.
 - **Desk owners activate tiers** on their desk NFT (burn-based, lazy-verified) and
   earn pro-rata yield from the $HUB pot: activation fees + treasury desk-sweep yield
   + treasury OTC-stock proceeds.
@@ -41,8 +42,9 @@ parameterized and re-verified on-chain.
 
 **Launcher fee engine** (source: https://otcdesks.cash/launcher launch form):
 - "Launch a coin whose creator fees buy tokenised stock for the people holding it."
-- Fixed fee split of a launched coin's creator fees: **Holders-in-stock 70% ·
-  OTC protocol 15% · OTC desk pot 10% · OTC buybacks 5% · launcher 0%**.
+- Fixed fee split of a launched coin's creator fees: **Holders-in-stock 67.5% ·
+  OTC desk pot 10% · OTC buybacks 10% · OTC protocol 5% · OTC-token holder
+  rewards 5% · token-account rent 2.5% · launcher 0%**.
 - The reward stock is **chosen at launch**; creator fees of the launched coin buy
   that stock and distribute it to the launched coin's **holders, pro-rata per
   wallet**.
@@ -102,12 +104,12 @@ parameterized and re-verified on-chain.
 | Post-launch | Confirm $HUB appears in the reward-stock rotation (inbound channel) |
 
 **Treasury HUB float policy (§A3.1).** The float exists for one purpose: the
-launcher's 70% leg pays OTC **pro-rata on HUB held**, so a zero-HUB treasury earns
+launcher's 67.5% leg pays OTC **pro-rata on HUB held**, so a zero-HUB treasury earns
 zero OTC rewards (source C). The cap is a **share of supply, never a fixed SOL
 amount** — a fixed 10–20 SOL buy early on the curve could be 10%+ of supply and
 reads as a dev wallet. At ≤2%:
 
-- The treasury captures ~2% of the daily OTC bought by the 70% leg — meaningful
+- The treasury captures ~2% of the daily OTC bought by the 67.5% leg — meaningful
   pot funding without starving community rewards or concentrating optics.
 - The float is custodied with the treasury multisig (program vault once the
   program is live), published with its on-chain balance, and covered by a
@@ -140,7 +142,7 @@ constant is never hand-updated. Update it anyway for the static/offline view.
 ### A4. Tier system
 
 Tiers bind to a desk NFT asset id, not to a wallet. Upgrade-only (pay the step
-difference). **Burn-based, never lock-based** — the launcher's 70% leg pays
+difference). **Burn-based, never lock-based** — the launcher's 67.5% leg pays
 per-wallet pro-rata on HUB held, so locked HUB would miss it; burned tiers never
 conflict.
 
@@ -161,7 +163,7 @@ Pot inflow sources:
 - **B — Treasury desk yield**: treasury-owned desks claim desk-pot rounds;
   proceeds → pot. ≈0.144 SOL/desk/day at current take.
 - **C — Treasury OTC-stock claims**: treasury HUB float (§A3.1, ≤2% of supply)
-  claims its pro-rata launcher 70% leg (paid in OTC) like any holder; OTC sold → pot.
+  claims its pro-rata launcher 67.5% leg (paid in OTC) like any holder; OTC sold → pot.
 - **D — Discount-exit SOL leg**: 50% SOL half of every treasury desk sale → pot.
 - **E — Consigned desks**: owner-sent desks (§A6.1) whose desk-pot rounds the
   treasury claims for the pool and distributes to activated desks.
@@ -192,7 +194,7 @@ so the accounting is exactly zero-sum. Desks activated after a round closed do
 not share in it (their stamp is already past it).
 
 Direct-to-holder stream (no tier needed, per wallet, pro-rata on HUB held):
-`0.70 × f × V_HUB_volume` of OTC bought daily, where `f` = creator-fee rate
+`0.675 × f × V_HUB_volume` of OTC bought daily, where `f` = creator-fee rate
 (verify at launch).
 
 ### A6. Treasury desk flywheel
@@ -557,7 +559,7 @@ same key infrastructure as mainnet) with airdrop-limited test SOL.
    claim path in §A5-C and staker holding guidance).
 2. Launched coins auto-join the reward-stock rotation (PONS precedent) — the
    inbound channel (§A3) exists.
-3. Creator-fee rate `f` and that the 70/15/10/5 split holds on the launch
+3. Creator-fee rate `f` and that the 67.5/10/10/5/5/2.5 split holds on the launch
    summary before signing.
 4. Treasury-owned desks receive desk-pot rounds identically to any desk (pilot
    sweep of 1–2 desks, verify claims).
@@ -720,7 +722,7 @@ treasury ATA is the only locked holder.
 - Every displayed figure must be derivable on-chain or from the published
   OtcSnapshot feed — no manual treasury reporting.
 - Community-tooling + DYOR disclaimers persist on this panel like everywhere else.
-- The tracker never estimates the launcher 70% leg (per-wallet pro-rata) — that
+- The tracker never estimates the launcher 67.5% leg (per-wallet pro-rata) — that
   stream is direct-to-holder and shown only as a link-out explanation, since it
   depends on the viewer's own HUB balance, not the tier system.
 

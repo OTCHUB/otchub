@@ -8345,7 +8345,7 @@
         "§A6.3 second flywheel — `[\"creator_fee\"]`. Created by the authority after `initialize_config`",
         "(same no-migration pattern as `OtcPotState`). `creator_fee_vault` (mint = `Config.otc_mint`,",
         "owner = `[\"pot\"]` PDA — same custody PDA as `otc_vault`) holds the treasury's pro-rata claim",
-        "on the OTC launcher's 70% holders-in-stock leg, deposited via `record_creator_fee`",
+        "on the OTC launcher's 67.5% holders-in-stock leg, deposited via `record_creator_fee`",
         "(`TransferChecked`, enforced). Once `pending_otc_units ≥ clear_threshold_units`,",
         "`clear_creator_fees` splits the whole pending balance 80/5/5/5/5 into five earmarks: the 80%",
         "desk-pot leg is injected into `OtcPotState` in the same instruction (no swap — it's already",

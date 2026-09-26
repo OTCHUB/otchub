@@ -103,7 +103,7 @@ export default function PotRoutingPanel({ latest }) {
         value={lastClosed?.per_desk_sol != null ? `${fmtSol(lastClosed.per_desk_sol, 3)}/desk` : "—"}
         href={scan(OTC_PROGRAM)} />
 
-      {/* launcher creator-fee split — 70/10/15/5 inside the per-minute claim tx */}
+      {/* launcher creator-fee split — 67.5/10/10/5/5/2.5 inside the per-minute claim tx */}
       <PotLauncherSplit launchpadSol={launchToday} />
 
       {/* pump.fun fee path — traced live on-chain 2026-09-07 */}
@@ -134,7 +134,7 @@ export default function PotRoutingPanel({ latest }) {
         </div>
         <p className="mt-1 leading-snug text-green-500/50">
           Green routes land directly in the pot. The launcher 10% desk share arrives inside
-          per-minute creator-fee claim transactions (pump.fun claim + stock buy + 4-way split,
+          per-minute creator-fee claim transactions (pump.fun claim + stock buy + 6-way split,
           verified on-chain 2026-09-09: pot inflows every minute, 0.0002–0.003 SOL each) — it never
           sits in a per-coin vault, which is why the earlier vault trace misread the route as broken.
           Day totals track launcher trading volume, so they vary. pump.fun still keeps its own

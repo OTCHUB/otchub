@@ -1,18 +1,21 @@
 import React from "react";
 import { fmtSol } from "@/lib/format";
 
-// Launcher creator-fee split, per otcdesks.cash/docs: every coin launched from
-// the launcher assigns its pump.fun creator fees to the protocol permanently
-// at launch (pump.fun gives up its own ability to change the split). Every
-// minute the protocol claims what the coin earned and splits it inside the
-// SAME transaction — nothing is ever parked waiting to be divided. Verified
-// on-chain 2026-09-09: pot inflows land at ~1/min in txs bundling the
-// pump.fun claim, the pump-AMM stock buy and the 4-way split.
+// Launcher creator-fee split, per otcdesks.cash/docs (updated split, confirmed
+// on /docs "The numbers" table and the live /launcher summary): every coin
+// launched from the launcher assigns its pump.fun creator fees to the
+// protocol permanently at launch (pump.fun gives up its own ability to change
+// the split). Every minute the protocol claims what the coin earned and
+// splits it inside the SAME transaction — nothing is ever parked waiting to
+// be divided. Pot inflows land at ~1/min in txs bundling the pump.fun claim,
+// the pump-AMM stock buy and the 6-way split below.
 const SHARES = [
-  { pct: "70%", to: "Holders", tone: "text-emerald-300", note: "Buys the coin's chosen stock · sent pro-rata to holders · nothing to claim" },
+  { pct: "67.5%", to: "Holders", tone: "text-emerald-300", note: "Buys the coin's chosen stock · sent pro-rata to holders · nothing to claim" },
   { pct: "10%", to: "Desk pot", tone: "text-cyan-300", note: "Buys stock for desks · lands in the pot every min" },
-  { pct: "15%", to: "Protocol", tone: "text-green-300", note: "Protocol share" },
-  { pct: "5%", to: "OTC buyback", tone: "text-amber-300", note: "Collects in a wallet · bought back by hand, no schedule" },
+  { pct: "10%", to: "OTC buyback", tone: "text-amber-300", note: "Buys OTC on the open market and burns it, in separate buy/burn txs" },
+  { pct: "5%", to: "Protocol", tone: "text-green-300", note: "Servers, database, APIs and infrastructure" },
+  { pct: "5%", to: "OTC holders", tone: "text-fuchsia-300", note: "Paid in SOL every 12h to anyone holding $20+ of OTC" },
+  { pct: "2.5%", to: "Account rent", tone: "text-green-500/70", note: "Opens the token accounts holders are paid into" },
 ];
 
 export default function PotLauncherSplit({ launchpadSol = 0 }) {
@@ -38,8 +41,8 @@ export default function PotLauncherSplit({ launchpadSol = 0 }) {
       <div className="mt-1 font-mono text-[10px] leading-snug text-green-500/50">
         Fee assignment is set at launch and permanent — nobody, including the protocol, can redirect it
         later. Holder payouts are pro-rata at the moment of paying; shares worth less than the
-        ~0.002 SOL account-open cost roll over to the next round. Verified on-chain: per-minute claim
-        txs bundle the pump.fun claim, the stock buy and the 4-way split.
+        ~0.002 SOL account-open cost roll over to the next round. Per-minute claim txs bundle the
+        pump.fun claim, the stock buy and the 6-way split above.
       </div>
     </div>
   );
