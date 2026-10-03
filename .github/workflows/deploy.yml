@@ -78,6 +78,19 @@ jobs:
           # Helius server-side so the browser never hits the public RPC directly.
           # Set this secret after deploying workers/solana-relay via wrangler.
           VITE_SOLANA_RELAY_URL=${{ secrets.VITE_SOLANA_RELAY_URL }}
+
+          # Supabase dashboard mirror (src/lib/dashboardFeed.js) — lets the
+          # browser read OTC price/pot/buyback/burn data directly from
+          # Supabase (anon, read-only key) instead of calling the Base44
+          # getOtcDashboard function on every page load / 60s poll. Without
+          # these, SUPABASE_URL/SUPABASE_ANON_KEY are empty at build time,
+          # dashboardFeed.js silently falls back to the Base44 function for
+          # EVERY request, and that function's stale-while-revalidate cache
+          # (base44/functions/getOtcDashboard/entry.ts) serves up to 30
+          # minutes of stale burn/buyback/pot numbers whenever a rebuild
+          # fails under Base44 entity-read quota pressure.
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
           EOF
 
       - name: Build
