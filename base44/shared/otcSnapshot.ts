@@ -377,6 +377,14 @@ export async function ingestOtcSnapshot(base44, { force = false } = {}) {
     protocol_distributed_sol: protocolDistributedSol,
     protocol_to_pot_sol: solOf(stats?.toPot),
     protocol_to_protocol_sol: solOf(stats?.toProtocol),
+    // Lifetime cumulative split of "earned" dedicated to buybacks — the
+    // "SOL deployed" / "OTC burned, all time" figures on otcdesks.cash's own
+    // /revenue page. Distinct from the two fields below, which are the
+    // CURRENT (un-swept) buyback wallet balance, not the lifetime total.
+    protocol_buyback_total_sol: solOf(stats?.toBuyback),
+    protocol_buyback_burned_total_otc: stats?.buybackBurned
+      ? stats.buybackBurned / Math.pow(10, OTC_DECIMALS)
+      : null,
     protocol_buyback_sol: solOf(stats?.buybackBalance),
     protocol_buyback_otc: buybackOtc,
     protocol_buyback_otc_value_sol:

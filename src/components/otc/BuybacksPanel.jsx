@@ -3,9 +3,17 @@ import { fmtSol, fmtNum } from "@/lib/format";
 
 export default function BuybacksPanel({ latest }) {
   // Cap the table at 20 rows so the panel never outgrows the ROUNDS chart.
+  // These are the most RECENT buyback transactions only — otcdesks.cash's
+  // own feed does not return the full lifetime list, so this table is a
+  // recent-activity log, not a complete history.
   const buybacks = (latest?.buybacks?.items || []).slice(0, 20);
-  const totalSol = buybacks.reduce((a, b) => a + (b.sol || 0), 0);
-  const totalOtc = buybacks.reduce((a, b) => a + (b.otc || 0), 0);
+  // LIFETIME totals come from the protocol's own cumulative counters
+  // (toBuyback / buybackBurned on otcdesks.cash's /api/stats — the exact
+  // "SOL deployed" / "OTC burned, all time" figures shown on its /revenue
+  // page), NOT a sum of the itemized log above, which only covers recent
+  // activity and would understate the all-time total.
+  const totalSol = latest?.protocol_buyback_total_sol;
+  const totalOtc = latest?.protocol_buyback_burned_total_otc;
 
   return (
     <div className="flex h-full flex-col border border-green-500/30 bg-black p-3">
@@ -13,12 +21,12 @@ export default function BuybacksPanel({ latest }) {
         BUYBACKS :: TREASURY
       </div>
       <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
-        <div className="border border-green-500/20 p-2">
-          <div className="text-[11px] uppercase text-green-500/50">SOL_BUYBACK</div>
+        <div className="border border-green-500/20 p-2" title="SOL deployed into buybacks, all time">
+          <div className="text-[11px] uppercase text-green-500/50">SOL_DEPLOYED_ALL_TIME</div>
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtSol(totalSol, 3)}</div>
         </div>
-        <div className="border border-green-500/20 p-2">
-          <div className="text-[11px] uppercase text-green-500/50">OTC_BURNED</div>
+        <div className="border border-green-500/20 p-2" title="OTC burned by buybacks, all time">
+          <div className="text-[11px] uppercase text-green-500/50">OTC_BURNED_ALL_TIME</div>
           <div className="mt-1 font-mono text-sm font-bold text-emerald-400">{fmtNum(totalOtc)}</div>
         </div>
       </div>
@@ -47,6 +55,7 @@ export default function BuybacksPanel({ latest }) {
           </tbody>
         </table>
       </div>
+      <div className="mt-1 shrink-0 text-[10px] uppercase text-green-500/40">Recent activity shown · totals above are lifetime</div>
     </div>
   );
 }

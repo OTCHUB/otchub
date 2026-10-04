@@ -54,9 +54,14 @@ export default function ProtocolPanel({ latest }) {
         </div>
       </Section>
 
-      <Section title="BUYBACK TREASURY">
-        <Row label="BUYBACK_SOL" value={fmtSol(latest?.protocol_buyback_sol)} desc="SOL in buyback treasury" />
-        <Row label="BUYBACK_OTC" value={`${fmtNum(latest?.protocol_buyback_otc)} OTC`} desc="OTC held in buyback treasury" />
+      <Section title="BUYBACK :: ALL TIME">
+        <Row label="SOL_DEPLOYED" value={fmtSol(latest?.protocol_buyback_total_sol)} desc="Lifetime SOL deployed into buybacks (otcdesks.cash: SOL deployed)" />
+        <Row label="OTC_BURNED" value={`${fmtNum(latest?.protocol_buyback_burned_total_otc)} OTC`} desc="Lifetime OTC destroyed by buybacks (otcdesks.cash: OTC burned, all time)" />
+      </Section>
+
+      <Section title="BUYBACK TREASURY (UNSWEPT)">
+        <Row label="BUYBACK_SOL" value={fmtSol(latest?.protocol_buyback_sol)} desc="SOL currently sitting in the buyback wallet, not yet swept" />
+        <Row label="BUYBACK_OTC" value={`${fmtNum(latest?.protocol_buyback_otc)} OTC`} desc="OTC currently held in the buyback wallet" />
         <Row label="OTC_VALUE_SOL" value={fmtSol(latest?.protocol_buyback_otc_value_sol, 4)} desc="Treasury OTC valued in SOL" />
         <Row label="OTC_VALUE_USD" value={fmtUsd(latest?.protocol_buyback_otc_value_usd)} desc="Treasury OTC valued in USD" />
       </Section>
