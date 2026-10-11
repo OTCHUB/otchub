@@ -281,9 +281,21 @@ function buildClaimSafetyAssertIx(userPk, userStock) {
   });
 }
 
-// Pack instructions into transactions by serialized message size (legacy tx
-// limit ~1232 bytes). Each tx gets a compute-budget instruction up front.
-const MAX_MSG_BYTES = 1000;
+// Pack instructions into transactions by serialized message size. Solana's
+// hard packet limit is 1232 bytes total; with exactly one required signature
+// (the fee payer — every PDA here is a non-signer) that leaves a real message
+// ceiling of 1232 - 65 (1 sig-count byte + 64-byte signature) = 1167 bytes.
+// A [claim, Lighthouse-assert] pair costs a fixed 171 bytes once the shared
+// desk/program accounts (config, config_ext, vault, vault_ext, token program,
+// ATA program, system program, user) are already in the tx — verified by
+// measuring real serialized claim+assert pairs for 1..5 tickers. That makes 4
+// pairs (1125 bytes) the most a single legacy tx can ever hold (a 5th jumps to
+// 1296, already past the hard ceiling), so 1140 is set just above the 4-pair
+// size with 27 bytes of real headroom below 1167 — enough to pack 4 stocks per
+// tx (matching the official OTC portal's batching) while still provably
+// impossible to exceed Solana's limit. Each tx also gets a compute-budget
+// instruction pair up front.
+const MAX_MSG_BYTES = 1140;
 
 async function packTxs(ixs, user, microLamports = FEE_FLOOR_UL) {
   const bh = await relay("blockhash");
@@ -331,8 +343,9 @@ async function packTxs(ixs, user, microLamports = FEE_FLOOR_UL) {
         // target on their own. There is nothing left to split off, so add
         // them back onto this same fresh tx instead of silently dropping
         // them: a tx a little over the soft target (which still leaves
-        // ~230 bytes of margin below Solana's hard 1232-byte packet limit)
-        // is always better than losing a claim instruction entirely.
+        // real margin below Solana's hard 1167-byte message ceiling — see
+        // the MAX_MSG_BYTES comment above) is always better than losing a
+        // claim instruction entirely.
         for (const c of carry) cur.add(c);
       }
     }
